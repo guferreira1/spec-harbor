@@ -1,0 +1,11 @@
+package generator
+
+type GenerationMode string
+
+const (
+	BlankMode GenerationMode = "blank"
+	GuidedMode GenerationMode = "guided"
+	TemplateMode GenerationMode = "template"
+	AIAssistedMode GenerationMode = "ai-assisted"
+	HybridMode GenerationMode = "hybrid"
+)
