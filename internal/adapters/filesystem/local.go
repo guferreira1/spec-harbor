@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -35,8 +36,40 @@ func (fileSystem *LocalFileSystem) FileExists(root string, relativePath string) 
 	return !info.IsDir(), nil
 }
 
+func (fileSystem *LocalFileSystem) PathExists(root string, relativePath string) (bool, error) {
+	_, err := os.Stat(fileSystem.fullPath(root, relativePath))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 func (fileSystem *LocalFileSystem) CreateDirectory(root string, relativePath string) error {
 	return os.MkdirAll(fileSystem.fullPath(root, relativePath), 0o755)
+}
+
+func (fileSystem *LocalFileSystem) MoveDirectory(root string, sourceRelativePath string, destinationRelativePath string) error {
+	sourcePath := fileSystem.fullPath(root, sourceRelativePath)
+	destinationPath := fileSystem.fullPath(root, destinationRelativePath)
+
+	sourceInfo, err := os.Stat(sourcePath)
+	if err != nil {
+		return err
+	}
+	if !sourceInfo.IsDir() {
+		return fmt.Errorf("source path is not a directory: %s", sourceRelativePath)
+	}
+
+	if _, err := os.Stat(destinationPath); err == nil {
+		return fmt.Errorf("destination path already exists: %s", destinationRelativePath)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	return os.Rename(sourcePath, destinationPath)
 }
 
 func (fileSystem *LocalFileSystem) WriteFileIfAbsent(root string, relativePath string, contents string) (bool, error) {

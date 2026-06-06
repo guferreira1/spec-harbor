@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/guferreira1/spec-harbor/internal/adapters/filesystem"
 	"github.com/guferreira1/spec-harbor/internal/adapters/templates"
@@ -60,7 +61,7 @@ func commandRegistry() map[string]CommandHandler {
 		"prompt":   promptCommand,
 		"validate": validateCommand,
 		"review":   notImplementedCommand("review"),
-		"archive":  notImplementedCommand("archive"),
+		"archive":  archiveCommand,
 		"config":   notImplementedCommand("config"),
 
 		"help":   helpCommand,
@@ -351,6 +352,83 @@ func printValidationReport(output io.Writer, result domain.ValidationResult) {
 	for _, finding := range result.Findings {
 		fmt.Fprintf(output, "- [%s] %s: %s\n", finding.Severity, finding.Code, finding.Message)
 	}
+}
+
+type archiveArguments struct {
+	changeID string
+}
+
+func archiveCommand(ctx CommandContext) error {
+	arguments, err := parseArchiveArguments(ctx.Args)
+	if err != nil {
+		return err
+	}
+
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	fileSystem := filesystem.NewLocalFileSystem()
+	archiveChange := usecase.NewArchiveChange(fileSystem)
+
+	result, err := archiveChange.Execute(usecase.ArchiveChangeInput{
+		ProjectRoot: root,
+		ChangeID:    arguments.changeID,
+		ArchiveDate: currentLocalArchiveDate(),
+	})
+	if err != nil {
+		return err
+	}
+
+	printArchiveReport(ctx.Output, result)
+	return nil
+}
+
+func parseArchiveArguments(args []string) (archiveArguments, error) {
+	var positionals []string
+
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			return archiveArguments{}, fmt.Errorf("unsupported flag: %s", arg)
+		}
+
+		positionals = append(positionals, arg)
+	}
+
+	if len(positionals) == 0 {
+		return archiveArguments{}, fmt.Errorf("change id is required")
+	}
+	if len(positionals) > 1 {
+		return archiveArguments{}, fmt.Errorf("unexpected argument: %s", positionals[1])
+	}
+
+	return archiveArguments{changeID: positionals[0]}, nil
+}
+
+func currentLocalArchiveDate() string {
+	return formatLocalArchiveDate(time.Now())
+}
+
+func formatLocalArchiveDate(now time.Time) string {
+	return now.Local().Format("2006-01-02")
+}
+
+func printArchiveReport(output io.Writer, result domain.ArchiveResult) {
+	moved := "no"
+	if result.Moved() {
+		moved = "yes"
+	}
+
+	fmt.Fprintln(output, "SpecHarbor change archived.")
+	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
+	fmt.Fprintf(output, "Source: %s\n", result.SourcePath)
+	fmt.Fprintf(output, "Archive: %s\n", result.ArchivePath)
+	fmt.Fprintf(output, "Archive date: %s\n", result.ArchiveDate)
+	fmt.Fprintf(output, "Moved: %s\n", moved)
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Moved directory:")
+	fmt.Fprintf(output, "- %s -> %s\n", result.MovedDirectory.SourcePath, result.MovedDirectory.ArchivePath)
 }
 
 func helpCommand(ctx CommandContext) error {
