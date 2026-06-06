@@ -2,7 +2,7 @@
 
 ## Problem
 
-SpecHarbor has an architecture specification that defines Hexagonal Architecture as the target structure, but the current Go packages still use early-stage feature-oriented locations:
+SpecHarbor has an architecture specification that defines Hexagonal Architecture as the target structure, but the project started with early-stage feature-oriented package locations:
 
 - `internal/ai`
 - `internal/cli`
@@ -15,7 +15,7 @@ As new spec authoring modes, validators, AI providers, coding agent targets, wor
 
 ## Goal
 
-Plan an incremental migration from the current package structure toward the target Hexagonal Architecture:
+Implement the first narrow migration slice from the early package structure toward the target Hexagonal Architecture:
 
 - `internal/core/domain`
 - `internal/core/ports`
@@ -23,44 +23,51 @@ Plan an incremental migration from the current package structure toward the targ
 - `internal/adapters`
 - `internal/platform`
 
-The migration should preserve the current behavior while establishing package boundaries that match the architecture specification.
+This change reorganizes existing packages where their current contents already have a clear architectural home. It preserves current CLI behavior, updates package declarations and imports, and avoids introducing new behavior or placeholder abstractions.
 
 ## Scope
 
-- Define how current packages should migrate to the target structure.
-- Define the intended responsibilities of each target package group.
-- Define an incremental migration sequence for future implementation.
-- Keep CLI behavior thin and free of business rules.
-- Preserve separation between AI providers, agent targets, and workflow connectors.
-- Keep this change limited to OpenSpec planning artifacts.
+- Move existing pure value definitions from `internal/scanner`, `internal/generator`, `internal/prompt`, and `internal/ai` into `internal/core/domain`.
+- Move version metadata from `internal/version` into `internal/platform/version`.
+- Move the CLI delivery package from `internal/cli` into `internal/adapters/cli`.
+- Update package declarations for moved files.
+- Update imports that reference moved packages.
+- Preserve existing CLI behavior for `help`, `version`, placeholder commands, and unknown commands.
+- Keep the change limited to package reorganization, package declaration updates, and import updates.
+- Preserve separation between AI providers, agent targets, and workflow connectors without adding new implementations.
 
 ## Out of Scope
 
-- Implementing Go code.
-- Moving Go files.
-- Renaming packages.
-- Changing command behavior.
+- Adding new CLI commands or command behavior.
 - Adding provider, agent, workflow, scanner, validator, or template implementations.
+- Adding OpenSpec file operations or config storage.
+- Adding `internal/core/ports` interfaces before use cases need them.
+- Adding `internal/core/usecase` orchestration while commands only provide CLI parsing and placeholder output.
+- Adding placeholder abstractions, compatibility wrappers, or empty packages only to satisfy the target architecture.
 - Adding architecture enforcement tooling.
 
-## Target Direction
+## Implemented Reorganization
 
-Current packages should migrate as follows:
+This change implements the following package moves:
 
 | Current location | Target location | Migration intent |
 | --- | --- | --- |
 | `cmd/specharbor` | `cmd/specharbor` | Remain the executable entrypoint and perform only process-level bootstrapping. |
-| `internal/cli` | `internal/adapters/cli` | Become the CLI adapter responsible for command parsing, terminal output, and invoking use cases. |
-| `internal/scanner` | `internal/core/domain`, `internal/core/ports`, `internal/core/usecase`, `internal/adapters/scanner` | Move project context concepts into domain, scanner contracts into ports, scan orchestration into use cases, and concrete detection into scanner adapters. |
-| `internal/generator` | `internal/core/domain`, `internal/core/ports`, `internal/core/usecase`, `internal/adapters/specauthor`, `internal/adapters/templates` | Move generation or authoring modes into domain, generation contracts into ports, orchestration into use cases, and concrete authoring strategies into adapters. |
-| `internal/prompt` | `internal/core/domain`, `internal/core/ports`, `internal/core/usecase`, `internal/adapters/prompt` | Move agent target concepts into domain, prompt generator contracts into ports, prompt orchestration into use cases, and concrete agent prompt renderers into adapters. |
-| `internal/ai` | `internal/core/domain`, `internal/core/ports`, `internal/adapters/ai` | Move provider identity concepts into domain, provider contracts into ports, and provider-specific API integrations into AI adapters. |
+| `internal/cli` | `internal/adapters/cli` | Become the CLI adapter responsible for command parsing, terminal output, and invoking future use cases. |
+| `internal/scanner/project.go` | `internal/core/domain/project_context.go` | Move `ProjectContext` into the domain as a pure project context value. |
+| `internal/generator/mode.go` | `internal/core/domain/generation_mode.go` | Move `GenerationMode` and its existing constants into the domain. |
+| `internal/prompt/agent.go` | `internal/core/domain/agent.go` | Move `Agent` and its existing constants into the domain. |
+| `internal/ai/provider.go` | `internal/core/domain/ai_provider.go` | Move `Provider` and its existing constants into the domain. |
 | `internal/version` | `internal/platform/version` | Treat version metadata as platform-level technical information used by adapters and bootstrapping code. |
+
+This change does not introduce `internal/core/ports`, `internal/core/usecase`, scanner adapters, spec author adapters, prompt adapters beyond the existing CLI delivery package, or AI adapters. Those packages should be added only when concrete behavior requires them.
 
 ## Success Criteria
 
-- The migration plan clearly maps each existing package to the target architecture.
-- The plan keeps core packages independent from adapters, CLI, terminal IO, file system access, provider SDKs, and external APIs.
-- Future implementation can be completed incrementally without a large one-step rewrite.
+- The package reorganization maps each moved file to the target architecture responsibility described above.
+- Package declarations and imports are updated for all moved files.
+- Existing CLI behavior is preserved.
+- The core domain remains independent from adapters, CLI, terminal IO, file system access, provider SDKs, and external APIs.
 - Agent-assisted authoring remains a no-API-key workflow.
-- The change does not modify Go code or move files.
+- The change does not add new behavior, new providers, new agents, new scanners, new validators, new templates, new workflow connectors, or OpenSpec file operations.
+- The change does not add placeholder ports, use cases, adapters, wrappers, or empty packages.

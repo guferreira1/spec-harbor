@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/guferreira1/spec-harbor/internal/version"
+	"github.com/guferreira1/spec-harbor/internal/platform/version"
 )
 
 func Execute(args []string) error {
