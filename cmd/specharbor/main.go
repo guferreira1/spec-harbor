@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/guferreira1/spec-harbor/internal/cli"
+	"github.com/guferreira1/spec-harbor/internal/adapters/cli"
 )
 
 func main() {
