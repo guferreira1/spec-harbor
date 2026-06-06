@@ -102,7 +102,7 @@ func TestExecuteInitPartialProject(t *testing.T) {
 }
 
 func TestExecutePromptPrintsRenderedPromptOnly(t *testing.T) {
-	t.Chdir(findProjectRoot(t))
+	t.Chdir(t.TempDir())
 
 	var output bytes.Buffer
 	if err := execute([]string{"prompt", "implement-prompt-command", "--role", "implementer"}, &output); err != nil {
@@ -214,27 +214,5 @@ func assertPathExists(t *testing.T, root string, relativePath string) {
 
 	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(relativePath))); err != nil {
 		t.Fatalf("expected %q to exist: %v", relativePath, err)
-	}
-}
-
-func findProjectRoot(t *testing.T) string {
-	t.Helper()
-
-	root, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd() error = %v", err)
-	}
-
-	for {
-		templatePath := filepath.Join(root, "agent-prompts", "roles", "implementer.md.tmpl")
-		if _, err := os.Stat(templatePath); err == nil {
-			return root
-		}
-
-		parent := filepath.Dir(root)
-		if parent == root {
-			t.Fatalf("could not find project root from %s", root)
-		}
-		root = parent
 	}
 }
