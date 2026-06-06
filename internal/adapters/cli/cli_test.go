@@ -2,11 +2,13 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/guferreira1/spec-harbor/internal/core/domain"
 	"github.com/guferreira1/spec-harbor/internal/platform/version"
 )
 
@@ -182,6 +184,143 @@ func TestExecutePromptRejectsInvalidArguments(t *testing.T) {
 	}
 }
 
+func TestExecuteValidatePrintsValidReport(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	createOpenSpecChange(t, root, "implement-validation-foundation", domain.RequiredOpenSpecChangeFiles())
+
+	var output bytes.Buffer
+	if err := execute([]string{"validate", "implement-validation-foundation"}, &output); err != nil {
+		t.Fatalf("execute(validate) error = %v", err)
+	}
+
+	want := `SpecHarbor change is valid.
+Change: implement-validation-foundation
+Checked path: openspec/changes/implement-validation-foundation
+Required files: 5
+Findings: 0
+`
+	if output.String() != want {
+		t.Fatalf("validate output = %q, want %q", output.String(), want)
+	}
+}
+
+func TestExecuteValidatePrintsInvalidReportForMissingRequiredFiles(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	createOpenSpecChange(t, root, "implement-validation-foundation", []string{
+		"design.md",
+		"tasks.md",
+		"acceptance-criteria.md",
+	})
+
+	var output bytes.Buffer
+	err := execute([]string{"validate", "implement-validation-foundation"}, &output)
+	assertExitCode(t, err, 1)
+
+	validateOutput := output.String()
+	for _, want := range []string{
+		"SpecHarbor change is invalid.",
+		"Change: implement-validation-foundation",
+		"Checked path: openspec/changes/implement-validation-foundation",
+		"Findings:",
+		"- [error] required_file_missing: Missing required file: proposal.md",
+		"- [error] required_file_missing: Missing required file: risks.md",
+	} {
+		if !strings.Contains(validateOutput, want) {
+			t.Fatalf("validate output = %q, want to contain %q", validateOutput, want)
+		}
+	}
+}
+
+func TestExecuteValidatePrintsInvalidReportForMissingChangeDirectory(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+
+	var output bytes.Buffer
+	err := execute([]string{"validate", "missing-change"}, &output)
+	assertExitCode(t, err, 1)
+
+	validateOutput := output.String()
+	for _, want := range []string{
+		"SpecHarbor change is invalid.",
+		"Change: missing-change",
+		"Checked path: openspec/changes/missing-change",
+		"- [error] change_directory_missing: Missing change directory: openspec/changes/missing-change",
+	} {
+		if !strings.Contains(validateOutput, want) {
+			t.Fatalf("validate output = %q, want to contain %q", validateOutput, want)
+		}
+	}
+}
+
+func TestExecuteValidatePrintsInvalidReportForMissingOpenSpecProjectStructure(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	var output bytes.Buffer
+	err := execute([]string{"validate", "change"}, &output)
+	assertExitCode(t, err, 1)
+
+	validateOutput := output.String()
+	for _, want := range []string{
+		"SpecHarbor change is invalid.",
+		"Change: change",
+		"Checked path: openspec/changes/change",
+		"- [error] project_root_unavailable: OpenSpec project structure is unavailable.",
+	} {
+		if !strings.Contains(validateOutput, want) {
+			t.Fatalf("validate output = %q, want to contain %q", validateOutput, want)
+		}
+	}
+	if strings.Contains(validateOutput, "change_directory_missing") {
+		t.Fatalf("validate output = %q, want no change directory finding when project structure is unavailable", validateOutput)
+	}
+}
+
+func TestExecuteValidateRejectsInvalidArguments(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "missing change id",
+			args: []string{"validate"},
+			want: "change id is required",
+		},
+		{
+			name: "unsupported flag",
+			args: []string{"validate", "--format", "json"},
+			want: "unsupported flag: --format",
+		},
+		{
+			name: "extra argument",
+			args: []string{"validate", "change", "extra"},
+			want: "unexpected argument: extra",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var output bytes.Buffer
+			err := execute(test.args, &output)
+			if err == nil {
+				t.Fatalf("execute(%v) error = nil, want %q", test.args, test.want)
+			}
+			if !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("execute(%v) error = %q, want %q", test.args, err.Error(), test.want)
+			}
+			if output.String() != "" {
+				t.Fatalf("execute(%v) output = %q, want empty output", test.args, output.String())
+			}
+		})
+	}
+}
+
 func TestExecutePreservesHelpVersionAndUnknownCommandBehavior(t *testing.T) {
 	var output bytes.Buffer
 	if err := execute([]string{"help"}, &output); err != nil {
@@ -206,6 +345,47 @@ func TestExecutePreservesHelpVersionAndUnknownCommandBehavior(t *testing.T) {
 	}
 	if err.Error() != "unknown command: missing" {
 		t.Fatalf("unknown command error = %q, want %q", err.Error(), "unknown command: missing")
+	}
+}
+
+func assertExitCode(t *testing.T, err error, code int) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatalf("execute() error = nil, want exit code %d", code)
+	}
+
+	var exitError ExitError
+	if !errors.As(err, &exitError) {
+		t.Fatalf("execute() error = %T %v, want ExitError", err, err)
+	}
+	if exitError.Code != code {
+		t.Fatalf("exit code = %d, want %d", exitError.Code, code)
+	}
+}
+
+func createOpenSpecProject(t *testing.T, root string) {
+	t.Helper()
+
+	if err := os.MkdirAll(filepath.Join(root, "openspec", "changes"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "openspec", "project.md"), []byte("project"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+}
+
+func createOpenSpecChange(t *testing.T, root string, changeID string, files []string) {
+	t.Helper()
+
+	changeDirectory := filepath.Join(root, "openspec", "changes", changeID)
+	if err := os.MkdirAll(changeDirectory, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	for _, file := range files {
+		if err := os.WriteFile(filepath.Join(changeDirectory, file), []byte(file), 0o644); err != nil {
+			t.Fatalf("WriteFile() error = %v", err)
+		}
 	}
 }
 

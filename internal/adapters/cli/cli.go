@@ -8,6 +8,7 @@ import (
 
 	"github.com/guferreira1/spec-harbor/internal/adapters/filesystem"
 	"github.com/guferreira1/spec-harbor/internal/adapters/templates"
+	"github.com/guferreira1/spec-harbor/internal/core/domain"
 	"github.com/guferreira1/spec-harbor/internal/core/usecase"
 	"github.com/guferreira1/spec-harbor/internal/platform/version"
 )
@@ -18,6 +19,14 @@ type CommandContext struct {
 }
 
 type CommandHandler func(ctx CommandContext) error
+
+type ExitError struct {
+	Code int
+}
+
+func (err ExitError) Error() string {
+	return fmt.Sprintf("exit status %d", err.Code)
+}
 
 func Execute(args []string) error {
 	return execute(args, os.Stdout)
@@ -49,7 +58,7 @@ func commandRegistry() map[string]CommandHandler {
 		"scan":     notImplementedCommand("scan"),
 		"generate": generateCommand,
 		"prompt":   promptCommand,
-		"validate": notImplementedCommand("validate"),
+		"validate": validateCommand,
 		"review":   notImplementedCommand("review"),
 		"archive":  notImplementedCommand("archive"),
 		"config":   notImplementedCommand("config"),
@@ -175,6 +184,81 @@ func parsePromptArguments(args []string) (promptArguments, error) {
 		changeID: positionals[0],
 		role:     role,
 	}, nil
+}
+
+type validateArguments struct {
+	changeID string
+}
+
+func validateCommand(ctx CommandContext) error {
+	arguments, err := parseValidateArguments(ctx.Args)
+	if err != nil {
+		return err
+	}
+
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	fileSystem := filesystem.NewLocalFileSystem()
+	validateChange := usecase.NewValidateChange(fileSystem)
+
+	result, err := validateChange.Execute(usecase.ValidateChangeInput{
+		ProjectRoot: root,
+		ChangeID:    arguments.changeID,
+	})
+	if err != nil {
+		return err
+	}
+
+	printValidationReport(ctx.Output, result)
+	if result.Status == domain.ValidationStatusInvalid {
+		return ExitError{Code: 1}
+	}
+
+	return nil
+}
+
+func parseValidateArguments(args []string) (validateArguments, error) {
+	var positionals []string
+
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			return validateArguments{}, fmt.Errorf("unsupported flag: %s", arg)
+		}
+
+		positionals = append(positionals, arg)
+	}
+
+	if len(positionals) == 0 {
+		return validateArguments{}, fmt.Errorf("change id is required")
+	}
+	if len(positionals) > 1 {
+		return validateArguments{}, fmt.Errorf("unexpected argument: %s", positionals[1])
+	}
+
+	return validateArguments{changeID: positionals[0]}, nil
+}
+
+func printValidationReport(output io.Writer, result domain.ValidationResult) {
+	if result.Status == domain.ValidationStatusValid {
+		fmt.Fprintln(output, "SpecHarbor change is valid.")
+		fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
+		fmt.Fprintf(output, "Checked path: %s\n", result.CheckedPath)
+		fmt.Fprintf(output, "Required files: %d\n", len(result.RequiredFiles))
+		fmt.Fprintf(output, "Findings: %d\n", len(result.Findings))
+		return
+	}
+
+	fmt.Fprintln(output, "SpecHarbor change is invalid.")
+	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
+	fmt.Fprintf(output, "Checked path: %s\n", result.CheckedPath)
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Findings:")
+	for _, finding := range result.Findings {
+		fmt.Fprintf(output, "- [%s] %s: %s\n", finding.Severity, finding.Code, finding.Message)
+	}
 }
 
 func helpCommand(ctx CommandContext) error {
