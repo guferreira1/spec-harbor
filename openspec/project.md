@@ -33,10 +33,10 @@ The project helps developers convert a loose idea into:
 
 ## Architecture boundaries
 
-- CLI routing belongs in `internal/cli`.
-- Project scanning belongs in `internal/scanner`.
-- Spec generation belongs in `internal/generator`.
-- Agent prompt rendering belongs in `internal/prompt`.
-- Spec validation belongs in `internal/validator`.
-- Provider integration belongs in `internal/ai`.
-- OpenSpec file operations belong in `internal/openspec`.
+- Domain concepts and value objects belong in `internal/core/domain`.
+- Ports consumed by use cases belong in `internal/core/ports`.
+- Application orchestration belongs in `internal/core/usecase`.
+- Concrete delivery mechanisms, providers, scanners, prompts, validators, templates, workflow connectors, and config implementations belong in `internal/adapters`.
+- Minimal cross-cutting technical helpers belong in `internal/platform`.
+
+Current packages may evolve gradually through focused OpenSpec changes. Avoid placeholder packages or abstractions until concrete behavior needs them.
