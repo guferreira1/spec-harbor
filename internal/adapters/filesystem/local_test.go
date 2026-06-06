@@ -9,6 +9,7 @@ import (
 )
 
 var _ ports.ValidationFileSystem = (*LocalFileSystem)(nil)
+var _ ports.GenerationFileSystem = (*LocalFileSystem)(nil)
 
 func TestLocalFileSystemCreatesDirectoriesAndFiles(t *testing.T) {
 	root := t.TempDir()

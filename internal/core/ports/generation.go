@@ -1,0 +1,16 @@
+package ports
+
+// GenerationFileSystem provides only the filesystem operations required by
+// OpenSpec change generation.
+type GenerationFileSystem interface {
+	DirectoryExists(root string, relativePath string) (bool, error)
+	FileExists(root string, relativePath string) (bool, error)
+	CreateDirectory(root string, relativePath string) error
+	WriteFileIfAbsent(root string, relativePath string, contents string) (bool, error)
+}
+
+// BlankChangeContent provides deterministic starter content for blank
+// OpenSpec change files.
+type BlankChangeContent interface {
+	ContentFor(relativePath string) (string, error)
+}
