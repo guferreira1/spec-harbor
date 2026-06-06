@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/guferreira1/spec-harbor/internal/core/domain"
 	"github.com/guferreira1/spec-harbor/internal/platform/version"
@@ -567,8 +568,169 @@ func TestExecuteValidateRejectsInvalidArguments(t *testing.T) {
 	}
 }
 
+func TestExecuteArchivePrintsSuccessReport(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	createOpenSpecChange(t, root, "implement-archive-foundation", domain.RequiredOpenSpecChangeFiles())
+
+	var output bytes.Buffer
+	if err := execute([]string{"archive", "implement-archive-foundation"}, &output); err != nil {
+		t.Fatalf("execute(archive) error = %v", err)
+	}
+
+	archiveDate := currentLocalArchiveDate()
+	want := `SpecHarbor change archived.
+Change: implement-archive-foundation
+Source: openspec/changes/implement-archive-foundation
+Archive: openspec/archive/` + archiveDate + `/implement-archive-foundation
+Archive date: ` + archiveDate + `
+Moved: yes
+
+Moved directory:
+- openspec/changes/implement-archive-foundation -> openspec/archive/` + archiveDate + `/implement-archive-foundation
+`
+	if output.String() != want {
+		t.Fatalf("archive output = %q, want %q", output.String(), want)
+	}
+
+	assertPathDoesNotExist(t, root, "openspec/changes/implement-archive-foundation")
+	assertPathExists(t, root, "openspec/archive/"+archiveDate+"/implement-archive-foundation")
+}
+
+func TestFormatLocalArchiveDate(t *testing.T) {
+	location := time.FixedZone("UTC-3", -3*60*60)
+	now := time.Date(2026, 6, 6, 23, 59, 0, 0, location)
+
+	if got := formatLocalArchiveDate(now); got != "2026-06-06" {
+		t.Fatalf("formatLocalArchiveDate() = %q, want 2026-06-06", got)
+	}
+}
+
+func TestExecuteArchiveRejectsInvalidArguments(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "missing change id",
+			args: []string{"archive"},
+			want: "change id is required",
+		},
+		{
+			name: "unsupported force flag",
+			args: []string{"archive", "change", "--force"},
+			want: "unsupported flag: --force",
+		},
+		{
+			name: "unsupported date flag",
+			args: []string{"archive", "change", "--date", "2026-06-06"},
+			want: "unsupported flag: --date",
+		},
+		{
+			name: "unsupported dry run flag",
+			args: []string{"archive", "change", "--dry-run"},
+			want: "unsupported flag: --dry-run",
+		},
+		{
+			name: "unsupported metadata flag",
+			args: []string{"archive", "change", "--metadata"},
+			want: "unsupported flag: --metadata",
+		},
+		{
+			name: "unsupported summary flag",
+			args: []string{"archive", "change", "--summary"},
+			want: "unsupported flag: --summary",
+		},
+		{
+			name: "unsupported github flag",
+			args: []string{"archive", "change", "--github"},
+			want: "unsupported flag: --github",
+		},
+		{
+			name: "unsupported gitlab flag",
+			args: []string{"archive", "change", "--gitlab"},
+			want: "unsupported flag: --gitlab",
+		},
+		{
+			name: "extra argument",
+			args: []string{"archive", "change", "extra"},
+			want: "unexpected argument: extra",
+		},
+		{
+			name: "unsafe traversal change id",
+			args: []string{"archive", "../unsafe"},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe absolute change id",
+			args: []string{"archive", "/unsafe"},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe slash change id",
+			args: []string{"archive", "bad/id"},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe backslash change id",
+			args: []string{"archive", `bad\id`},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe colon change id",
+			args: []string{"archive", "bad:id"},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe dot change id",
+			args: []string{"archive", "."},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe dotdot change id",
+			args: []string{"archive", ".."},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "leading dash change id",
+			args: []string{"archive", "-bad-id"},
+			want: "unsupported flag: -bad-id",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+
+			var output bytes.Buffer
+			err := execute(test.args, &output)
+			if err == nil {
+				t.Fatalf("execute(%v) error = nil, want %q", test.args, test.want)
+			}
+			if !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("execute(%v) error = %q, want %q", test.args, err.Error(), test.want)
+			}
+			if output.String() != "" {
+				t.Fatalf("execute(%v) output = %q, want empty output", test.args, output.String())
+			}
+			assertPathDoesNotExist(t, root, "openspec/archive")
+		})
+	}
+}
+
 func TestExecutePreservesHelpVersionAndUnknownCommandBehavior(t *testing.T) {
 	var output bytes.Buffer
+	if err := execute(nil, &output); err != nil {
+		t.Fatalf("execute(no args) error = %v", err)
+	}
+	if !strings.Contains(output.String(), "Usage:") {
+		t.Fatalf("no-arg output = %q, want Usage", output.String())
+	}
+
+	output.Reset()
 	if err := execute([]string{"help"}, &output); err != nil {
 		t.Fatalf("execute(help) error = %v", err)
 	}
