@@ -21,6 +21,7 @@ The project helps developers convert a loose idea into:
 - Guided generation
 - Template generation
 - AI-assisted generation
+- Agent-assisted generation
 - Hybrid generation
 
 ## Technical stack
@@ -40,3 +41,13 @@ The project helps developers convert a loose idea into:
 - Minimal cross-cutting technical helpers belong in `internal/platform`.
 
 Current packages may evolve gradually through focused OpenSpec changes. Avoid placeholder packages or abstractions until concrete behavior needs them.
+
+## Agent rules
+
+Global and role-specific operating rules live under:
+
+```text
+.specharbor/rules/
+```
+
+Agent prompt templates should reference those rules instead of duplicating all operational instructions.
