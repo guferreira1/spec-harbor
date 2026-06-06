@@ -1,0 +1,28 @@
+project:
+  name: ""
+  default_language: en
+  default_generation_mode: guided
+
+openspec:
+  root: openspec
+  changes_dir: openspec/changes
+  specs_dir: openspec/specs
+
+agents:
+  default: codex
+  supported:
+    - codex
+    - claude-code
+    - cursor
+    - devin
+    - github-copilot
+    - gemini-cli
+    - roo-code
+    - windsurf
+    - aider
+    - generic
+
+ai:
+  provider: openai-compatible
+  model: ""
+  api_key_env: SPECHARBOR_AI_API_KEY

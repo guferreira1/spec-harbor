@@ -1,0 +1,22 @@
+# Acceptance Criteria: Implement Init Command
+
+- Running `specharbor init` from an empty directory exits successfully.
+- The command creates `openspec/project.md`.
+- The command creates `openspec/specs/`.
+- The command creates `openspec/changes/`.
+- The command creates `.specharbor/config.yml`.
+- The command creates `.specharbor/rules/`.
+- The command creates default rule files for global, spec author, implementer, architecture reviewer, test engineer, and change reviewer roles.
+- Generated configuration does not contain real secrets, tokens, API keys, or provider credentials.
+- Existing files are not overwritten by default.
+- Running `specharbor init` a second time exits successfully and prints a clear already-initialized message.
+- Running `specharbor init` in a partially initialized project creates missing required items and preserves existing item contents.
+- The CLI output for initialization is concise and deterministic.
+- The initialization use case lives in `internal/core/usecase`.
+- Initialization ports live in `internal/core/ports`.
+- Concrete filesystem and template behavior lives in `internal/adapters`.
+- Core packages do not import adapters, CLI packages, `os`, terminal IO, network APIs, or provider SDKs.
+- `cmd/specharbor/main.go` remains limited to process bootstrapping.
+- Existing `help`, `version`, and unknown command behavior is preserved.
+- Focused tests cover empty, partial, and already-initialized initialization flows.
+- `go test ./...` succeeds.
