@@ -4,7 +4,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/guferreira1/spec-harbor/internal/core/ports"
 )
+
+var _ ports.ValidationFileSystem = (*LocalFileSystem)(nil)
 
 func TestLocalFileSystemCreatesDirectoriesAndFiles(t *testing.T) {
 	root := t.TempDir()
@@ -45,6 +49,14 @@ func TestLocalFileSystemCreatesDirectoriesAndFiles(t *testing.T) {
 	if string(contents) != "project" {
 		t.Fatalf("file contents = %q, want %q", string(contents), "project")
 	}
+
+	exists, err = fileSystem.FileExists(root, "openspec/project.md")
+	if err != nil {
+		t.Fatalf("FileExists() error = %v", err)
+	}
+	if !exists {
+		t.Fatalf("FileExists() = false, want true")
+	}
 }
 
 func TestLocalFileSystemDoesNotOverwriteExistingFiles(t *testing.T) {
@@ -73,5 +85,54 @@ func TestLocalFileSystemDoesNotOverwriteExistingFiles(t *testing.T) {
 	}
 	if string(contents) != "original" {
 		t.Fatalf("file contents = %q, want %q", string(contents), "original")
+	}
+}
+
+func TestLocalFileSystemDistinguishesMissingFilesAndDirectories(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+
+	fileExists, err := fileSystem.FileExists(root, "openspec/project.md")
+	if err != nil {
+		t.Fatalf("FileExists() error = %v", err)
+	}
+	if fileExists {
+		t.Fatalf("FileExists() = true, want false")
+	}
+
+	directoryExists, err := fileSystem.DirectoryExists(root, "openspec/changes")
+	if err != nil {
+		t.Fatalf("DirectoryExists() error = %v", err)
+	}
+	if directoryExists {
+		t.Fatalf("DirectoryExists() = true, want false")
+	}
+}
+
+func TestLocalFileSystemDistinguishesFilesFromDirectories(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+
+	if err := os.MkdirAll(filepath.Join(root, "openspec", "changes"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "openspec", "project.md"), []byte("project"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	fileExists, err := fileSystem.FileExists(root, "openspec/changes")
+	if err != nil {
+		t.Fatalf("FileExists() error = %v", err)
+	}
+	if fileExists {
+		t.Fatalf("FileExists() for directory = true, want false")
+	}
+
+	directoryExists, err := fileSystem.DirectoryExists(root, "openspec/project.md")
+	if err != nil {
+		t.Fatalf("DirectoryExists() error = %v", err)
+	}
+	if directoryExists {
+		t.Fatalf("DirectoryExists() for file = true, want false")
 	}
 }
