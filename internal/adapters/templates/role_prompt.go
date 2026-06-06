@@ -2,13 +2,16 @@ package templates
 
 import (
 	"bytes"
+	"embed"
 	"fmt"
-	"os"
-	"path/filepath"
+	"path"
 	"text/template"
 
 	"github.com/guferreira1/spec-harbor/internal/core/domain"
 )
+
+//go:embed role_prompts/*.md.tmpl
+var rolePromptFS embed.FS
 
 type RolePromptTemplates struct{}
 
@@ -17,10 +20,12 @@ func NewRolePromptTemplates() *RolePromptTemplates {
 }
 
 func (templates *RolePromptTemplates) TemplateForRole(projectRoot string, role domain.PromptRole) (string, error) {
-	templatePath := filepath.Join(projectRoot, "agent-prompts", "roles", string(role)+".md.tmpl")
-	contents, err := os.ReadFile(templatePath)
+	_ = projectRoot
+
+	templatePath := path.Join("role_prompts", string(role)+".md.tmpl")
+	contents, err := rolePromptFS.ReadFile(templatePath)
 	if err != nil {
-		return "", fmt.Errorf("read role prompt template %s: %w", role, err)
+		return "", fmt.Errorf("read embedded role prompt template %s: %w", role, err)
 	}
 	return string(contents), nil
 }
