@@ -33,4 +33,10 @@ func TestRequiredOpenSpecChangeFiles(t *testing.T) {
 			t.Fatalf("required file %d = %q, want %q", index, files[index], file)
 		}
 	}
+
+	files[0] = "mutated.md"
+	reloadedFiles := RequiredOpenSpecChangeFiles()
+	if reloadedFiles[0] != "proposal.md" {
+		t.Fatalf("RequiredOpenSpecChangeFiles() returned mutable policy, first file = %q", reloadedFiles[0])
+	}
 }

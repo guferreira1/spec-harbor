@@ -102,8 +102,100 @@ func initCommand(ctx CommandContext) error {
 }
 
 func generateCommand(ctx CommandContext) error {
-	fmt.Fprintf(ctx.Output, "specharbor generate: %s\n", strings.Join(ctx.Args, " "))
+	arguments, err := parseGenerateArguments(ctx.Args)
+	if err != nil {
+		return err
+	}
+
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	fileSystem := filesystem.NewLocalFileSystem()
+	content := templates.NewDefaultBlankChangeContent()
+	generateChange := usecase.NewGenerateChange(fileSystem, content)
+
+	result, err := generateChange.Execute(usecase.GenerateChangeInput{
+		ProjectRoot: root,
+		ChangeID:    arguments.changeID,
+		Mode:        domain.BlankMode,
+	})
+	if err != nil {
+		return err
+	}
+
+	printGenerationReport(ctx.Output, result)
 	return nil
+}
+
+type generateArguments struct {
+	changeID string
+}
+
+func parseGenerateArguments(args []string) (generateArguments, error) {
+	var positionals []string
+	blankCount := 0
+
+	for _, arg := range args {
+		if arg == "--blank" {
+			blankCount++
+			if blankCount > 1 {
+				return generateArguments{}, fmt.Errorf("blank generation flag specified more than once")
+			}
+			continue
+		}
+
+		if strings.HasPrefix(arg, "-") {
+			return generateArguments{}, fmt.Errorf("unsupported flag: %s", arg)
+		}
+
+		positionals = append(positionals, arg)
+	}
+
+	if len(positionals) == 0 {
+		return generateArguments{}, fmt.Errorf("change id is required")
+	}
+	if len(positionals) > 1 {
+		return generateArguments{}, fmt.Errorf("unexpected argument: %s", positionals[1])
+	}
+	if blankCount == 0 {
+		return generateArguments{}, fmt.Errorf("blank generation flag is required")
+	}
+
+	return generateArguments{changeID: positionals[0]}, nil
+}
+
+func printGenerationReport(output io.Writer, result domain.GenerationResult) {
+	createdFiles := result.CreatedFiles()
+	skippedExistingFiles := result.SkippedExistingFiles()
+	directoryStatus := "existing"
+	if result.ChangeDirectoryCreated {
+		directoryStatus = "created"
+	}
+
+	fmt.Fprintln(output, "SpecHarbor blank change generated.")
+	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
+	fmt.Fprintf(output, "Path: %s\n", result.ChangePath)
+	fmt.Fprintf(output, "Directory: %s\n", directoryStatus)
+	fmt.Fprintf(output, "Created files: %d\n", len(createdFiles))
+	fmt.Fprintf(output, "Skipped existing files: %d\n", len(skippedExistingFiles))
+
+	if len(createdFiles) > 0 {
+		fmt.Fprintln(output)
+		fmt.Fprintln(output, "Created:")
+		for _, file := range createdFiles {
+			fmt.Fprintf(output, "- %s\n", file)
+		}
+	}
+
+	if len(skippedExistingFiles) > 0 {
+		fmt.Fprintln(output)
+		fmt.Fprintln(output, "Skipped existing:")
+		for _, file := range skippedExistingFiles {
+			fmt.Fprintf(output, "- %s\n", file)
+		}
+	}
 }
 
 type promptArguments struct {
