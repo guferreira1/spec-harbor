@@ -48,7 +48,7 @@ func commandRegistry() map[string]CommandHandler {
 		"init":     initCommand,
 		"scan":     notImplementedCommand("scan"),
 		"generate": generateCommand,
-		"prompt":   notImplementedCommand("prompt"),
+		"prompt":   promptCommand,
 		"validate": notImplementedCommand("validate"),
 		"review":   notImplementedCommand("review"),
 		"archive":  notImplementedCommand("archive"),
@@ -95,6 +95,86 @@ func initCommand(ctx CommandContext) error {
 func generateCommand(ctx CommandContext) error {
 	fmt.Fprintf(ctx.Output, "specharbor generate: %s\n", strings.Join(ctx.Args, " "))
 	return nil
+}
+
+type promptArguments struct {
+	changeID string
+	role     string
+}
+
+func promptCommand(ctx CommandContext) error {
+	arguments, err := parsePromptArguments(ctx.Args)
+	if err != nil {
+		return err
+	}
+
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	roleTemplates := templates.NewRolePromptTemplates()
+	renderer := templates.NewPromptTemplateRenderer()
+	renderPrompt := usecase.NewRenderPrompt(roleTemplates, renderer)
+
+	result, err := renderPrompt.Execute(usecase.RenderPromptInput{
+		ProjectRoot: root,
+		ChangeID:    arguments.changeID,
+		Role:        arguments.role,
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprint(ctx.Output, result.Prompt)
+	return nil
+}
+
+func parsePromptArguments(args []string) (promptArguments, error) {
+	var positionals []string
+	var role string
+	roleProvided := false
+
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		if arg == "--role" {
+			if roleProvided {
+				return promptArguments{}, fmt.Errorf("prompt role flag specified more than once")
+			}
+			if index+1 >= len(args) {
+				return promptArguments{}, fmt.Errorf("prompt role value is required")
+			}
+			if strings.HasPrefix(args[index+1], "-") {
+				return promptArguments{}, fmt.Errorf("prompt role value is required")
+			}
+
+			role = args[index+1]
+			roleProvided = true
+			index++
+			continue
+		}
+
+		if strings.HasPrefix(arg, "-") {
+			return promptArguments{}, fmt.Errorf("unsupported flag: %s", arg)
+		}
+
+		positionals = append(positionals, arg)
+	}
+
+	if len(positionals) == 0 {
+		return promptArguments{}, fmt.Errorf("change id is required")
+	}
+	if len(positionals) > 1 {
+		return promptArguments{}, fmt.Errorf("unexpected argument: %s", positionals[1])
+	}
+	if !roleProvided || strings.TrimSpace(role) == "" {
+		return promptArguments{}, fmt.Errorf("prompt role is required")
+	}
+
+	return promptArguments{
+		changeID: positionals[0],
+		role:     role,
+	}, nil
 }
 
 func helpCommand(ctx CommandContext) error {

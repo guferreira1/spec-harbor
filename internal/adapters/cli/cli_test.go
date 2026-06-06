@@ -101,6 +101,87 @@ func TestExecuteInitPartialProject(t *testing.T) {
 	assertPathExists(t, root, ".specharbor/rules/change-reviewer.md")
 }
 
+func TestExecutePromptPrintsRenderedPromptOnly(t *testing.T) {
+	t.Chdir(findProjectRoot(t))
+
+	var output bytes.Buffer
+	if err := execute([]string{"prompt", "implement-prompt-command", "--role", "implementer"}, &output); err != nil {
+		t.Fatalf("execute(prompt) error = %v", err)
+	}
+
+	promptOutput := output.String()
+	if !strings.HasPrefix(promptOutput, "# Implementer Agent\n") {
+		t.Fatalf("prompt output = %q, want implementer prompt only", promptOutput)
+	}
+	if !strings.Contains(promptOutput, "openspec/changes/implement-prompt-command/") {
+		t.Fatalf("prompt output = %q, want rendered change id", promptOutput)
+	}
+	if strings.Contains(promptOutput, "{{change_id}}") {
+		t.Fatalf("prompt output = %q, want no raw change_id placeholder", promptOutput)
+	}
+	if strings.Contains(promptOutput, "{{task}}") {
+		t.Fatalf("prompt output = %q, want no raw task placeholder", promptOutput)
+	}
+	if strings.Contains(promptOutput, "not implemented") {
+		t.Fatalf("prompt output = %q, want rendered prompt instead of placeholder", promptOutput)
+	}
+}
+
+func TestExecutePromptRejectsInvalidArguments(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "missing change id",
+			args: []string{"prompt"},
+			want: "change id is required",
+		},
+		{
+			name: "missing role",
+			args: []string{"prompt", "implement-prompt-command"},
+			want: "prompt role is required",
+		},
+		{
+			name: "missing role value",
+			args: []string{"prompt", "implement-prompt-command", "--role"},
+			want: "prompt role value is required",
+		},
+		{
+			name: "unsupported role",
+			args: []string{"prompt", "implement-prompt-command", "--role", "unknown"},
+			want: "unsupported prompt role: unknown",
+		},
+		{
+			name: "unsupported flag",
+			args: []string{"prompt", "implement-prompt-command", "--target", "codex"},
+			want: "unsupported flag: --target",
+		},
+		{
+			name: "extra argument",
+			args: []string{"prompt", "implement-prompt-command", "--role", "implementer", "extra"},
+			want: "unexpected argument: extra",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var output bytes.Buffer
+			err := execute(test.args, &output)
+			if err == nil {
+				t.Fatalf("execute(%v) error = nil, want %q", test.args, test.want)
+			}
+			if !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("execute(%v) error = %q, want %q", test.args, err.Error(), test.want)
+			}
+			if output.String() != "" {
+				t.Fatalf("execute(%v) output = %q, want empty output", test.args, output.String())
+			}
+		})
+	}
+}
+
 func TestExecutePreservesHelpVersionAndUnknownCommandBehavior(t *testing.T) {
 	var output bytes.Buffer
 	if err := execute([]string{"help"}, &output); err != nil {
@@ -133,5 +214,27 @@ func assertPathExists(t *testing.T, root string, relativePath string) {
 
 	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(relativePath))); err != nil {
 		t.Fatalf("expected %q to exist: %v", relativePath, err)
+	}
+}
+
+func findProjectRoot(t *testing.T) string {
+	t.Helper()
+
+	root, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+
+	for {
+		templatePath := filepath.Join(root, "agent-prompts", "roles", "implementer.md.tmpl")
+		if _, err := os.Stat(templatePath); err == nil {
+			return root
+		}
+
+		parent := filepath.Dir(root)
+		if parent == root {
+			t.Fatalf("could not find project root from %s", root)
+		}
+		root = parent
 	}
 }

@@ -1,0 +1,25 @@
+# Acceptance Criteria: Implement Prompt Command
+
+- Running `specharbor prompt <change-id> --role spec-author` exits successfully and prints the rendered Spec Author prompt.
+- Running `specharbor prompt <change-id> --role architecture-reviewer` exits successfully and prints the rendered Architecture Reviewer prompt.
+- Running `specharbor prompt <change-id> --role implementer` exits successfully and prints the rendered Implementer prompt.
+- Running `specharbor prompt <change-id> --role test-engineer` exits successfully and prints the rendered Test Engineer prompt.
+- Running `specharbor prompt <change-id> --role change-reviewer` exits successfully and prints the rendered Change Reviewer prompt.
+- The command accepts exactly one change id argument.
+- The command requires a `--role` argument.
+- Unsupported roles are rejected with a clear error.
+- Missing change id, missing role, missing role value, unsupported flags, and extra positional arguments are rejected.
+- Role templates are loaded from `agent-prompts/roles/` or from embedded copies that preserve those template contents.
+- The rendered output replaces `{{change_id}}` with the requested change id.
+- The rendered output does not contain raw `{{change_id}}` or `{{task}}` placeholders.
+- Successful stdout contains only the rendered prompt.
+- The command does not call AI providers, local model APIs, provider SDKs, external agents, workflow tools, or external processes.
+- The command does not require provider API keys or agent credentials.
+- The prompt rendering use case lives in `internal/core/usecase`.
+- Prompt ports live in `internal/core/ports`.
+- Concrete template loading and rendering behavior lives in `internal/adapters`.
+- Core packages do not import adapters, CLI packages, `os`, `filepath`, terminal IO, network APIs, provider SDKs, external-agent tooling, or workflow SDKs.
+- `cmd/specharbor/main.go` remains limited to process bootstrapping unless minimal error handling changes are required.
+- Existing `help`, `version`, `init`, and unknown command behavior is preserved.
+- Focused tests cover use case, template adapter, and CLI behavior.
+- `go test ./...` succeeds.
