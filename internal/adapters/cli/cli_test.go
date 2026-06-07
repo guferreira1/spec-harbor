@@ -938,6 +938,174 @@ func TestExecuteArchiveRejectsInvalidArguments(t *testing.T) {
 	}
 }
 
+func TestExecuteScanPrintsPopulatedReport(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	writeScanFile(t, root, "go.mod", "module example")
+	writeScanFile(t, root, "package.json", "{}")
+	writeScanFile(t, root, "package-lock.json", "{}")
+	writeScanFile(t, root, "Dockerfile", "FROM scratch")
+	if err := os.MkdirAll(filepath.Join(root, ".github", "workflows"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(.github/workflows) error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "openspec", "changes"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(openspec/changes) error = %v", err)
+	}
+	writeScanFile(t, root, "openspec/project.md", "project")
+
+	var output bytes.Buffer
+	if err := execute([]string{"scan"}, &output); err != nil {
+		t.Fatalf("execute(scan) error = %v", err)
+	}
+
+	want := "SpecHarbor project scan completed.\n" +
+		"Project root: " + scanReportRoot(t) + "\n" +
+		"\nDetected ecosystems:\n- Go: go.mod\n- Node: package.json\n" +
+		"\nPackage managers:\n- npm: package-lock.json\n" +
+		"\nTest command hints:\n- go test ./...\n- npm test\n" +
+		"\nCI:\n- GitHub Actions: .github/workflows/\n" +
+		"\nContainers/deployment:\n- Dockerfile\n" +
+		"\nSpecHarbor/OpenSpec:\n- openspec/project.md\n- openspec/changes/\n" +
+		"\nNotes:\n- No Kubernetes manifests detected.\n"
+	if output.String() != want {
+		t.Fatalf("scan output = %q, want %q", output.String(), want)
+	}
+}
+
+func TestExecuteScanPrintsEmptyReport(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	var output bytes.Buffer
+	if err := execute([]string{"scan"}, &output); err != nil {
+		t.Fatalf("execute(scan) error = %v", err)
+	}
+
+	want := "SpecHarbor project scan completed.\n" +
+		"Project root: " + scanReportRoot(t) + "\n" +
+		"\nDetected ecosystems:\n- none detected\n" +
+		"\nPackage managers:\n- none detected\n" +
+		"\nTest command hints:\n- none detected\n" +
+		"\nCI:\n- none detected\n" +
+		"\nContainers/deployment:\n- none detected\n" +
+		"\nSpecHarbor/OpenSpec:\n- none detected\n" +
+		"\nNotes:\n- No known project signals detected.\n"
+	if output.String() != want {
+		t.Fatalf("scan output = %q, want %q", output.String(), want)
+	}
+}
+
+func TestExecuteScanIsStackAgnostic(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	writeScanFile(t, root, "package.json", "{}")
+	writeScanFile(t, root, "Dockerfile", "FROM scratch")
+	writeScanFile(t, root, ".gitlab-ci.yml", "stages: []")
+
+	var output bytes.Buffer
+	if err := execute([]string{"scan"}, &output); err != nil {
+		t.Fatalf("execute(scan) error = %v", err)
+	}
+
+	scanOutput := output.String()
+	for _, want := range []string{
+		"- Node: package.json",
+		"- GitLab CI: .gitlab-ci.yml",
+		"- Dockerfile",
+	} {
+		if !strings.Contains(scanOutput, want) {
+			t.Fatalf("scan output = %q, want to contain %q", scanOutput, want)
+		}
+	}
+	if strings.Contains(scanOutput, "- Go: go.mod") {
+		t.Fatalf("scan output = %q, want no Go detection in a non-Go project", scanOutput)
+	}
+}
+
+func TestExecuteScanRejectsInvalidArguments(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "positional argument",
+			args: []string{"scan", "extra"},
+			want: "unexpected argument: extra",
+		},
+		{
+			name: "unsupported json flag",
+			args: []string{"scan", "--json"},
+			want: "unsupported flag: --json",
+		},
+		{
+			name: "unsupported path flag",
+			args: []string{"scan", "--path", "/tmp"},
+			want: "unsupported flag: --path",
+		},
+		{
+			name: "unsupported deep flag",
+			args: []string{"scan", "--deep"},
+			want: "unsupported flag: --deep",
+		},
+		{
+			name: "unsupported ai flag",
+			args: []string{"scan", "--ai"},
+			want: "unsupported flag: --ai",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+
+			var output bytes.Buffer
+			err := execute(test.args, &output)
+			if err == nil {
+				t.Fatalf("execute(%v) error = nil, want %q", test.args, test.want)
+			}
+			if !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("execute(%v) error = %q, want %q", test.args, err.Error(), test.want)
+			}
+			if output.String() != "" {
+				t.Fatalf("execute(%v) output = %q, want empty output", test.args, output.String())
+			}
+		})
+	}
+}
+
+func TestExecuteScanReturnsZeroWhenReportPrinted(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	var output bytes.Buffer
+	err := execute([]string{"scan"}, &output)
+	if err != nil {
+		t.Fatalf("execute(scan) error = %v, want nil", err)
+	}
+	if !strings.HasPrefix(output.String(), "SpecHarbor project scan completed.\n") {
+		t.Fatalf("scan output = %q, want completion line", output.String())
+	}
+}
+
+func writeScanFile(t *testing.T, root string, relativePath string, contents string) {
+	t.Helper()
+
+	if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(relativePath)), []byte(contents), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v", relativePath, err)
+	}
+}
+
+func scanReportRoot(t *testing.T) string {
+	t.Helper()
+
+	root, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+	return root
+}
+
 func TestExecutePreservesHelpVersionAndUnknownCommandBehavior(t *testing.T) {
 	var output bytes.Buffer
 	if err := execute(nil, &output); err != nil {
@@ -970,6 +1138,16 @@ func TestExecutePreservesHelpVersionAndUnknownCommandBehavior(t *testing.T) {
 	}
 	if err.Error() != "unknown command: missing" {
 		t.Fatalf("unknown command error = %q, want %q", err.Error(), "unknown command: missing")
+	}
+}
+
+func TestExecuteConfigReportsNotImplemented(t *testing.T) {
+	var output bytes.Buffer
+	if err := execute([]string{"config"}, &output); err != nil {
+		t.Fatalf("execute(config) error = %v", err)
+	}
+	if output.String() != "specharbor config: not implemented yet\n" {
+		t.Fatalf("config output = %q, want not-implemented message", output.String())
 	}
 }
 

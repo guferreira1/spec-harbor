@@ -56,7 +56,7 @@ func commandRegistry() map[string]CommandHandler {
 	return map[string]CommandHandler{
 		"version":  versionCommand,
 		"init":     initCommand,
-		"scan":     notImplementedCommand("scan"),
+		"scan":     scanCommand,
 		"generate": generateCommand,
 		"prompt":   promptCommand,
 		"validate": validateCommand,
@@ -100,6 +100,83 @@ func initCommand(ctx CommandContext) error {
 	fmt.Fprintf(ctx.Output, "Skipped existing: %d\n", len(result.Skipped))
 
 	return nil
+}
+
+func scanCommand(ctx CommandContext) error {
+	if err := parseScanArguments(ctx.Args); err != nil {
+		return err
+	}
+
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	fileSystem := filesystem.NewLocalFileSystem()
+	scanProject := usecase.NewScanProject(fileSystem)
+
+	result, err := scanProject.Execute(usecase.ScanProjectInput{ProjectRoot: root})
+	if err != nil {
+		return err
+	}
+
+	printScanReport(ctx.Output, result)
+	return nil
+}
+
+func parseScanArguments(args []string) error {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			return fmt.Errorf("unsupported flag: %s", arg)
+		}
+		return fmt.Errorf("unexpected argument: %s", arg)
+	}
+	return nil
+}
+
+func printScanReport(output io.Writer, result domain.ScanResult) {
+	fmt.Fprintln(output, "SpecHarbor project scan completed.")
+	fmt.Fprintf(output, "Project root: %s\n", result.ProjectRoot)
+
+	printScanDetectionSection(output, "Detected ecosystems:", result.Ecosystems)
+	printScanDetectionSection(output, "Package managers:", result.PackageManagers)
+	printScanLineSection(output, "Test command hints:", result.TestCommandHints)
+	printScanDetectionSection(output, "CI:", result.CIProviders)
+	printScanDetectionSection(output, "Containers/deployment:", result.ContainerDeployments)
+	printScanDetectionSection(output, "SpecHarbor/OpenSpec:", result.SpecHarborSignals)
+	printScanLineSection(output, "Notes:", result.Notes)
+}
+
+func printScanDetectionSection(output io.Writer, heading string, detections []domain.ScanDetection) {
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, heading)
+
+	if len(detections) == 0 {
+		fmt.Fprintln(output, "- none detected")
+		return
+	}
+
+	for _, detection := range detections {
+		if detection.Name != "" {
+			fmt.Fprintf(output, "- %s: %s\n", detection.Name, detection.Signal)
+			continue
+		}
+		fmt.Fprintf(output, "- %s\n", detection.Signal)
+	}
+}
+
+func printScanLineSection(output io.Writer, heading string, lines []string) {
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, heading)
+
+	if len(lines) == 0 {
+		fmt.Fprintln(output, "- none detected")
+		return
+	}
+
+	for _, line := range lines {
+		fmt.Fprintf(output, "- %s\n", line)
+	}
 }
 
 func generateCommand(ctx CommandContext) error {
