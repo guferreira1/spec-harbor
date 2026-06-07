@@ -3,6 +3,7 @@ package filesystem
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/guferreira1/spec-harbor/internal/core/ports"
@@ -12,6 +13,53 @@ var _ ports.ValidationFileSystem = (*LocalFileSystem)(nil)
 var _ ports.GenerationFileSystem = (*LocalFileSystem)(nil)
 var _ ports.ArchiveFileSystem = (*LocalFileSystem)(nil)
 var _ ports.ReviewFileSystem = (*LocalFileSystem)(nil)
+var _ ports.ScanFileSystem = (*LocalFileSystem)(nil)
+
+func TestLocalFileSystemListsImmediateEntryNamesWithoutRecursion(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+
+	if err := os.MkdirAll(filepath.Join(root, "openspec", "changes"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example"), 0o644); err != nil {
+		t.Fatalf("WriteFile(go.mod) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "Dockerfile"), []byte("FROM scratch"), 0o644); err != nil {
+		t.Fatalf("WriteFile(Dockerfile) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "openspec", "project.md"), []byte("project"), 0o644); err != nil {
+		t.Fatalf("WriteFile(openspec/project.md) error = %v", err)
+	}
+
+	names, err := fileSystem.ListDirectoryNames(root, ".")
+	if err != nil {
+		t.Fatalf("ListDirectoryNames() error = %v", err)
+	}
+
+	want := map[string]bool{"openspec": true, "go.mod": true, "Dockerfile": true}
+	if len(names) != len(want) {
+		t.Fatalf("ListDirectoryNames() = %v, want immediate entries %v", names, want)
+	}
+	for _, name := range names {
+		if !want[name] {
+			t.Fatalf("ListDirectoryNames() returned unexpected entry %q (names = %v)", name, names)
+		}
+		if strings.Contains(name, "/") || strings.Contains(name, string(filepath.Separator)) {
+			t.Fatalf("ListDirectoryNames() returned a nested path %q, want immediate entry name", name)
+		}
+	}
+}
+
+func TestLocalFileSystemListDirectoryNamesReturnsErrorForMissingDirectory(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+
+	_, err := fileSystem.ListDirectoryNames(root, "missing")
+	if err == nil {
+		t.Fatalf("ListDirectoryNames() error = nil, want missing directory error")
+	}
+}
 
 func TestLocalFileSystemCreatesDirectoriesAndFiles(t *testing.T) {
 	root := t.TempDir()

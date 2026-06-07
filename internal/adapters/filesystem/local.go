@@ -47,6 +47,19 @@ func (fileSystem *LocalFileSystem) PathExists(root string, relativePath string) 
 	return true, nil
 }
 
+func (fileSystem *LocalFileSystem) ListDirectoryNames(root string, relativePath string) ([]string, error) {
+	entries, err := os.ReadDir(fileSystem.fullPath(root, relativePath))
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	return names, nil
+}
+
 func (fileSystem *LocalFileSystem) ReadFile(root string, relativePath string) (string, error) {
 	contents, err := os.ReadFile(fileSystem.fullPath(root, relativePath))
 	if err != nil {
