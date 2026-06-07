@@ -1,0 +1,35 @@
+# Acceptance Criteria: Improve SpecHarbor CI
+
+- The SpecHarbor CI workflow runs on pull requests.
+- The SpecHarbor CI workflow runs on pushes to `main`.
+- The workflow uses `actions/checkout@v4`.
+- The workflow uses `actions/setup-go@v5`.
+- The workflow sets up Go from the version declared by the SpecHarbor project, preferably through `go-version-file: go.mod`.
+- The workflow includes a dedicated Go formatting check before tests.
+- The formatting check uses `find . -name "*.go" -print0 | xargs -0 gofmt -l` or an equivalent small shell script based on `gofmt -l`.
+- The formatting check inspects all `.go` files in the SpecHarbor repository.
+- CI fails when any `.go` file in the SpecHarbor repository is not gofmt-formatted.
+- Formatting failures print the list of unformatted files in the GitHub Actions logs.
+- The formatting check does not rewrite files in CI.
+- The formatting check exits zero when no unformatted files are found.
+- The workflow runs tests with `go test -count=1 ./...`.
+- The test step does not rely on cached Go test results.
+- Test failures are reported through normal `go test` output.
+- The workflow remains simple: checkout, Go setup, formatting check, and test check.
+- The workflow does not add lint tools that require extra installation.
+- The workflow does not add release automation.
+- The workflow does not add coverage upload.
+- The workflow does not add deployment.
+- The workflow does not add external services.
+- The workflow does not add Docker-based CI.
+- The workflow does not add a complex matrix build unless a concrete reliability issue is documented.
+- The change does not modify CLI behavior.
+- The change does not add SpecHarbor product commands.
+- The change does not add user-project CI detection.
+- The change does not define, generate, or assume CI behavior for user projects.
+- The change does not modify `cmd/`, `internal/core/`, `internal/adapters/`, or `internal/platform/`.
+- The living architecture spec is unchanged.
+- Local verification includes `find . -name "*.go" -print0 | xargs -0 gofmt -l`.
+- Local verification includes `go test -count=1 ./...`.
+- Repository-required verification includes `go test ./...`.
+- This change's `tasks.md` is updated to reflect only implementation work that was actually completed.
