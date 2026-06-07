@@ -60,7 +60,7 @@ func commandRegistry() map[string]CommandHandler {
 		"generate": generateCommand,
 		"prompt":   promptCommand,
 		"validate": validateCommand,
-		"review":   notImplementedCommand("review"),
+		"review":   reviewCommand,
 		"archive":  archiveCommand,
 		"config":   notImplementedCommand("config"),
 
@@ -347,6 +347,86 @@ func printValidationReport(output io.Writer, result domain.ValidationResult) {
 	fmt.Fprintln(output, "SpecHarbor change is invalid.")
 	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
 	fmt.Fprintf(output, "Checked path: %s\n", result.CheckedPath)
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Findings:")
+	for _, finding := range result.Findings {
+		fmt.Fprintf(output, "- [%s] %s: %s\n", finding.Severity, finding.Code, finding.Message)
+	}
+}
+
+type reviewArguments struct {
+	changeID string
+}
+
+func reviewCommand(ctx CommandContext) error {
+	arguments, err := parseReviewArguments(ctx.Args)
+	if err != nil {
+		return err
+	}
+
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	fileSystem := filesystem.NewLocalFileSystem()
+	reviewChange := usecase.NewReviewChange(fileSystem)
+
+	result, err := reviewChange.Execute(usecase.ReviewChangeInput{
+		ProjectRoot: root,
+		ChangeID:    arguments.changeID,
+	})
+	if err != nil {
+		return err
+	}
+
+	printReviewReport(ctx.Output, result)
+	if result.Status != domain.ReviewStatusApproved {
+		return ExitError{Code: 1}
+	}
+
+	return nil
+}
+
+func parseReviewArguments(args []string) (reviewArguments, error) {
+	var positionals []string
+
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			return reviewArguments{}, fmt.Errorf("unsupported flag: %s", arg)
+		}
+
+		positionals = append(positionals, arg)
+	}
+
+	if len(positionals) == 0 {
+		return reviewArguments{}, fmt.Errorf("change id is required")
+	}
+	if len(positionals) > 1 {
+		return reviewArguments{}, fmt.Errorf("unexpected argument: %s", positionals[1])
+	}
+
+	return reviewArguments{changeID: positionals[0]}, nil
+}
+
+func printReviewReport(output io.Writer, result domain.ReviewResult) {
+	fmt.Fprintln(output, "SpecHarbor review completed.")
+	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
+	fmt.Fprintf(output, "Checked path: %s\n", result.CheckedPath)
+	fmt.Fprintf(output, "Status: %s\n", result.Status)
+	fmt.Fprintf(
+		output,
+		"Tasks: %d total, %d completed, %d incomplete\n",
+		result.Tasks.Total,
+		result.Tasks.Completed,
+		result.Tasks.Incomplete,
+	)
+
+	if len(result.Findings) == 0 {
+		fmt.Fprintln(output, "Findings: 0")
+		return
+	}
+
 	fmt.Fprintln(output)
 	fmt.Fprintln(output, "Findings:")
 	for _, finding := range result.Findings {

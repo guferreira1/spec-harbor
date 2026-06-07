@@ -11,6 +11,7 @@ import (
 var _ ports.ValidationFileSystem = (*LocalFileSystem)(nil)
 var _ ports.GenerationFileSystem = (*LocalFileSystem)(nil)
 var _ ports.ArchiveFileSystem = (*LocalFileSystem)(nil)
+var _ ports.ReviewFileSystem = (*LocalFileSystem)(nil)
 
 func TestLocalFileSystemCreatesDirectoriesAndFiles(t *testing.T) {
 	root := t.TempDir()
@@ -136,6 +137,26 @@ func TestLocalFileSystemDistinguishesFilesFromDirectories(t *testing.T) {
 	}
 	if directoryExists {
 		t.Fatalf("DirectoryExists() for file = true, want false")
+	}
+}
+
+func TestLocalFileSystemReadsReviewFiles(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+	tasksPath := filepath.Join(root, "openspec", "changes", "change")
+	if err := os.MkdirAll(tasksPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tasksPath, "tasks.md"), []byte("- [x] Done\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	contents, err := fileSystem.ReadFile(root, "openspec/changes/change/tasks.md")
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if contents != "- [x] Done\n" {
+		t.Fatalf("ReadFile() = %q, want task contents", contents)
 	}
 }
 

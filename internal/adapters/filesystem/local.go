@@ -47,6 +47,14 @@ func (fileSystem *LocalFileSystem) PathExists(root string, relativePath string) 
 	return true, nil
 }
 
+func (fileSystem *LocalFileSystem) ReadFile(root string, relativePath string) (string, error) {
+	contents, err := os.ReadFile(fileSystem.fullPath(root, relativePath))
+	if err != nil {
+		return "", err
+	}
+	return string(contents), nil
+}
+
 func (fileSystem *LocalFileSystem) CreateDirectory(root string, relativePath string) error {
 	return os.MkdirAll(fileSystem.fullPath(root, relativePath), 0o755)
 }
