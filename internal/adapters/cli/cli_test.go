@@ -568,6 +568,223 @@ func TestExecuteValidateRejectsInvalidArguments(t *testing.T) {
 	}
 }
 
+func TestExecuteReviewPrintsApprovedReport(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	createReviewOpenSpecChange(t, root, "implement-review-foundation", reviewTasks([]string{
+		"Add review domain types.",
+		"Add review filesystem port.",
+		"Add review use case.",
+		"Add local filesystem compatibility.",
+		"Add deterministic task parsing.",
+		"Wire the review CLI command.",
+		"Format the approved report.",
+		"Format the needs-work report.",
+		"Format the invalid report.",
+		"Add CLI exit-code behavior.",
+		"Run gofmt.",
+		"Run go test ./...",
+	}, nil), nil)
+
+	var output bytes.Buffer
+	if err := execute([]string{"review", "implement-review-foundation"}, &output); err != nil {
+		t.Fatalf("execute(review) error = %v", err)
+	}
+
+	want := `SpecHarbor review completed.
+Change: implement-review-foundation
+Checked path: openspec/changes/implement-review-foundation
+Status: approved
+Tasks: 12 total, 12 completed, 0 incomplete
+Findings: 0
+`
+	if output.String() != want {
+		t.Fatalf("review output = %q, want %q", output.String(), want)
+	}
+}
+
+func TestExecuteReviewPrintsNeedsWorkReportAndReturnsNonZero(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	createReviewOpenSpecChange(t, root, "implement-review-foundation", reviewTasks([]string{
+		"Add review domain types.",
+		"Add review filesystem port.",
+		"Add review use case.",
+		"Add local filesystem compatibility.",
+		"Add deterministic task parsing.",
+		"Wire the review CLI command.",
+		"Format the approved report.",
+		"Format the needs-work report.",
+		"Format the invalid report.",
+		"Add CLI exit-code behavior.",
+	}, []string{
+		"Run go test ./...",
+		"Update this tasks.md by checking off only completed tasks.",
+	}), nil)
+
+	var output bytes.Buffer
+	err := execute([]string{"review", "implement-review-foundation"}, &output)
+	assertExitCode(t, err, 1)
+
+	want := `SpecHarbor review completed.
+Change: implement-review-foundation
+Checked path: openspec/changes/implement-review-foundation
+Status: needs-work
+Tasks: 12 total, 10 completed, 2 incomplete
+
+Findings:
+- [warning] incomplete_task: Task is not completed: Run go test ./...
+- [warning] incomplete_task: Task is not completed: Update this tasks.md by checking off only completed tasks.
+`
+	if output.String() != want {
+		t.Fatalf("review output = %q, want %q", output.String(), want)
+	}
+}
+
+func TestExecuteReviewPrintsInvalidReportAndReturnsNonZero(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	createReviewOpenSpecChange(t, root, "implement-review-foundation", "- [x] Done\n", map[string]bool{"risks.md": true})
+
+	var output bytes.Buffer
+	err := execute([]string{"review", "implement-review-foundation"}, &output)
+	assertExitCode(t, err, 1)
+
+	want := `SpecHarbor review completed.
+Change: implement-review-foundation
+Checked path: openspec/changes/implement-review-foundation
+Status: invalid
+Tasks: 0 total, 0 completed, 0 incomplete
+
+Findings:
+- [error] required_file_missing: Missing required file: risks.md
+`
+	if output.String() != want {
+		t.Fatalf("review output = %q, want %q", output.String(), want)
+	}
+}
+
+func TestExecuteReviewRejectsInvalidArguments(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "missing change id",
+			args: []string{"review"},
+			want: "change id is required",
+		},
+		{
+			name: "unsupported json flag",
+			args: []string{"review", "change", "--json"},
+			want: "unsupported flag: --json",
+		},
+		{
+			name: "unsupported format flag",
+			args: []string{"review", "change", "--format", "json"},
+			want: "unsupported flag: --format",
+		},
+		{
+			name: "unsupported ai flag",
+			args: []string{"review", "change", "--ai"},
+			want: "unsupported flag: --ai",
+		},
+		{
+			name: "unsupported github flag",
+			args: []string{"review", "change", "--github"},
+			want: "unsupported flag: --github",
+		},
+		{
+			name: "unsupported gitlab flag",
+			args: []string{"review", "change", "--gitlab"},
+			want: "unsupported flag: --gitlab",
+		},
+		{
+			name: "unsupported diff flag",
+			args: []string{"review", "change", "--diff"},
+			want: "unsupported flag: --diff",
+		},
+		{
+			name: "unsupported fix flag",
+			args: []string{"review", "change", "--fix"},
+			want: "unsupported flag: --fix",
+		},
+		{
+			name: "unsupported agent flag",
+			args: []string{"review", "change", "--agent"},
+			want: "unsupported flag: --agent",
+		},
+		{
+			name: "extra argument",
+			args: []string{"review", "change", "extra"},
+			want: "unexpected argument: extra",
+		},
+		{
+			name: "unsafe traversal change id",
+			args: []string{"review", "../unsafe"},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe absolute change id",
+			args: []string{"review", "/unsafe"},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe slash change id",
+			args: []string{"review", "bad/id"},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe backslash change id",
+			args: []string{"review", `bad\id`},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe colon change id",
+			args: []string{"review", "bad:id"},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe dot change id",
+			args: []string{"review", "."},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe dotdot change id",
+			args: []string{"review", ".."},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "leading dash change id",
+			args: []string{"review", "-bad-id"},
+			want: "unsupported flag: -bad-id",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+
+			var output bytes.Buffer
+			err := execute(test.args, &output)
+			if err == nil {
+				t.Fatalf("execute(%v) error = nil, want %q", test.args, test.want)
+			}
+			if !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("execute(%v) error = %q, want %q", test.args, err.Error(), test.want)
+			}
+			if output.String() != "" {
+				t.Fatalf("execute(%v) output = %q, want empty output", test.args, output.String())
+			}
+		})
+	}
+}
+
 func TestExecuteArchivePrintsSuccessReport(t *testing.T) {
 	root := t.TempDir()
 	t.Chdir(root)
@@ -795,6 +1012,43 @@ func createOpenSpecChange(t *testing.T, root string, changeID string, files []st
 			t.Fatalf("WriteFile() error = %v", err)
 		}
 	}
+}
+
+func createReviewOpenSpecChange(t *testing.T, root string, changeID string, tasksContents string, skipFiles map[string]bool) {
+	t.Helper()
+
+	changeDirectory := filepath.Join(root, "openspec", "changes", changeID)
+	if err := os.MkdirAll(changeDirectory, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	for _, file := range domain.RequiredOpenSpecChangeFiles() {
+		if skipFiles[file] {
+			continue
+		}
+
+		contents := file
+		if file == "tasks.md" {
+			contents = tasksContents
+		}
+		if err := os.WriteFile(filepath.Join(changeDirectory, file), []byte(contents), 0o644); err != nil {
+			t.Fatalf("WriteFile() error = %v", err)
+		}
+	}
+}
+
+func reviewTasks(completed []string, incomplete []string) string {
+	var builder strings.Builder
+	for _, task := range completed {
+		builder.WriteString("- [x] ")
+		builder.WriteString(task)
+		builder.WriteByte('\n')
+	}
+	for _, task := range incomplete {
+		builder.WriteString("- [ ] ")
+		builder.WriteString(task)
+		builder.WriteByte('\n')
+	}
+	return builder.String()
 }
 
 func assertPathExists(t *testing.T, root string, relativePath string) {
