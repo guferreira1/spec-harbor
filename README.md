@@ -30,6 +30,7 @@ Implemented commands on the current branch:
 go run ./cmd/specharbor init
 go run ./cmd/specharbor scan
 go run ./cmd/specharbor generate add-example-feature --blank
+go run ./cmd/specharbor generate add-feature --template feature
 go run ./cmd/specharbor validate add-example-feature
 go run ./cmd/specharbor prompt add-example-feature --role implementer
 go run ./cmd/specharbor review add-example-feature
@@ -40,6 +41,8 @@ go run ./cmd/specharbor config
 
 `config` is a read-only alias for `config show`. It reads `.specharbor/config.yml` and prints a local config report when the project has a supported version `1` config file.
 
+Built-in template generation supports exactly `feature`, `bugfix`, `docs`, and `refactor`. See [Usage](docs/usage.md) and [Generation modes](docs/generation-modes.md) for details.
+
 ## Status
 
 Implemented:
@@ -47,6 +50,7 @@ Implemented:
 - OpenSpec project initialization.
 - Stack-agnostic local project scanning.
 - Blank OpenSpec change generation.
+- Built-in OpenSpec change template generation for `feature`, `bugfix`, `docs`, and `refactor`.
 - Change validation, review, and archive.
 - Role-based prompt generation with `--role`.
 - Read-only local config display with `config show` and `config`.
@@ -57,7 +61,8 @@ In progress:
 
 Planned:
 
-- Guided, template, AI-assisted, agent-assisted, and hybrid spec generation beyond the current blank mode.
+- Guided, AI-assisted, agent-assisted, and hybrid spec generation.
+- Future template capabilities such as custom, remote, and config-driven templates.
 - Config mutation commands such as `config get`, `config set`, and `config unset`.
 - AI-provider and workflow connector support.
 
@@ -78,6 +83,7 @@ go test ./...
 ## Docs
 
 - [Usage](docs/usage.md)
+- [Generation modes](docs/generation-modes.md)
 - [Workflow](docs/workflow.md)
 - [Agent roles](docs/agent-roles.md)
 - [Contributing](docs/contributing.md)
