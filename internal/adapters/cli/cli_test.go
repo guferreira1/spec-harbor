@@ -1141,14 +1141,239 @@ func TestExecutePreservesHelpVersionAndUnknownCommandBehavior(t *testing.T) {
 	}
 }
 
-func TestExecuteConfigReportsNotImplemented(t *testing.T) {
+func TestExecuteConfigShowPrintsConfigReport(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	writeLocalConfig(t, root, versionOneConfigYAML())
+
 	var output bytes.Buffer
-	if err := execute([]string{"config"}, &output); err != nil {
+	if err := execute([]string{"config", "show"}, &output); err != nil {
+		t.Fatalf("execute(config show) error = %v", err)
+	}
+
+	if output.String() != expectedConfigReport() {
+		t.Fatalf("config show output = %q, want %q", output.String(), expectedConfigReport())
+	}
+}
+
+func TestExecuteConfigAliasMatchesConfigShow(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	writeLocalConfig(t, root, versionOneConfigYAML())
+
+	var showOutput bytes.Buffer
+	if err := execute([]string{"config", "show"}, &showOutput); err != nil {
+		t.Fatalf("execute(config show) error = %v", err)
+	}
+
+	var aliasOutput bytes.Buffer
+	if err := execute([]string{"config"}, &aliasOutput); err != nil {
 		t.Fatalf("execute(config) error = %v", err)
 	}
-	if output.String() != "specharbor config: not implemented yet\n" {
-		t.Fatalf("config output = %q, want not-implemented message", output.String())
+
+	if aliasOutput.String() != showOutput.String() {
+		t.Fatalf("config alias output = %q, want config show output %q", aliasOutput.String(), showOutput.String())
 	}
+}
+
+func TestExecuteConfigRejectsUnsupportedFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "config json", args: []string{"config", "--json"}, want: "unsupported flag: --json"},
+		{name: "show json", args: []string{"config", "show", "--json"}, want: "unsupported flag: --json"},
+		{name: "format", args: []string{"config", "--format", "json"}, want: "unsupported flag: --format"},
+		{name: "path", args: []string{"config", "--path", "/tmp"}, want: "unsupported flag: --path"},
+		{name: "global", args: []string{"config", "--global"}, want: "unsupported flag: --global"},
+		{name: "set flag", args: []string{"config", "--set"}, want: "unsupported flag: --set"},
+		{name: "get flag", args: []string{"config", "--get"}, want: "unsupported flag: --get"},
+		{name: "env", args: []string{"config", "--env"}, want: "unsupported flag: --env"},
+		{name: "secrets", args: []string{"config", "--secrets"}, want: "unsupported flag: --secrets"},
+		{name: "interactive", args: []string{"config", "--interactive"}, want: "unsupported flag: --interactive"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+
+			var output bytes.Buffer
+			err := execute(test.args, &output)
+			if err == nil {
+				t.Fatalf("execute(%v) error = nil, want %q", test.args, test.want)
+			}
+			if !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("execute(%v) error = %q, want %q", test.args, err.Error(), test.want)
+			}
+			if output.String() != "" {
+				t.Fatalf("execute(%v) output = %q, want empty output", test.args, output.String())
+			}
+		})
+	}
+}
+
+func TestExecuteConfigRejectsUnsupportedSubcommands(t *testing.T) {
+	tests := []string{"get", "set", "unset", "list", "edit", "other"}
+
+	for _, subcommand := range tests {
+		t.Run(subcommand, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+
+			var output bytes.Buffer
+			err := execute([]string{"config", subcommand}, &output)
+			if err == nil {
+				t.Fatalf("execute(config %s) error = nil, want unsupported subcommand", subcommand)
+			}
+
+			want := "unsupported config subcommand: " + subcommand
+			if !strings.Contains(err.Error(), want) {
+				t.Fatalf("execute(config %s) error = %q, want %q", subcommand, err.Error(), want)
+			}
+			if output.String() != "" {
+				t.Fatalf("execute(config %s) output = %q, want empty output", subcommand, output.String())
+			}
+		})
+	}
+}
+
+func TestExecuteConfigRejectsExtraArgumentsAfterShow(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	var output bytes.Buffer
+	err := execute([]string{"config", "show", "extra"}, &output)
+	if err == nil {
+		t.Fatalf("execute(config show extra) error = nil, want unexpected argument")
+	}
+	if !strings.Contains(err.Error(), "unexpected argument: extra") {
+		t.Fatalf("execute(config show extra) error = %q, want unexpected argument: extra", err.Error())
+	}
+	if output.String() != "" {
+		t.Fatalf("execute(config show extra) output = %q, want empty output", output.String())
+	}
+}
+
+func TestExecuteConfigReturnsErrorsForConfigFailures(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(t *testing.T, root string)
+		want  string
+	}{
+		{
+			name:  "missing config",
+			setup: func(_ *testing.T, _ string) {},
+			want:  "missing config file",
+		},
+		{
+			name: "invalid yaml",
+			setup: func(t *testing.T, root string) {
+				writeLocalConfig(t, root, "version: [\n")
+			},
+			want: "invalid config YAML",
+		},
+		{
+			name: "unsupported version",
+			setup: func(t *testing.T, root string) {
+				writeLocalConfig(t, root, "version: 2\n")
+			},
+			want: "unsupported config version",
+		},
+		{
+			name: "unreadable config",
+			setup: func(t *testing.T, root string) {
+				writeLocalConfig(t, root, versionOneConfigYAML())
+				configPath := filepath.Join(root, ".specharbor", "config.yml")
+				if err := os.Chmod(configPath, 0); err != nil {
+					t.Fatalf("Chmod(config.yml) error = %v", err)
+				}
+				t.Cleanup(func() {
+					_ = os.Chmod(configPath, 0o644)
+				})
+			},
+			want: "unreadable config",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+			test.setup(t, root)
+
+			var output bytes.Buffer
+			err := execute([]string{"config", "show"}, &output)
+			if err == nil {
+				t.Fatalf("execute(config show) error = nil, want %q", test.want)
+			}
+			if !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("execute(config show) error = %q, want %q", err.Error(), test.want)
+			}
+			if output.String() != "" {
+				t.Fatalf("execute(config show) output = %q, want empty output", output.String())
+			}
+		})
+	}
+}
+
+func writeLocalConfig(t *testing.T, root string, contents string) {
+	t.Helper()
+
+	if err := os.MkdirAll(filepath.Join(root, ".specharbor"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(.specharbor) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".specharbor", "config.yml"), []byte(contents), 0o644); err != nil {
+		t.Fatalf("WriteFile(config.yml) error = %v", err)
+	}
+}
+
+func versionOneConfigYAML() string {
+	return `version: 1
+
+defaults:
+  agent_role: implementer
+  generation_mode: blank
+
+validation:
+  require_all_change_files: true
+
+review:
+  require_completed_tasks: true
+
+archive:
+  date_layout: "2006-01-02"
+
+scan:
+  include_common_project_files: true
+
+output:
+  format: text
+`
+}
+
+func expectedConfigReport() string {
+	return `SpecHarbor configuration loaded.
+Path: .specharbor/config.yml
+Version: 1
+
+Defaults:
+- agent role: implementer
+- generation mode: blank
+
+Validation:
+- require all change files: true
+
+Review:
+- require completed tasks: true
+
+Archive:
+- date layout: 2006-01-02
+
+Scan:
+- include common project files: true
+
+Output:
+- format: text
+`
 }
 
 func assertExitCode(t *testing.T, err error, code int) {

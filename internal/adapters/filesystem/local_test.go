@@ -14,6 +14,7 @@ var _ ports.GenerationFileSystem = (*LocalFileSystem)(nil)
 var _ ports.ArchiveFileSystem = (*LocalFileSystem)(nil)
 var _ ports.ReviewFileSystem = (*LocalFileSystem)(nil)
 var _ ports.ScanFileSystem = (*LocalFileSystem)(nil)
+var _ ports.ConfigFileSystem = (*LocalFileSystem)(nil)
 
 func TestLocalFileSystemListsImmediateEntryNamesWithoutRecursion(t *testing.T) {
 	root := t.TempDir()
@@ -205,6 +206,51 @@ func TestLocalFileSystemReadsReviewFiles(t *testing.T) {
 	}
 	if contents != "- [x] Done\n" {
 		t.Fatalf("ReadFile() = %q, want task contents", contents)
+	}
+}
+
+func TestLocalFileSystemReadsLocalConfigFile(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+
+	if err := os.MkdirAll(filepath.Join(root, ".specharbor"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(.specharbor) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".specharbor", "config.yml"), []byte("version: 1\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(config.yml) error = %v", err)
+	}
+
+	exists, err := fileSystem.FileExists(root, ".specharbor/config.yml")
+	if err != nil {
+		t.Fatalf("FileExists() error = %v", err)
+	}
+	if !exists {
+		t.Fatalf("FileExists() = false, want true")
+	}
+
+	contents, err := fileSystem.ReadFile(root, ".specharbor/config.yml")
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if contents != "version: 1\n" {
+		t.Fatalf("ReadFile() = %q, want version config", contents)
+	}
+}
+
+func TestLocalFileSystemDoesNotTreatConfigDirectoryAsFile(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+
+	if err := os.MkdirAll(filepath.Join(root, ".specharbor", "config.yml"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(config.yml directory) error = %v", err)
+	}
+
+	exists, err := fileSystem.FileExists(root, ".specharbor/config.yml")
+	if err != nil {
+		t.Fatalf("FileExists() error = %v", err)
+	}
+	if exists {
+		t.Fatalf("FileExists() for config directory = true, want false")
 	}
 }
 

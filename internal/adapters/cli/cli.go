@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	configadapter "github.com/guferreira1/spec-harbor/internal/adapters/config"
 	"github.com/guferreira1/spec-harbor/internal/adapters/filesystem"
 	"github.com/guferreira1/spec-harbor/internal/adapters/templates"
 	"github.com/guferreira1/spec-harbor/internal/core/domain"
@@ -62,7 +63,7 @@ func commandRegistry() map[string]CommandHandler {
 		"validate": validateCommand,
 		"review":   reviewCommand,
 		"archive":  archiveCommand,
-		"config":   notImplementedCommand("config"),
+		"config":   configCommand,
 
 		"help":   helpCommand,
 		"-h":     helpCommand,
@@ -588,16 +589,83 @@ func printArchiveReport(output io.Writer, result domain.ArchiveResult) {
 	fmt.Fprintf(output, "- %s -> %s\n", result.MovedDirectory.SourcePath, result.MovedDirectory.ArchivePath)
 }
 
-func helpCommand(ctx CommandContext) error {
-	printHelp(ctx.Output)
+func configCommand(ctx CommandContext) error {
+	if err := parseConfigArguments(ctx.Args); err != nil {
+		return err
+	}
+
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	fileSystem := filesystem.NewLocalFileSystem()
+	parser := configadapter.NewYAMLParser()
+	showConfig := usecase.NewShowConfig(fileSystem, parser)
+
+	result, err := showConfig.Execute(usecase.ShowConfigInput{ProjectRoot: root})
+	if err != nil {
+		return err
+	}
+
+	printConfigReport(ctx.Output, result)
 	return nil
 }
 
-func notImplementedCommand(command string) CommandHandler {
-	return func(ctx CommandContext) error {
-		fmt.Fprintf(ctx.Output, "specharbor %s: not implemented yet\n", command)
+func parseConfigArguments(args []string) error {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			return fmt.Errorf("unsupported flag: %s", arg)
+		}
+	}
+
+	if len(args) == 0 {
 		return nil
 	}
+	if args[0] != "show" {
+		return fmt.Errorf("unsupported config subcommand: %s", args[0])
+	}
+	if len(args) > 1 {
+		return fmt.Errorf("unexpected argument: %s", args[1])
+	}
+
+	return nil
+}
+
+func printConfigReport(output io.Writer, result domain.ConfigResult) {
+	fmt.Fprintln(output, "SpecHarbor configuration loaded.")
+	fmt.Fprintf(output, "Path: %s\n", result.Path)
+	fmt.Fprintf(output, "Version: %d\n", result.Config.Version)
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Defaults:")
+	fmt.Fprintf(output, "- agent role: %s\n", result.Config.Defaults.AgentRole)
+	fmt.Fprintf(output, "- generation mode: %s\n", result.Config.Defaults.GenerationMode)
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Validation:")
+	fmt.Fprintf(output, "- require all change files: %t\n", result.Config.Validation.RequireAllChangeFiles)
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Review:")
+	fmt.Fprintf(output, "- require completed tasks: %t\n", result.Config.Review.RequireCompletedTasks)
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Archive:")
+	fmt.Fprintf(output, "- date layout: %s\n", result.Config.Archive.DateLayout)
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Scan:")
+	fmt.Fprintf(output, "- include common project files: %t\n", result.Config.Scan.IncludeCommonProjectFiles)
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Output:")
+	fmt.Fprintf(output, "- format: %s\n", result.Config.Output.Format)
+}
+
+func helpCommand(ctx CommandContext) error {
+	printHelp(ctx.Output)
+	return nil
 }
 
 func printHelp(output io.Writer) {
