@@ -1,0 +1,52 @@
+# Acceptance Criteria: Implement Template Generation
+
+- `specharbor generate <change-id> --blank` remains unchanged in behavior, overwrite policy, unsafe change id validation, and human-readable reporting.
+- `specharbor generate <change-id> --template feature` creates `openspec/changes/<change-id>/` when missing and creates the required files with feature-oriented starter content.
+- `specharbor generate <change-id> --template bugfix` creates `openspec/changes/<change-id>/` when missing and creates the required files with bugfix-oriented starter content.
+- `specharbor generate <change-id> --template docs` creates `openspec/changes/<change-id>/` when missing and creates the required files with documentation-oriented starter content.
+- `specharbor generate <change-id> --template refactor` creates `openspec/changes/<change-id>/` when missing and creates the required files with refactor-oriented starter content.
+- Template generation creates the same required files currently created by blank generation:
+  - `proposal.md`
+  - `design.md`
+  - `tasks.md`
+  - `acceptance-criteria.md`
+  - `risks.md`
+- Required filenames come from the shared domain required OpenSpec change file policy rather than a CLI-specific list.
+- Template generation content is deterministic, local, generic, human-readable, and safe to commit.
+- Generated template `tasks.md` files contain unchecked tasks only.
+- Template generation does not call AI providers, local model APIs, provider SDKs, external agents, source-control APIs, workflow tools, network APIs, external processes, or config integrations.
+- Template generation does not require provider API keys, local model credentials, agent credentials, source-control credentials, workflow credentials, or network access.
+- If the change directory already exists, template generation creates only missing required files and skips existing required files.
+- Existing files are never overwritten.
+- Existing file contents are preserved exactly.
+- Created files and skipped existing files are reported in deterministic human-readable output.
+- The template generation report includes the selected template name, change id, relative change path, directory status, created file count, skipped existing file count, and relevant filenames.
+- The template generation report does not include absolute local paths, debug output, provider details, agent details, source-control details, workflow details, network details, or validation summaries.
+- Unknown template names return a clear error.
+- `--template` without a template name returns a clear error.
+- Providing both `--blank` and `--template` returns a clear error.
+- Unsupported flags return a clear error.
+- Extra positional arguments return a clear error.
+- Duplicate generation mode flags return a clear error.
+- Unsafe change ids are rejected before filesystem writes occur.
+- Unsafe change id validation remains consistent with existing blank generation.
+- Missing OpenSpec project structure is rejected before the target change directory or files are created.
+- Missing `openspec/project.md` or `openspec/changes/` continues to return the existing clear generation error telling the user to run `specharbor init` first.
+- `specharbor generate <change-id> --template <template-name>` does not initialize a project and does not create `openspec/`, `openspec/project.md`, or `openspec/changes/`.
+- CLI parsing and reporting remain in `internal/adapters/cli`.
+- Generation orchestration remains in `internal/core/usecase`.
+- Generation domain concepts remain in `internal/core/domain`.
+- Generation filesystem behavior remains behind ports in `internal/core/ports`.
+- Concrete filesystem writes remain in `internal/adapters/filesystem`.
+- Built-in template content is provided by a concrete adapter, likely under `internal/adapters/templates`.
+- Core packages do not import adapters, CLI packages, terminal IO, provider SDKs, network APIs, external-agent tooling, source-control SDKs, workflow SDKs, or concrete template engines.
+- The implementation does not add guided generation, AI-assisted generation, agent-assisted generation, hybrid generation, custom user templates, remote template registry, template marketplace, filesystem template discovery, interactive prompts, provider integration, source-control integration, workflow integration, or config-backed template selection.
+- No unrelated command behavior changes are included.
+- `init`, `scan`, `validate`, `prompt`, `review`, `archive`, `config`, `help`, `version`, and unknown command behavior are preserved.
+- No README changes are included.
+- No documentation changes outside this OpenSpec change are included.
+- No CI changes are included.
+- `.github/workflows/ci.yml` is not modified.
+- `.specharbor/config.yml` is not modified.
+- Focused tests cover domain concepts, ports/use case behavior, template content adapter behavior, CLI parsing and reporting, idempotency, unsafe change ids, error cases, blank generation regression, and unrelated command regressions.
+- `go test ./...` succeeds.

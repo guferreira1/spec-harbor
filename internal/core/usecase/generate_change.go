@@ -10,20 +10,34 @@ import (
 )
 
 type GenerateChangeInput struct {
-	ProjectRoot string
-	ChangeID    string
-	Mode        domain.GenerationMode
+	ProjectRoot  string
+	ChangeID     string
+	Mode         domain.GenerationMode
+	TemplateName string
 }
 
 type GenerateChange struct {
-	fileSystem ports.GenerationFileSystem
-	content    ports.BlankChangeContent
+	fileSystem      ports.GenerationFileSystem
+	blankContent    ports.BlankChangeContent
+	templateContent ports.TemplateChangeContent
 }
 
 func NewGenerateChange(fileSystem ports.GenerationFileSystem, content ports.BlankChangeContent) *GenerateChange {
 	return &GenerateChange{
-		fileSystem: fileSystem,
-		content:    content,
+		fileSystem:   fileSystem,
+		blankContent: content,
+	}
+}
+
+func NewGenerateChangeWithTemplateContent(
+	fileSystem ports.GenerationFileSystem,
+	blankContent ports.BlankChangeContent,
+	templateContent ports.TemplateChangeContent,
+) *GenerateChange {
+	return &GenerateChange{
+		fileSystem:      fileSystem,
+		blankContent:    blankContent,
+		templateContent: templateContent,
 	}
 }
 
@@ -34,8 +48,11 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 	if useCase.fileSystem == nil {
 		return domain.GenerationResult{}, errors.New("generation filesystem is required")
 	}
-	if useCase.content == nil {
+	if input.Mode == domain.BlankMode && useCase.blankContent == nil {
 		return domain.GenerationResult{}, errors.New("blank change content is required")
+	}
+	if input.Mode == domain.TemplateMode && useCase.templateContent == nil {
+		return domain.GenerationResult{}, errors.New("template change content is required")
 	}
 
 	projectRoot := strings.TrimSpace(input.ProjectRoot)
@@ -47,11 +64,21 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 	if changeID == "" {
 		return domain.GenerationResult{}, errors.New("change id is required")
 	}
-	if input.Mode != domain.BlankMode {
-		return domain.GenerationResult{}, fmt.Errorf("unsupported generation mode: %s", input.Mode)
-	}
 	if err := validateGenerationChangeID(changeID); err != nil {
 		return domain.GenerationResult{}, err
+	}
+
+	var templateName domain.TemplateName
+	switch input.Mode {
+	case domain.BlankMode:
+	case domain.TemplateMode:
+		var err error
+		templateName, err = domain.ParseTemplateName(input.TemplateName)
+		if err != nil {
+			return domain.GenerationResult{}, err
+		}
+	default:
+		return domain.GenerationResult{}, fmt.Errorf("unsupported generation mode: %s", input.Mode)
 	}
 
 	changePath := openspecChangesDirectory + "/" + changeID
@@ -64,9 +91,20 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 		return domain.GenerationResult{}, err
 	}
 
-	createdFiles, skippedExistingFiles, err := useCase.writeBlankFiles(projectRoot, changePath)
+	createdFiles, skippedExistingFiles, err := useCase.writeChangeFiles(projectRoot, changePath, input.Mode, templateName)
 	if err != nil {
 		return domain.GenerationResult{}, err
+	}
+
+	if input.Mode == domain.TemplateMode {
+		return domain.NewTemplateGenerationResult(
+			changeID,
+			templateName,
+			changePath,
+			directoryCreated,
+			createdFiles,
+			skippedExistingFiles,
+		), nil
 	}
 
 	return domain.NewGenerationResult(
@@ -125,14 +163,19 @@ func (useCase *GenerateChange) ensureChangeDirectory(projectRoot string, changeP
 	return true, nil
 }
 
-func (useCase *GenerateChange) writeBlankFiles(projectRoot string, changePath string) ([]string, []string, error) {
+func (useCase *GenerateChange) writeChangeFiles(
+	projectRoot string,
+	changePath string,
+	mode domain.GenerationMode,
+	templateName domain.TemplateName,
+) ([]string, []string, error) {
 	var createdFiles []string
 	var skippedExistingFiles []string
 
 	for _, requiredFile := range domain.RequiredOpenSpecChangeFiles() {
-		contents, err := useCase.content.ContentFor(requiredFile)
+		contents, err := useCase.contentFor(mode, templateName, requiredFile)
 		if err != nil {
-			return nil, nil, fmt.Errorf("load blank content for %s: %w", requiredFile, err)
+			return nil, nil, err
 		}
 
 		created, err := useCase.fileSystem.WriteFileIfAbsent(projectRoot, changePath+"/"+requiredFile, contents)
@@ -148,4 +191,24 @@ func (useCase *GenerateChange) writeBlankFiles(projectRoot string, changePath st
 	}
 
 	return createdFiles, skippedExistingFiles, nil
+}
+
+func (useCase *GenerateChange) contentFor(
+	mode domain.GenerationMode,
+	templateName domain.TemplateName,
+	requiredFile string,
+) (string, error) {
+	if mode == domain.TemplateMode {
+		contents, err := useCase.templateContent.ContentFor(templateName, requiredFile)
+		if err != nil {
+			return "", fmt.Errorf("load %s template content for %s: %w", templateName, requiredFile, err)
+		}
+		return contents, nil
+	}
+
+	contents, err := useCase.blankContent.ContentFor(requiredFile)
+	if err != nil {
+		return "", fmt.Errorf("load blank content for %s: %w", requiredFile, err)
+	}
+	return contents, nil
 }
