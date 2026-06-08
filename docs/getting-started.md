@@ -1,12 +1,8 @@
 # Getting Started
 
-SpecHarbor is currently in early development.
+Use the current command reference instead of this legacy quickstart:
 
-Planned first flow:
+- [Usage](usage.md)
+- [Workflow](workflow.md)
 
-```bash
-specharbor init
-specharbor generate "Add payment webhook with idempotency"
-specharbor prompt add-payment-webhook --agent codex
-specharbor validate add-payment-webhook
-```
+The implemented prompt syntax uses `--role`.

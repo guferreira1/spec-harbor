@@ -1,12 +1,12 @@
 # SpecHarbor
 
-**SpecHarbor** is an open source CLI for generating, validating, and managing OpenSpec-based development workflows for AI coding agents.
+**SpecHarbor** is a Go CLI for OpenSpec-based AI coding-agent workflows.
 
-It helps developers move from a loose feature idea to a structured specification, task list, acceptance criteria, and agent-ready implementation prompt.
+It helps a team turn a loose idea into a scoped OpenSpec change, implementation tasks, an agent prompt, review checks, and an archive trail.
 
 ## Why
 
-AI coding agents are powerful, but without a clear specification they can easily:
+AI coding agents are useful when the task is explicit. They are risky when the work starts from a vague instruction, because they can:
 
 - modify unrelated files;
 - ignore project architecture;
@@ -14,53 +14,74 @@ AI coding agents are powerful, but without a clear specification they can easily
 - invent requirements;
 - create inconsistent implementations.
 
-SpecHarbor turns the workflow into something more controlled:
+SpecHarbor keeps the work centered on a change package that both humans and agents can inspect:
 
 ```text
 Idea -> OpenSpec change -> Tasks -> Agent prompt -> Implementation -> Review -> Archive
 ```
 
-## Supported agent targets
+SpecHarbor dogfoods this workflow for its own development. Meaningful changes to this repository should start from an OpenSpec change under `openspec/changes/`.
 
-SpecHarbor is designed to generate prompts for multiple AI coding agents, including:
+## Current Commands
 
-- Codex
-- Claude Code
-- Cursor
-- Devin
-- GitHub Copilot
-- Gemini CLI
-- Roo Code
-- Windsurf
-- Aider
-- Generic agents
-
-## Generation modes
-
-SpecHarbor supports multiple specification generation strategies:
-
-- **Blank mode**: create a minimal OpenSpec change structure for teams that want full control.
-- **Guided mode**: ask questions and generate a spec from the answers.
-- **Template mode**: generate specs from built-in or custom templates.
-- **AI-assisted mode**: generate specs using an AI provider.
-- **Hybrid mode**: combine project scanning, user answers, templates, and AI.
-
-## Planned commands
+Implemented commands on the current branch:
 
 ```bash
-specharbor init
-specharbor scan
-specharbor generate "Add payment webhook with idempotency"
-specharbor prompt add-payment-webhook --agent codex
-specharbor validate add-payment-webhook
-specharbor review add-payment-webhook
-specharbor archive add-payment-webhook
-specharbor config set ai.provider openai
+go run ./cmd/specharbor init
+go run ./cmd/specharbor scan
+go run ./cmd/specharbor generate add-example-feature --blank
+go run ./cmd/specharbor validate add-example-feature
+go run ./cmd/specharbor prompt add-example-feature --role implementer
+go run ./cmd/specharbor review add-example-feature
+go run ./cmd/specharbor archive add-example-feature
+go run ./cmd/specharbor config show
+go run ./cmd/specharbor config
 ```
 
-## Current status
+`config` is a read-only alias for `config show`. It reads `.specharbor/config.yml` and prints a local config report when the project has a supported version `1` config file.
 
-This repository contains the initial project structure and the first OpenSpec change for bootstrapping the CLI.
+## Status
+
+Implemented:
+
+- OpenSpec project initialization.
+- Stack-agnostic local project scanning.
+- Blank OpenSpec change generation.
+- Change validation, review, and archive.
+- Role-based prompt generation with `--role`.
+- Read-only local config display with `config show` and `config`.
+
+In progress:
+
+- Documentation updates are tracked through OpenSpec changes and should not describe unmerged behavior as available.
+
+Planned:
+
+- Guided, template, AI-assisted, agent-assisted, and hybrid spec generation beyond the current blank mode.
+- Config mutation commands such as `config get`, `config set`, and `config unset`.
+- AI-provider and workflow connector support.
+
+## Local Development
+
+Build the CLI from the repository root:
+
+```bash
+go build ./cmd/specharbor
+```
+
+Run tests:
+
+```bash
+go test ./...
+```
+
+## Docs
+
+- [Usage](docs/usage.md)
+- [Workflow](docs/workflow.md)
+- [Agent roles](docs/agent-roles.md)
+- [Contributing](docs/contributing.md)
+- [Development](docs/development.md)
 
 ## License
 
