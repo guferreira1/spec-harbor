@@ -52,6 +52,63 @@ func TestGenerateChangeCreatesNewBlankChange(t *testing.T) {
 	assertStringSlicesEqual(t, content.requests, domain.RequiredOpenSpecChangeFiles())
 }
 
+func TestGenerateChangeCreatesNewTemplateChange(t *testing.T) {
+	tests := []struct {
+		name         string
+		templateName domain.TemplateName
+	}{
+		{name: "feature", templateName: domain.FeatureTemplate},
+		{name: "bugfix", templateName: domain.BugfixTemplate},
+		{name: "docs", templateName: domain.DocsTemplate},
+		{name: "refactor", templateName: domain.RefactorTemplate},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			changeID := test.name + "-change"
+			fileSystem := newFakeGenerationFileSystem()
+			seedGenerationOpenSpecProject(fileSystem)
+			templateContent := newFakeTemplateChangeContent()
+			useCase := NewGenerateChangeWithTemplateContent(fileSystem, newFakeBlankChangeContent(), templateContent)
+
+			result, err := useCase.Execute(GenerateChangeInput{
+				ProjectRoot:  "/project",
+				ChangeID:     changeID,
+				Mode:         domain.TemplateMode,
+				TemplateName: string(test.templateName),
+			})
+			if err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+
+			changePath := openspecChangesDirectory + "/" + changeID
+			if result.Mode != domain.TemplateMode {
+				t.Fatalf("Mode = %q, want %q", result.Mode, domain.TemplateMode)
+			}
+			if result.TemplateName != test.templateName {
+				t.Fatalf("TemplateName = %q, want %q", result.TemplateName, test.templateName)
+			}
+			if result.ChangePath != changePath {
+				t.Fatalf("ChangePath = %q, want %q", result.ChangePath, changePath)
+			}
+			if !result.ChangeDirectoryCreated {
+				t.Fatalf("ChangeDirectoryCreated = false, want true")
+			}
+			assertStringSlicesEqual(t, result.CreatedFiles(), domain.RequiredOpenSpecChangeFiles())
+			assertStringSlicesEqual(t, result.SkippedExistingFiles(), nil)
+
+			for _, requiredFile := range domain.RequiredOpenSpecChangeFiles() {
+				path := changePath + "/" + requiredFile
+				want := defaultTemplateContent(test.templateName, requiredFile)
+				if fileSystem.files[path] != want {
+					t.Fatalf("file %q content = %q, want %q", path, fileSystem.files[path], want)
+				}
+			}
+			assertTemplateRequestsEqual(t, templateContent.requests, test.templateName, domain.RequiredOpenSpecChangeFiles())
+		})
+	}
+}
+
 func TestGenerateChangeCreatesTargetDirectoryWhenMissing(t *testing.T) {
 	changeID := "missing-directory"
 	fileSystem := newFakeGenerationFileSystem()
@@ -107,6 +164,49 @@ func TestGenerateChangeFillsMissingFilesWhenTargetDirectoryExists(t *testing.T) 
 	}
 }
 
+func TestGenerateChangeTemplateFillsMissingFilesAndPreservesExisting(t *testing.T) {
+	changeID := "partial-template-change"
+	changePath := openspecChangesDirectory + "/" + changeID
+	fileSystem := newFakeGenerationFileSystem()
+	seedGenerationOpenSpecProject(fileSystem)
+	fileSystem.directories[changePath] = true
+	fileSystem.files[changePath+"/proposal.md"] = "custom proposal"
+	fileSystem.files[changePath+"/tasks.md"] = "custom tasks"
+
+	result, err := NewGenerateChangeWithTemplateContent(
+		fileSystem,
+		newFakeBlankChangeContent(),
+		newFakeTemplateChangeContent(),
+	).Execute(GenerateChangeInput{
+		ProjectRoot:  "/project",
+		ChangeID:     changeID,
+		Mode:         domain.TemplateMode,
+		TemplateName: string(domain.FeatureTemplate),
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if result.ChangeDirectoryCreated {
+		t.Fatalf("ChangeDirectoryCreated = true, want false")
+	}
+	assertStringSlicesEqual(t, result.CreatedFiles(), []string{"design.md", "acceptance-criteria.md", "risks.md"})
+	assertStringSlicesEqual(t, result.SkippedExistingFiles(), []string{"proposal.md", "tasks.md"})
+	if fileSystem.files[changePath+"/proposal.md"] != "custom proposal" {
+		t.Fatalf("existing proposal.md was overwritten")
+	}
+	if fileSystem.files[changePath+"/tasks.md"] != "custom tasks" {
+		t.Fatalf("existing tasks.md was overwritten")
+	}
+	for _, requiredFile := range []string{"design.md", "acceptance-criteria.md", "risks.md"} {
+		path := changePath + "/" + requiredFile
+		want := defaultTemplateContent(domain.FeatureTemplate, requiredFile)
+		if fileSystem.files[path] != want {
+			t.Fatalf("file %q content = %q, want %q", path, fileSystem.files[path], want)
+		}
+	}
+}
+
 func TestGenerateChangeSkipsExistingFilesAndDoesNotOverwrite(t *testing.T) {
 	changeID := "existing-change"
 	changePath := openspecChangesDirectory + "/" + changeID
@@ -156,11 +256,6 @@ func TestGenerateChangeRejectsInvalidInput(t *testing.T) {
 			name:  "unsupported guided mode",
 			input: GenerateChangeInput{ProjectRoot: "/project", ChangeID: "change", Mode: domain.GuidedMode},
 			want:  "unsupported generation mode: guided",
-		},
-		{
-			name:  "unsupported template mode",
-			input: GenerateChangeInput{ProjectRoot: "/project", ChangeID: "change", Mode: domain.TemplateMode},
-			want:  "unsupported generation mode: template",
 		},
 		{
 			name:  "unsupported ai-assisted mode",
@@ -226,6 +321,124 @@ func TestGenerateChangeRejectsInvalidInput(t *testing.T) {
 	}
 }
 
+func TestGenerateChangeRejectsInvalidTemplateInputBeforeTargetWrites(t *testing.T) {
+	tests := []struct {
+		name  string
+		input GenerateChangeInput
+		want  string
+	}{
+		{
+			name: "missing template name",
+			input: GenerateChangeInput{
+				ProjectRoot: "/project",
+				ChangeID:    "change",
+				Mode:        domain.TemplateMode,
+			},
+			want: "template name is required",
+		},
+		{
+			name: "unknown template name",
+			input: GenerateChangeInput{
+				ProjectRoot:  "/project",
+				ChangeID:     "change",
+				Mode:         domain.TemplateMode,
+				TemplateName: "maintenance",
+			},
+			want: "unknown template name: maintenance",
+		},
+		{
+			name: "unsafe template change id",
+			input: GenerateChangeInput{
+				ProjectRoot:  "/project",
+				ChangeID:     "../unsafe",
+				Mode:         domain.TemplateMode,
+				TemplateName: string(domain.FeatureTemplate),
+			},
+			want: "change id must be a safe single path segment",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fileSystem := newFakeGenerationFileSystem()
+			templateContent := newFakeTemplateChangeContent()
+
+			_, err := NewGenerateChangeWithTemplateContent(
+				fileSystem,
+				newFakeBlankChangeContent(),
+				templateContent,
+			).Execute(test.input)
+			if err == nil {
+				t.Fatalf("Execute() error = nil, want %q", test.want)
+			}
+			if !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("Execute() error = %q, want %q", err.Error(), test.want)
+			}
+			if fileSystem.operationCount() != 0 {
+				t.Fatalf("filesystem operations = %d, want 0 before rejecting invalid template input", fileSystem.operationCount())
+			}
+			if len(templateContent.requests) != 0 {
+				t.Fatalf("template content requests = %v, want none before rejecting invalid template input", templateContent.requests)
+			}
+		})
+	}
+}
+
+func TestGenerateChangeTemplateUsesSameUnsafeChangeIDValidationAsBlankGeneration(t *testing.T) {
+	unsafeChangeIDs := []string{
+		".",
+		"..",
+		"../outside",
+		"/outside",
+		"bad/id",
+		`bad\id`,
+		"C:bad",
+		"-bad",
+	}
+
+	for _, changeID := range unsafeChangeIDs {
+		t.Run(changeID, func(t *testing.T) {
+			blankFileSystem := newFakeGenerationFileSystem()
+			_, blankErr := NewGenerateChange(blankFileSystem, newFakeBlankChangeContent()).Execute(GenerateChangeInput{
+				ProjectRoot: "/project",
+				ChangeID:    changeID,
+				Mode:        domain.BlankMode,
+			})
+			if blankErr == nil {
+				t.Fatalf("blank Execute() error = nil, want unsafe change id error")
+			}
+
+			templateFileSystem := newFakeGenerationFileSystem()
+			templateContent := newFakeTemplateChangeContent()
+			_, templateErr := NewGenerateChangeWithTemplateContent(
+				templateFileSystem,
+				newFakeBlankChangeContent(),
+				templateContent,
+			).Execute(GenerateChangeInput{
+				ProjectRoot:  "/project",
+				ChangeID:     changeID,
+				Mode:         domain.TemplateMode,
+				TemplateName: string(domain.FeatureTemplate),
+			})
+			if templateErr == nil {
+				t.Fatalf("template Execute() error = nil, want unsafe change id error")
+			}
+			if templateErr.Error() != blankErr.Error() {
+				t.Fatalf("template Execute() error = %q, want same unsafe id error as blank %q", templateErr.Error(), blankErr.Error())
+			}
+			if blankFileSystem.operationCount() != 0 {
+				t.Fatalf("blank filesystem operations = %d, want 0 before rejecting unsafe id", blankFileSystem.operationCount())
+			}
+			if templateFileSystem.operationCount() != 0 {
+				t.Fatalf("template filesystem operations = %d, want 0 before rejecting unsafe id", templateFileSystem.operationCount())
+			}
+			if len(templateContent.requests) != 0 {
+				t.Fatalf("template content requests = %v, want none before rejecting unsafe id", templateContent.requests)
+			}
+		})
+	}
+}
+
 func TestGenerateChangeRejectsMissingOpenSpecProjectBeforeTargetWrites(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -279,6 +492,96 @@ func TestGenerateChangeRejectsMissingOpenSpecProjectBeforeTargetWrites(t *testin
 				t.Fatalf("generation created openspec/changes")
 			}
 		})
+	}
+}
+
+func TestGenerateChangeTemplateRejectsMissingOpenSpecProjectBeforeTargetWrites(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(fileSystem *fakeGenerationFileSystem)
+	}{
+		{
+			name:  "missing project file",
+			setup: func(fileSystem *fakeGenerationFileSystem) { fileSystem.directories[openspecChangesDirectory] = true },
+		},
+		{
+			name:  "missing changes directory",
+			setup: func(fileSystem *fakeGenerationFileSystem) { fileSystem.files[openspecProjectFile] = "project" },
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fileSystem := newFakeGenerationFileSystem()
+			templateContent := newFakeTemplateChangeContent()
+			test.setup(fileSystem)
+
+			_, err := NewGenerateChangeWithTemplateContent(
+				fileSystem,
+				newFakeBlankChangeContent(),
+				templateContent,
+			).Execute(GenerateChangeInput{
+				ProjectRoot:  "/project",
+				ChangeID:     "change",
+				Mode:         domain.TemplateMode,
+				TemplateName: string(domain.FeatureTemplate),
+			})
+			if err == nil {
+				t.Fatalf("Execute() error = nil, want missing project structure error")
+			}
+			for _, want := range []string{"OpenSpec project structure is missing", "specharbor init"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("Execute() error = %q, want to contain %q", err.Error(), want)
+				}
+			}
+			if len(fileSystem.createdDirectories) != 0 {
+				t.Fatalf("created directories = %v, want none", fileSystem.createdDirectories)
+			}
+			if len(fileSystem.writtenFiles) != 0 {
+				t.Fatalf("written files = %v, want none", fileSystem.writtenFiles)
+			}
+			if len(templateContent.requests) != 0 {
+				t.Fatalf("template content requests = %v, want none before project structure is available", templateContent.requests)
+			}
+		})
+	}
+}
+
+func TestGenerateChangeTemplateReturnsContentLoadingErrorsBeforeFileWrites(t *testing.T) {
+	wantErr := errors.New("template content unavailable")
+	fileSystem := newFakeGenerationFileSystem()
+	seedGenerationOpenSpecProject(fileSystem)
+	templateContent := newFakeTemplateChangeContent()
+	templateContent.errors["feature:proposal.md"] = wantErr
+
+	_, err := NewGenerateChangeWithTemplateContent(
+		fileSystem,
+		newFakeBlankChangeContent(),
+		templateContent,
+	).Execute(GenerateChangeInput{
+		ProjectRoot:  "/project",
+		ChangeID:     "change",
+		Mode:         domain.TemplateMode,
+		TemplateName: string(domain.FeatureTemplate),
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want content error")
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Execute() error = %v, want wrapping %v", err, wantErr)
+	}
+	if !strings.Contains(err.Error(), "load feature template content for proposal.md") {
+		t.Fatalf("Execute() error = %q, want template content context", err.Error())
+	}
+	if len(fileSystem.writtenFiles) != 0 {
+		t.Fatalf("written files = %v, want none when first template file content cannot load", fileSystem.writtenFiles)
+	}
+	if len(templateContent.requests) != 1 {
+		t.Fatalf("template content requests = %v, want only first required file", templateContent.requests)
+	}
+	firstRequiredFile := domain.RequiredOpenSpecChangeFiles()[0]
+	if templateContent.requests[0].templateName != domain.FeatureTemplate || templateContent.requests[0].relativePath != firstRequiredFile {
+		t.Fatalf("template content requests = %v, want first %s request for %s", templateContent.requests, domain.FeatureTemplate, firstRequiredFile)
 	}
 }
 
@@ -361,6 +664,34 @@ func TestGenerateChangeReturnsContentLoadingErrors(t *testing.T) {
 	}
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("Execute() error = %v, want wrapping %v", err, wantErr)
+	}
+}
+
+func TestGenerateChangeReturnsTemplateContentLoadingErrors(t *testing.T) {
+	wantErr := errors.New("template content unavailable")
+	fileSystem := newFakeGenerationFileSystem()
+	seedGenerationOpenSpecProject(fileSystem)
+	templateContent := newFakeTemplateChangeContent()
+	templateContent.errors["feature:proposal.md"] = wantErr
+
+	_, err := NewGenerateChangeWithTemplateContent(
+		fileSystem,
+		newFakeBlankChangeContent(),
+		templateContent,
+	).Execute(GenerateChangeInput{
+		ProjectRoot:  "/project",
+		ChangeID:     "change",
+		Mode:         domain.TemplateMode,
+		TemplateName: string(domain.FeatureTemplate),
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want content error")
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Execute() error = %v, want wrapping %v", err, wantErr)
+	}
+	if !strings.Contains(err.Error(), "load feature template content for proposal.md") {
+		t.Fatalf("Execute() error = %q, want template content context", err.Error())
 	}
 }
 
@@ -459,6 +790,35 @@ func defaultBlankContent(relativePath string) string {
 	return "blank:" + relativePath
 }
 
+type templateContentRequest struct {
+	templateName domain.TemplateName
+	relativePath string
+}
+
+type fakeTemplateChangeContent struct {
+	errors   map[string]error
+	requests []templateContentRequest
+}
+
+func newFakeTemplateChangeContent() *fakeTemplateChangeContent {
+	return &fakeTemplateChangeContent{errors: make(map[string]error)}
+}
+
+func (content *fakeTemplateChangeContent) ContentFor(templateName domain.TemplateName, relativePath string) (string, error) {
+	content.requests = append(content.requests, templateContentRequest{
+		templateName: templateName,
+		relativePath: relativePath,
+	})
+	if err := content.errors[string(templateName)+":"+relativePath]; err != nil {
+		return "", err
+	}
+	return defaultTemplateContent(templateName, relativePath), nil
+}
+
+func defaultTemplateContent(templateName domain.TemplateName, relativePath string) string {
+	return "template:" + string(templateName) + ":" + relativePath
+}
+
 func assertStringSlicesEqual(t *testing.T, got []string, want []string) {
 	t.Helper()
 
@@ -468,6 +828,24 @@ func assertStringSlicesEqual(t *testing.T, got []string, want []string) {
 	for index := range got {
 		if got[index] != want[index] {
 			t.Fatalf("slice = %v, want %v", got, want)
+		}
+	}
+}
+
+func assertTemplateRequestsEqual(
+	t *testing.T,
+	got []templateContentRequest,
+	templateName domain.TemplateName,
+	requiredFiles []string,
+) {
+	t.Helper()
+
+	if len(got) != len(requiredFiles) {
+		t.Fatalf("template requests = %v, want %d requests", got, len(requiredFiles))
+	}
+	for index, requiredFile := range requiredFiles {
+		if got[index].templateName != templateName || got[index].relativePath != requiredFile {
+			t.Fatalf("template requests = %v, want %s request for %s at index %d", got, templateName, requiredFile, index)
 		}
 	}
 }

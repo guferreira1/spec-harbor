@@ -8,6 +8,12 @@ func TestBlankGenerationModeValue(t *testing.T) {
 	}
 }
 
+func TestTemplateGenerationModeValue(t *testing.T) {
+	if TemplateMode != "template" {
+		t.Fatalf("TemplateMode = %q, want template", TemplateMode)
+	}
+}
+
 func TestNewGenerationResultCopiesFileSlices(t *testing.T) {
 	created := []string{"proposal.md"}
 	skipped := []string{"design.md"}
@@ -44,5 +50,23 @@ func TestGenerationResultAccessorsReturnCopies(t *testing.T) {
 	}
 	if result.SkippedExistingFiles()[0] != "design.md" {
 		t.Fatalf("SkippedExistingFiles()[0] = %q, want design.md", result.SkippedExistingFiles()[0])
+	}
+}
+
+func TestNewTemplateGenerationResultSetsTemplateModeAndName(t *testing.T) {
+	result := NewTemplateGenerationResult(
+		"change",
+		FeatureTemplate,
+		"openspec/changes/change",
+		true,
+		[]string{"proposal.md"},
+		[]string{"design.md"},
+	)
+
+	if result.Mode != TemplateMode {
+		t.Fatalf("Mode = %q, want %q", result.Mode, TemplateMode)
+	}
+	if result.TemplateName != FeatureTemplate {
+		t.Fatalf("TemplateName = %q, want %q", result.TemplateName, FeatureTemplate)
 	}
 }

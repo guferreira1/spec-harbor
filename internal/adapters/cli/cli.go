@@ -192,13 +192,15 @@ func generateCommand(ctx CommandContext) error {
 	}
 
 	fileSystem := filesystem.NewLocalFileSystem()
-	content := templates.NewDefaultBlankChangeContent()
-	generateChange := usecase.NewGenerateChange(fileSystem, content)
+	blankContent := templates.NewDefaultBlankChangeContent()
+	templateContent := templates.NewBuiltInChangeTemplates()
+	generateChange := usecase.NewGenerateChangeWithTemplateContent(fileSystem, blankContent, templateContent)
 
 	result, err := generateChange.Execute(usecase.GenerateChangeInput{
-		ProjectRoot: root,
-		ChangeID:    arguments.changeID,
-		Mode:        domain.BlankMode,
+		ProjectRoot:  root,
+		ChangeID:     arguments.changeID,
+		Mode:         arguments.mode,
+		TemplateName: arguments.templateName,
 	})
 	if err != nil {
 		return err
@@ -209,19 +211,41 @@ func generateCommand(ctx CommandContext) error {
 }
 
 type generateArguments struct {
-	changeID string
+	changeID     string
+	mode         domain.GenerationMode
+	templateName string
 }
 
 func parseGenerateArguments(args []string) (generateArguments, error) {
 	var positionals []string
-	blankCount := 0
+	blankProvided := false
+	templateProvided := false
+	var templateName string
 
-	for _, arg := range args {
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
 		if arg == "--blank" {
-			blankCount++
-			if blankCount > 1 {
+			if blankProvided {
 				return generateArguments{}, fmt.Errorf("blank generation flag specified more than once")
 			}
+			blankProvided = true
+			continue
+		}
+
+		if arg == "--template" {
+			if templateProvided {
+				return generateArguments{}, fmt.Errorf("template generation flag specified more than once")
+			}
+			if index+1 >= len(args) {
+				return generateArguments{}, fmt.Errorf("template name is required")
+			}
+			if strings.HasPrefix(args[index+1], "-") {
+				return generateArguments{}, fmt.Errorf("template name is required")
+			}
+
+			templateName = args[index+1]
+			templateProvided = true
+			index++
 			continue
 		}
 
@@ -232,17 +256,33 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 		positionals = append(positionals, arg)
 	}
 
+	if blankProvided && templateProvided {
+		return generateArguments{}, fmt.Errorf("blank and template generation flags cannot be used together")
+	}
 	if len(positionals) == 0 {
 		return generateArguments{}, fmt.Errorf("change id is required")
 	}
 	if len(positionals) > 1 {
 		return generateArguments{}, fmt.Errorf("unexpected argument: %s", positionals[1])
 	}
-	if blankCount == 0 {
-		return generateArguments{}, fmt.Errorf("blank generation flag is required")
+	if !blankProvided && !templateProvided {
+		return generateArguments{}, fmt.Errorf("generation mode flag is required")
+	}
+	if templateProvided {
+		if strings.TrimSpace(templateName) == "" {
+			return generateArguments{}, fmt.Errorf("template name is required")
+		}
+		return generateArguments{
+			changeID:     positionals[0],
+			mode:         domain.TemplateMode,
+			templateName: templateName,
+		}, nil
 	}
 
-	return generateArguments{changeID: positionals[0]}, nil
+	return generateArguments{
+		changeID: positionals[0],
+		mode:     domain.BlankMode,
+	}, nil
 }
 
 func printGenerationReport(output io.Writer, result domain.GenerationResult) {
@@ -253,8 +293,15 @@ func printGenerationReport(output io.Writer, result domain.GenerationResult) {
 		directoryStatus = "created"
 	}
 
-	fmt.Fprintln(output, "SpecHarbor blank change generated.")
+	if result.Mode == domain.TemplateMode {
+		fmt.Fprintln(output, "SpecHarbor template change generated.")
+	} else {
+		fmt.Fprintln(output, "SpecHarbor blank change generated.")
+	}
 	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
+	if result.Mode == domain.TemplateMode {
+		fmt.Fprintf(output, "Template: %s\n", result.TemplateName)
+	}
 	fmt.Fprintf(output, "Path: %s\n", result.ChangePath)
 	fmt.Fprintf(output, "Directory: %s\n", directoryStatus)
 	fmt.Fprintf(output, "Created files: %d\n", len(createdFiles))

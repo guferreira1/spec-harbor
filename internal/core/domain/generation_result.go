@@ -3,6 +3,7 @@ package domain
 type GenerationResult struct {
 	ChangeID               string
 	Mode                   GenerationMode
+	TemplateName           TemplateName
 	ChangePath             string
 	ChangeDirectoryCreated bool
 	createdFiles           []string
@@ -20,6 +21,25 @@ func NewGenerationResult(
 	return GenerationResult{
 		ChangeID:               changeID,
 		Mode:                   mode,
+		ChangePath:             changePath,
+		ChangeDirectoryCreated: changeDirectoryCreated,
+		createdFiles:           append([]string(nil), createdFiles...),
+		skippedExistingFiles:   append([]string(nil), skippedExistingFiles...),
+	}
+}
+
+func NewTemplateGenerationResult(
+	changeID string,
+	templateName TemplateName,
+	changePath string,
+	changeDirectoryCreated bool,
+	createdFiles []string,
+	skippedExistingFiles []string,
+) GenerationResult {
+	return GenerationResult{
+		ChangeID:               changeID,
+		Mode:                   TemplateMode,
+		TemplateName:           templateName,
 		ChangePath:             changePath,
 		ChangeDirectoryCreated: changeDirectoryCreated,
 		createdFiles:           append([]string(nil), createdFiles...),

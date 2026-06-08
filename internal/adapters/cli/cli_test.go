@@ -161,6 +161,108 @@ func TestExecuteGenerateBlankAcceptsFlagBeforeChangeID(t *testing.T) {
 	}
 }
 
+func TestExecuteGenerateTemplatePrintsCreatedReport(t *testing.T) {
+	tests := []struct {
+		templateName string
+		changeID     string
+		wantProposal string
+	}{
+		{
+			templateName: "feature",
+			changeID:     "add-feature",
+			wantProposal: "## Proposed Solution",
+		},
+		{
+			templateName: "bugfix",
+			changeID:     "fix-bug",
+			wantProposal: "## Current Behavior",
+		},
+		{
+			templateName: "docs",
+			changeID:     "update-docs",
+			wantProposal: "## Documentation Goal",
+		},
+		{
+			templateName: "refactor",
+			changeID:     "cleanup-code",
+			wantProposal: "## Refactor Goal",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.templateName, func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+			createOpenSpecProject(t, root)
+
+			var output bytes.Buffer
+			if err := execute([]string{"generate", test.changeID, "--template", test.templateName}, &output); err != nil {
+				t.Fatalf("execute(generate) error = %v", err)
+			}
+
+			want := `SpecHarbor template change generated.
+Change: ` + test.changeID + `
+Template: ` + test.templateName + `
+Path: openspec/changes/` + test.changeID + `
+Directory: created
+Created files: 5
+Skipped existing files: 0
+
+Created:
+- proposal.md
+- design.md
+- tasks.md
+- acceptance-criteria.md
+- risks.md
+`
+			if output.String() != want {
+				t.Fatalf("generate output = %q, want %q", output.String(), want)
+			}
+
+			changeDirectory := filepath.Join(root, "openspec", "changes", test.changeID)
+			for _, requiredFile := range domain.RequiredOpenSpecChangeFiles() {
+				path := filepath.Join(changeDirectory, requiredFile)
+				contents, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatalf("ReadFile(%q) error = %v", path, err)
+				}
+				if strings.TrimSpace(string(contents)) == "" {
+					t.Fatalf("generated file %q is empty", requiredFile)
+				}
+				if requiredFile == "tasks.md" {
+					assertUncheckedTasksOnly(t, string(contents))
+				}
+			}
+
+			proposal, err := os.ReadFile(filepath.Join(changeDirectory, "proposal.md"))
+			if err != nil {
+				t.Fatalf("ReadFile(proposal.md) error = %v", err)
+			}
+			if !strings.Contains(string(proposal), test.wantProposal) {
+				t.Fatalf("proposal.md = %q, want to contain %q", string(proposal), test.wantProposal)
+			}
+		})
+	}
+}
+
+func TestExecuteGenerateTemplateAcceptsFlagBeforeChangeID(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+
+	var output bytes.Buffer
+	if err := execute([]string{"generate", "--template", "feature", "order-independent-template"}, &output); err != nil {
+		t.Fatalf("execute(generate) error = %v", err)
+	}
+
+	if !strings.Contains(output.String(), "Change: order-independent-template") {
+		t.Fatalf("generate output = %q, want change id", output.String())
+	}
+	if !strings.Contains(output.String(), "Template: feature") {
+		t.Fatalf("generate output = %q, want template name", output.String())
+	}
+}
+
 func TestExecuteGenerateBlankPrintsSkippedExistingReport(t *testing.T) {
 	root := t.TempDir()
 	t.Chdir(root)
@@ -201,6 +303,71 @@ Skipped existing:
 	}
 }
 
+func TestExecuteGenerateTemplateCompletesPartialChangeAndPrintsSkippedReport(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	createOpenSpecChange(t, root, "partial-template-change", []string{"proposal.md", "tasks.md"})
+
+	changeDirectory := filepath.Join(root, "openspec", "changes", "partial-template-change")
+	proposalPath := filepath.Join(changeDirectory, "proposal.md")
+	tasksPath := filepath.Join(changeDirectory, "tasks.md")
+	if err := os.WriteFile(proposalPath, []byte("custom proposal"), 0o644); err != nil {
+		t.Fatalf("WriteFile(proposal.md) error = %v", err)
+	}
+	if err := os.WriteFile(tasksPath, []byte("custom tasks"), 0o644); err != nil {
+		t.Fatalf("WriteFile(tasks.md) error = %v", err)
+	}
+
+	var output bytes.Buffer
+	if err := execute([]string{"generate", "partial-template-change", "--template", "feature"}, &output); err != nil {
+		t.Fatalf("execute(generate) error = %v", err)
+	}
+
+	want := `SpecHarbor template change generated.
+Change: partial-template-change
+Template: feature
+Path: openspec/changes/partial-template-change
+Directory: existing
+Created files: 3
+Skipped existing files: 2
+
+Created:
+- design.md
+- acceptance-criteria.md
+- risks.md
+
+Skipped existing:
+- proposal.md
+- tasks.md
+`
+	if output.String() != want {
+		t.Fatalf("generate output = %q, want %q", output.String(), want)
+	}
+
+	proposal, err := os.ReadFile(proposalPath)
+	if err != nil {
+		t.Fatalf("ReadFile(proposal.md) error = %v", err)
+	}
+	if string(proposal) != "custom proposal" {
+		t.Fatalf("proposal.md contents = %q, want preserved custom proposal", string(proposal))
+	}
+	tasks, err := os.ReadFile(tasksPath)
+	if err != nil {
+		t.Fatalf("ReadFile(tasks.md) error = %v", err)
+	}
+	if string(tasks) != "custom tasks" {
+		t.Fatalf("tasks.md contents = %q, want preserved custom tasks", string(tasks))
+	}
+	design, err := os.ReadFile(filepath.Join(changeDirectory, "design.md"))
+	if err != nil {
+		t.Fatalf("ReadFile(design.md) error = %v", err)
+	}
+	if !strings.Contains(string(design), "## Architecture Notes") {
+		t.Fatalf("design.md = %q, want feature template content", string(design))
+	}
+}
+
 func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 	tests := []struct {
 		name string
@@ -213,9 +380,9 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 			want: "change id is required",
 		},
 		{
-			name: "missing blank flag",
+			name: "missing generation mode flag",
 			args: []string{"generate", "change"},
-			want: "blank generation flag is required",
+			want: "generation mode flag is required",
 		},
 		{
 			name: "blank without change id",
@@ -233,9 +400,44 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 			want: "unsupported flag: --guided",
 		},
 		{
-			name: "unsupported template flag",
+			name: "missing template name",
 			args: []string{"generate", "change", "--template"},
-			want: "unsupported flag: --template",
+			want: "template name is required",
+		},
+		{
+			name: "template without change id",
+			args: []string{"generate", "--template", "feature"},
+			want: "change id is required",
+		},
+		{
+			name: "empty template name",
+			args: []string{"generate", "change", "--template", ""},
+			want: "template name is required",
+		},
+		{
+			name: "unknown template name",
+			args: []string{"generate", "change", "--template", "maintenance"},
+			want: "unknown template name: maintenance",
+		},
+		{
+			name: "blank and template flags together",
+			args: []string{"generate", "change", "--blank", "--template", "feature"},
+			want: "blank and template generation flags cannot be used together",
+		},
+		{
+			name: "template and blank flags together",
+			args: []string{"generate", "change", "--template", "feature", "--blank"},
+			want: "blank and template generation flags cannot be used together",
+		},
+		{
+			name: "blank and template flags together without change id",
+			args: []string{"generate", "--blank", "--template", "feature"},
+			want: "blank and template generation flags cannot be used together",
+		},
+		{
+			name: "duplicate template flag",
+			args: []string{"generate", "change", "--template", "feature", "--template", "bugfix"},
+			want: "template generation flag specified more than once",
 		},
 		{
 			name: "unsupported ai flag",
@@ -268,8 +470,18 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 			want: "unexpected argument: extra",
 		},
 		{
+			name: "template extra argument",
+			args: []string{"generate", "change", "--template", "feature", "extra"},
+			want: "unexpected argument: extra",
+		},
+		{
 			name: "unsafe traversal change id",
 			args: []string{"generate", "../unsafe", "--blank"},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe template traversal change id",
+			args: []string{"generate", "../unsafe", "--template", "feature"},
 			want: "change id must be a safe single path segment",
 		},
 		{
@@ -348,6 +560,45 @@ func TestExecuteGenerateRejectsMissingOpenSpecProjectWithoutCreatingStructure(t 
 		t.Fatalf("execute(generate) output = %q, want empty output", output.String())
 	}
 	assertPathDoesNotExist(t, root, "openspec")
+}
+
+func TestExecuteGenerateTemplateRejectsMissingOpenSpecProjectWithoutCreatingStructure(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	var output bytes.Buffer
+	err := execute([]string{"generate", "missing-project", "--template", "feature"}, &output)
+	if err == nil {
+		t.Fatalf("execute(generate) error = nil, want missing project structure error")
+	}
+	for _, want := range []string{"OpenSpec project structure is missing", "specharbor init"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("execute(generate) error = %q, want to contain %q", err.Error(), want)
+		}
+	}
+	if output.String() != "" {
+		t.Fatalf("execute(generate) output = %q, want empty output", output.String())
+	}
+	assertPathDoesNotExist(t, root, "openspec")
+}
+
+func TestExecuteGenerateTemplateRejectsUnknownTemplateWithoutCreatingChange(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+
+	var output bytes.Buffer
+	err := execute([]string{"generate", "unknown-template-change", "--template", "maintenance"}, &output)
+	if err == nil {
+		t.Fatalf("execute(generate) error = nil, want unknown template error")
+	}
+	if !strings.Contains(err.Error(), "unknown template name: maintenance") {
+		t.Fatalf("execute(generate) error = %q, want unknown template context", err.Error())
+	}
+	if output.String() != "" {
+		t.Fatalf("execute(generate) output = %q, want empty output", output.String())
+	}
+	assertPathDoesNotExist(t, root, "openspec/changes/unknown-template-change")
 }
 
 func TestExecutePromptPrintsRenderedPromptOnly(t *testing.T) {

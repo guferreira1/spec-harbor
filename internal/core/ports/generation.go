@@ -1,5 +1,7 @@
 package ports
 
+import "github.com/guferreira1/spec-harbor/internal/core/domain"
+
 // GenerationFileSystem provides only the filesystem operations required by
 // OpenSpec change generation.
 type GenerationFileSystem interface {
@@ -13,4 +15,10 @@ type GenerationFileSystem interface {
 // OpenSpec change files.
 type BlankChangeContent interface {
 	ContentFor(relativePath string) (string, error)
+}
+
+// TemplateChangeContent provides deterministic starter content for built-in
+// OpenSpec change templates.
+type TemplateChangeContent interface {
+	ContentFor(templateName domain.TemplateName, relativePath string) (string, error)
 }
