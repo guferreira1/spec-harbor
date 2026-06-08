@@ -34,13 +34,34 @@ go run ./cmd/specharbor scan
 
 The report can include detected ecosystems, package managers, test command hints, CI signals, container or deployment signals, SpecHarbor/OpenSpec signals, and notes. The command does not require flags or arguments.
 
-### Generate a Blank Change
+### Generate a Change
 
 ```bash
 go run ./cmd/specharbor generate add-example-feature --blank
 ```
 
-`generate <change-id> --blank` creates the expected OpenSpec change structure without writing requirements for you:
+`generate <change-id> --blank` creates the expected OpenSpec change structure with blank/manual starter content.
+
+Built-in template generation uses the same command with `--template <template-name>`:
+
+```bash
+go run ./cmd/specharbor generate <change-id> --template <template-name>
+```
+
+For example:
+
+```bash
+go run ./cmd/specharbor generate add-example-feature --template feature
+```
+
+Supported built-in templates are exactly:
+
+- `feature`
+- `bugfix`
+- `docs`
+- `refactor`
+
+Both blank and built-in template generation create the same required OpenSpec change files:
 
 ```text
 openspec/changes/<change-id>/
@@ -51,7 +72,19 @@ openspec/changes/<change-id>/
   risks.md
 ```
 
-Blank generation is the only implemented generation mode. Guided, template, AI-assisted, agent-assisted, and hybrid generation are planned.
+Built-in template content is deterministic, local, and generic starter content. It is safe to edit after generation, and it does not mean SpecHarbor inferred project-specific requirements.
+
+Existing files are skipped and are not overwritten. If a change directory partially exists, running generation again recovers it by creating only the missing required files.
+
+Copy-pasteable examples from the repository root:
+
+```bash
+go run ./cmd/specharbor generate add-example-feature --blank
+go run ./cmd/specharbor generate add-example-feature --template feature
+go run ./cmd/specharbor generate fix-example-bug --template bugfix
+go run ./cmd/specharbor generate update-example-docs --template docs
+go run ./cmd/specharbor generate refactor-example-flow --template refactor
+```
 
 ### Validate a Change
 
@@ -132,7 +165,12 @@ Do not archive a change until the implementation is complete and reviewed.
 
 The following items are product direction, not implemented command behavior:
 
-- generation modes other than `--blank`;
+- guided generation;
+- AI-assisted generation;
+- agent-assisted generation;
+- hybrid generation;
+- custom, remote, and config-driven templates;
+- interactive generation prompts;
 - AI provider setup;
 - provider API key management;
 - config mutation commands;
