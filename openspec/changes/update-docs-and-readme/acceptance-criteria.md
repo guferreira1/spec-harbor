@@ -1,0 +1,31 @@
+# Acceptance Criteria: Update Docs and README
+
+- `README.md` accurately defines SpecHarbor as a Go CLI for OpenSpec-based development workflows for AI coding agents.
+- `README.md` explains the current product direction without marketing fluff.
+- Documentation clearly separates implemented commands from in-progress or planned commands.
+- Implemented command examples use verified syntax for `init`, `generate <change-id> --blank`, `validate <change-id>`, `prompt <change-id> --role <role>`, `review <change-id>`, and `archive <change-id>`.
+- Documentation does not claim scan or config behavior is complete unless it is merged and verified on the documentation branch.
+- Documentation describes scan/config as roadmap or in progress when merge status is not verified.
+- Documentation explains the OpenSpec/SDD workflow that SpecHarbor supports.
+- Documentation explains the expected OpenSpec change file structure.
+- Usage examples are simple, copy-pasteable, and oriented around running from the repository root.
+- Documentation includes local build guidance when valid.
+- Documentation includes local test guidance using `go test ./...`.
+- Agent role documentation explains the Spec Author, Architecture Reviewer, Implementer, Test Engineer, and Change Reviewer roles.
+- Agent role documentation shows role prompt generation with `specharbor prompt <change-id> --role <role>`.
+- Contributor documentation explains that meaningful feature work should start with an OpenSpec change.
+- Contributor documentation tells contributors to keep implementation scope aligned to the active change.
+- Contributor documentation tells contributors to update `tasks.md` only for work actually completed.
+- Contributor documentation includes practical branch hygiene guidance for parallel coding-agent work.
+- Documentation warns that unrelated dirty worktree changes must not be reverted or overwritten.
+- Documentation states that SpecHarbor's own CI is Go-specific.
+- Documentation states that user project scanning must remain stack-agnostic.
+- Documentation avoids secrets, API keys, provider credentials, and provider-specific setup instructions beyond high-level roadmap notes.
+- Documentation does not introduce package-manager distribution, install scripts, release automation, website tooling, or badges unless explicitly justified.
+- Existing docs under `docs/` are reconciled so stale getting-started or generation-mode claims do not remain.
+- No Go code is changed.
+- No Go tests are changed.
+- `.github/workflows/ci.yml` is not changed.
+- The living architecture spec is not changed unless a concrete need is justified.
+- `go test ./...` succeeds after implementation unless an unrelated pre-existing failure is documented.
+- `specharbor validate update-docs-and-readme` succeeds when the command can be run from the repository root.
