@@ -1,23 +1,23 @@
 # Generation Modes
 
-SpecHarbor supports multiple generation modes.
+SpecHarbor currently implements blank OpenSpec change generation only.
 
-## Blank
+## Implemented
 
-Creates a minimal structure so the user can write everything manually.
+```bash
+go run ./cmd/specharbor generate add-example-feature --blank
+```
 
-## Guided
+Blank generation creates the OpenSpec change file structure so the user can write the content manually.
 
-Asks questions and creates the spec from the answers.
+## Planned
 
-## Template
+The following generation modes are product direction, not implemented behavior:
 
-Uses built-in or custom templates.
+- guided generation;
+- template generation;
+- AI-assisted generation;
+- agent-assisted generation;
+- hybrid generation.
 
-## AI-assisted
-
-Uses a configured provider to draft specs.
-
-## Hybrid
-
-Combines project scanning, user answers, templates, and provider output.
+Agent-assisted workflows are intended to avoid requiring provider API keys, but detailed provider or agent setup is not part of the current implemented command set.
