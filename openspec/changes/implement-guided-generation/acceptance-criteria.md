@@ -1,0 +1,82 @@
+# Acceptance Criteria: Implement Guided Generation
+
+- Existing `specharbor generate <change-id> --blank` behavior remains unchanged.
+- Existing `specharbor generate <change-id> --blank` overwrite policy remains unchanged.
+- Existing `specharbor generate <change-id> --blank` unsafe change id validation remains unchanged.
+- Existing `specharbor generate <change-id> --blank` reporting remains unchanged.
+- Existing `specharbor generate <change-id> --template feature` behavior remains unchanged.
+- Existing `specharbor generate <change-id> --template bugfix` behavior remains unchanged.
+- Existing `specharbor generate <change-id> --template docs` behavior remains unchanged.
+- Existing `specharbor generate <change-id> --template refactor` behavior remains unchanged.
+- Existing built-in template generation overwrite policy remains unchanged.
+- Existing built-in template generation unsafe change id validation remains unchanged.
+- `specharbor generate <change-id> --guided --type feature --title "<title>" --summary "<summary>"` creates `openspec/changes/<change-id>/` when missing and creates the required files with feature-oriented guided starter content.
+- `specharbor generate <change-id> --guided --type bugfix --title "<title>" --summary "<summary>"` creates `openspec/changes/<change-id>/` when missing and creates the required files with bugfix-oriented guided starter content.
+- `specharbor generate <change-id> --guided --type docs --title "<title>" --summary "<summary>"` creates `openspec/changes/<change-id>/` when missing and creates the required files with documentation-oriented guided starter content.
+- `specharbor generate <change-id> --guided --type refactor --title "<title>" --summary "<summary>"` creates `openspec/changes/<change-id>/` when missing and creates the required files with refactor-oriented guided starter content.
+- Guided generation creates the same required files as blank and built-in template generation:
+  - `proposal.md`
+  - `design.md`
+  - `tasks.md`
+  - `acceptance-criteria.md`
+  - `risks.md`
+- Required filenames come from the shared domain required OpenSpec change file policy rather than a CLI-specific list.
+- Guided output includes the supplied title.
+- Guided output includes the supplied summary.
+- Guided output is deterministic, local, human-readable, generic, and safe to commit.
+- Generated guided `tasks.md` files contain unchecked tasks only.
+- Guided generation does not claim implementation, validation, review, archiving, or documentation updates have already happened.
+- Unknown guided type returns a clear error.
+- `--guided` without `--type` returns a clear error.
+- `--guided` without `--title` returns a clear error.
+- `--guided` without `--summary` returns a clear error.
+- `--guided --type` without a following type value returns a clear error.
+- `--guided --title` without a following title value returns a clear error.
+- `--guided --summary` without a following summary value returns a clear error.
+- Empty guided type, title, or summary values return clear errors when representable by the parser.
+- Guided mode combined with `--blank` returns a clear error.
+- Guided mode combined with `--template` returns a clear error.
+- Existing `--blank` combined with `--template` conflict behavior remains unchanged.
+- Unsupported flags return a clear error.
+- Extra positional arguments return a clear error.
+- Duplicate conflicting flags return a clear error if current parser patterns support that validation.
+- If the change directory already exists, guided generation creates only missing required files and skips existing required files.
+- Existing files are not overwritten.
+- Existing file contents are preserved exactly.
+- Partial directory recovery still works.
+- Created files and skipped existing files are reported in deterministic human-readable output.
+- The guided generation report includes the selected guided type, change id, relative change path, directory status, created file count, skipped existing file count, and relevant filenames.
+- The guided generation report includes the supplied title.
+- The guided generation report does not include absolute local paths, debug output, provider details, agent details, source-control details, workflow details, network details, interactive prompts, or validation summaries.
+- Unsafe change ids are rejected before filesystem writes occur.
+- Unsafe change id validation remains consistent with existing blank and template generation.
+- Missing OpenSpec project structure is rejected before the target change directory or files are created.
+- Missing `openspec/project.md` or `openspec/changes/` continues to return the existing clear generation error telling the user to run `specharbor init` first.
+- Guided generation does not initialize a project and does not create `openspec/`, `openspec/project.md`, or `openspec/changes/`.
+- No interactive prompts are introduced.
+- No AI provider behavior is introduced.
+- No provider SDK behavior is introduced.
+- No local model behavior is introduced.
+- No network behavior is introduced.
+- No source-control behavior is introduced.
+- No workflow connector behavior is introduced.
+- No external process execution behavior is introduced.
+- No provider API keys, local model credentials, agent credentials, source-control credentials, workflow credentials, or network access are required.
+- CLI parsing and reporting remain in `internal/adapters/cli`.
+- Generation orchestration remains in `internal/core/usecase`.
+- Generation domain concepts remain in `internal/core/domain`.
+- Generation filesystem behavior remains behind ports in `internal/core/ports`.
+- Concrete filesystem writes remain in `internal/adapters/filesystem`.
+- Guided content is provided through a port/interface owned by the core.
+- Concrete guided content lives in `internal/adapters/templates` or another justified adapter package.
+- Core packages do not import adapters, CLI packages, terminal IO, provider SDKs, network APIs, external-agent tooling, source-control SDKs, workflow SDKs, external process execution, or concrete template engines.
+- The implementation does not add AI-assisted generation, agent-assisted generation, hybrid generation, custom templates, remote template registry, template marketplace, filesystem template discovery, interactive prompts, provider integration, source-control integration, workflow integration, or config-backed template selection.
+- No unrelated command behavior changes are included.
+- `init`, `scan`, `validate`, `prompt`, `review`, `archive`, `config`, `help`, `version`, and unknown command behavior are preserved.
+- No README changes are included.
+- No documentation changes outside this OpenSpec change are included.
+- No CI changes are included.
+- `.github/workflows/ci.yml` is not modified.
+- `.specharbor/config.yml` is not modified.
+- Focused tests cover domain concepts, ports/use case behavior, guided content adapter behavior, CLI parsing and reporting, idempotency, unsafe change ids, error cases, blank generation regression, template generation regression, and unrelated command regressions.
+- `go test ./...` succeeds.

@@ -14,12 +14,16 @@ type GenerateChangeInput struct {
 	ChangeID     string
 	Mode         domain.GenerationMode
 	TemplateName string
+	GuidedType   string
+	Title        string
+	Summary      string
 }
 
 type GenerateChange struct {
 	fileSystem      ports.GenerationFileSystem
 	blankContent    ports.BlankChangeContent
 	templateContent ports.TemplateChangeContent
+	guidedContent   ports.GuidedChangeContent
 }
 
 func NewGenerateChange(fileSystem ports.GenerationFileSystem, content ports.BlankChangeContent) *GenerateChange {
@@ -41,6 +45,20 @@ func NewGenerateChangeWithTemplateContent(
 	}
 }
 
+func NewGenerateChangeWithContent(
+	fileSystem ports.GenerationFileSystem,
+	blankContent ports.BlankChangeContent,
+	templateContent ports.TemplateChangeContent,
+	guidedContent ports.GuidedChangeContent,
+) *GenerateChange {
+	return &GenerateChange{
+		fileSystem:      fileSystem,
+		blankContent:    blankContent,
+		templateContent: templateContent,
+		guidedContent:   guidedContent,
+	}
+}
+
 func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.GenerationResult, error) {
 	if useCase == nil {
 		return domain.GenerationResult{}, errors.New("generate change use case is required")
@@ -53,6 +71,9 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 	}
 	if input.Mode == domain.TemplateMode && useCase.templateContent == nil {
 		return domain.GenerationResult{}, errors.New("template change content is required")
+	}
+	if input.Mode == domain.GuidedMode && useCase.guidedContent == nil {
+		return domain.GenerationResult{}, errors.New("guided change content is required")
 	}
 
 	projectRoot := strings.TrimSpace(input.ProjectRoot)
@@ -69,6 +90,9 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 	}
 
 	var templateName domain.TemplateName
+	var guidedType domain.GuidedType
+	var guidedTitle string
+	var guidedSummary string
 	switch input.Mode {
 	case domain.BlankMode:
 	case domain.TemplateMode:
@@ -76,6 +100,20 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 		templateName, err = domain.ParseTemplateName(input.TemplateName)
 		if err != nil {
 			return domain.GenerationResult{}, err
+		}
+	case domain.GuidedMode:
+		var err error
+		guidedType, err = domain.ParseGuidedType(input.GuidedType)
+		if err != nil {
+			return domain.GenerationResult{}, err
+		}
+		guidedTitle = strings.TrimSpace(input.Title)
+		if guidedTitle == "" {
+			return domain.GenerationResult{}, errors.New("guided title is required")
+		}
+		guidedSummary = strings.TrimSpace(input.Summary)
+		if guidedSummary == "" {
+			return domain.GenerationResult{}, errors.New("guided summary is required")
 		}
 	default:
 		return domain.GenerationResult{}, fmt.Errorf("unsupported generation mode: %s", input.Mode)
@@ -91,7 +129,14 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 		return domain.GenerationResult{}, err
 	}
 
-	createdFiles, skippedExistingFiles, err := useCase.writeChangeFiles(projectRoot, changePath, input.Mode, templateName)
+	contentRequest := generationContentRequest{
+		mode:          input.Mode,
+		templateName:  templateName,
+		guidedType:    guidedType,
+		guidedTitle:   guidedTitle,
+		guidedSummary: guidedSummary,
+	}
+	createdFiles, skippedExistingFiles, err := useCase.writeChangeFiles(projectRoot, changePath, contentRequest)
 	if err != nil {
 		return domain.GenerationResult{}, err
 	}
@@ -100,6 +145,18 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 		return domain.NewTemplateGenerationResult(
 			changeID,
 			templateName,
+			changePath,
+			directoryCreated,
+			createdFiles,
+			skippedExistingFiles,
+		), nil
+	}
+
+	if input.Mode == domain.GuidedMode {
+		return domain.NewGuidedGenerationResult(
+			changeID,
+			guidedType,
+			guidedTitle,
 			changePath,
 			directoryCreated,
 			createdFiles,
@@ -128,6 +185,14 @@ func validateGenerationChangeID(changeID string) error {
 		return errors.New("change id must be a safe single path segment")
 	}
 	return nil
+}
+
+type generationContentRequest struct {
+	mode          domain.GenerationMode
+	templateName  domain.TemplateName
+	guidedType    domain.GuidedType
+	guidedTitle   string
+	guidedSummary string
 }
 
 func (useCase *GenerateChange) requireOpenSpecProject(projectRoot string) error {
@@ -166,14 +231,13 @@ func (useCase *GenerateChange) ensureChangeDirectory(projectRoot string, changeP
 func (useCase *GenerateChange) writeChangeFiles(
 	projectRoot string,
 	changePath string,
-	mode domain.GenerationMode,
-	templateName domain.TemplateName,
+	contentRequest generationContentRequest,
 ) ([]string, []string, error) {
 	var createdFiles []string
 	var skippedExistingFiles []string
 
 	for _, requiredFile := range domain.RequiredOpenSpecChangeFiles() {
-		contents, err := useCase.contentFor(mode, templateName, requiredFile)
+		contents, err := useCase.contentFor(contentRequest, requiredFile)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -194,14 +258,26 @@ func (useCase *GenerateChange) writeChangeFiles(
 }
 
 func (useCase *GenerateChange) contentFor(
-	mode domain.GenerationMode,
-	templateName domain.TemplateName,
+	contentRequest generationContentRequest,
 	requiredFile string,
 ) (string, error) {
-	if mode == domain.TemplateMode {
-		contents, err := useCase.templateContent.ContentFor(templateName, requiredFile)
+	if contentRequest.mode == domain.TemplateMode {
+		contents, err := useCase.templateContent.ContentFor(contentRequest.templateName, requiredFile)
 		if err != nil {
-			return "", fmt.Errorf("load %s template content for %s: %w", templateName, requiredFile, err)
+			return "", fmt.Errorf("load %s template content for %s: %w", contentRequest.templateName, requiredFile, err)
+		}
+		return contents, nil
+	}
+
+	if contentRequest.mode == domain.GuidedMode {
+		contents, err := useCase.guidedContent.ContentFor(
+			contentRequest.guidedType,
+			contentRequest.guidedTitle,
+			contentRequest.guidedSummary,
+			requiredFile,
+		)
+		if err != nil {
+			return "", fmt.Errorf("load %s guided content for %s: %w", contentRequest.guidedType, requiredFile, err)
 		}
 		return contents, nil
 	}

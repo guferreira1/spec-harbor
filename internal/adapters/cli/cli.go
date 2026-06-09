@@ -194,13 +194,17 @@ func generateCommand(ctx CommandContext) error {
 	fileSystem := filesystem.NewLocalFileSystem()
 	blankContent := templates.NewDefaultBlankChangeContent()
 	templateContent := templates.NewBuiltInChangeTemplates()
-	generateChange := usecase.NewGenerateChangeWithTemplateContent(fileSystem, blankContent, templateContent)
+	guidedContent := templates.NewGuidedChangeTemplates()
+	generateChange := usecase.NewGenerateChangeWithContent(fileSystem, blankContent, templateContent, guidedContent)
 
 	result, err := generateChange.Execute(usecase.GenerateChangeInput{
 		ProjectRoot:  root,
 		ChangeID:     arguments.changeID,
 		Mode:         arguments.mode,
 		TemplateName: arguments.templateName,
+		GuidedType:   arguments.guidedType,
+		Title:        arguments.title,
+		Summary:      arguments.summary,
 	})
 	if err != nil {
 		return err
@@ -214,13 +218,23 @@ type generateArguments struct {
 	changeID     string
 	mode         domain.GenerationMode
 	templateName string
+	guidedType   string
+	title        string
+	summary      string
 }
 
 func parseGenerateArguments(args []string) (generateArguments, error) {
 	var positionals []string
 	blankProvided := false
 	templateProvided := false
+	guidedProvided := false
+	guidedTypeProvided := false
+	titleProvided := false
+	summaryProvided := false
 	var templateName string
+	var guidedType string
+	var title string
+	var summary string
 
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
@@ -229,6 +243,14 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 				return generateArguments{}, fmt.Errorf("blank generation flag specified more than once")
 			}
 			blankProvided = true
+			continue
+		}
+
+		if arg == "--guided" {
+			if guidedProvided {
+				return generateArguments{}, fmt.Errorf("guided generation flag specified more than once")
+			}
+			guidedProvided = true
 			continue
 		}
 
@@ -249,6 +271,57 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 			continue
 		}
 
+		if arg == "--type" {
+			if guidedTypeProvided {
+				return generateArguments{}, fmt.Errorf("guided type flag specified more than once")
+			}
+			if index+1 >= len(args) {
+				return generateArguments{}, fmt.Errorf("guided type is required")
+			}
+			if strings.HasPrefix(args[index+1], "-") {
+				return generateArguments{}, fmt.Errorf("guided type is required")
+			}
+
+			guidedType = args[index+1]
+			guidedTypeProvided = true
+			index++
+			continue
+		}
+
+		if arg == "--title" {
+			if titleProvided {
+				return generateArguments{}, fmt.Errorf("guided title flag specified more than once")
+			}
+			if index+1 >= len(args) {
+				return generateArguments{}, fmt.Errorf("guided title is required")
+			}
+			if strings.HasPrefix(args[index+1], "-") {
+				return generateArguments{}, fmt.Errorf("guided title is required")
+			}
+
+			title = args[index+1]
+			titleProvided = true
+			index++
+			continue
+		}
+
+		if arg == "--summary" {
+			if summaryProvided {
+				return generateArguments{}, fmt.Errorf("guided summary flag specified more than once")
+			}
+			if index+1 >= len(args) {
+				return generateArguments{}, fmt.Errorf("guided summary is required")
+			}
+			if strings.HasPrefix(args[index+1], "-") {
+				return generateArguments{}, fmt.Errorf("guided summary is required")
+			}
+
+			summary = args[index+1]
+			summaryProvided = true
+			index++
+			continue
+		}
+
 		if strings.HasPrefix(arg, "-") {
 			return generateArguments{}, fmt.Errorf("unsupported flag: %s", arg)
 		}
@@ -259,13 +332,22 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 	if blankProvided && templateProvided {
 		return generateArguments{}, fmt.Errorf("blank and template generation flags cannot be used together")
 	}
+	if guidedProvided && blankProvided {
+		return generateArguments{}, fmt.Errorf("guided and blank generation flags cannot be used together")
+	}
+	if guidedProvided && templateProvided {
+		return generateArguments{}, fmt.Errorf("guided and template generation flags cannot be used together")
+	}
+	if !guidedProvided && (guidedTypeProvided || titleProvided || summaryProvided) {
+		return generateArguments{}, fmt.Errorf("guided input flags require --guided")
+	}
 	if len(positionals) == 0 {
 		return generateArguments{}, fmt.Errorf("change id is required")
 	}
 	if len(positionals) > 1 {
 		return generateArguments{}, fmt.Errorf("unexpected argument: %s", positionals[1])
 	}
-	if !blankProvided && !templateProvided {
+	if !blankProvided && !templateProvided && !guidedProvided {
 		return generateArguments{}, fmt.Errorf("generation mode flag is required")
 	}
 	if templateProvided {
@@ -276,6 +358,27 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 			changeID:     positionals[0],
 			mode:         domain.TemplateMode,
 			templateName: templateName,
+		}, nil
+	}
+	if guidedProvided {
+		if !guidedTypeProvided || strings.TrimSpace(guidedType) == "" {
+			return generateArguments{}, fmt.Errorf("guided type is required")
+		}
+		if _, err := domain.ParseGuidedType(guidedType); err != nil {
+			return generateArguments{}, err
+		}
+		if !titleProvided || strings.TrimSpace(title) == "" {
+			return generateArguments{}, fmt.Errorf("guided title is required")
+		}
+		if !summaryProvided || strings.TrimSpace(summary) == "" {
+			return generateArguments{}, fmt.Errorf("guided summary is required")
+		}
+		return generateArguments{
+			changeID:   positionals[0],
+			mode:       domain.GuidedMode,
+			guidedType: guidedType,
+			title:      title,
+			summary:    summary,
 		}, nil
 	}
 
@@ -295,12 +398,18 @@ func printGenerationReport(output io.Writer, result domain.GenerationResult) {
 
 	if result.Mode == domain.TemplateMode {
 		fmt.Fprintln(output, "SpecHarbor template change generated.")
+	} else if result.Mode == domain.GuidedMode {
+		fmt.Fprintln(output, "SpecHarbor guided change generated.")
 	} else {
 		fmt.Fprintln(output, "SpecHarbor blank change generated.")
 	}
 	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
 	if result.Mode == domain.TemplateMode {
 		fmt.Fprintf(output, "Template: %s\n", result.TemplateName)
+	}
+	if result.Mode == domain.GuidedMode {
+		fmt.Fprintf(output, "Guided type: %s\n", result.GuidedType)
+		fmt.Fprintf(output, "Title: %s\n", result.GuidedTitle)
 	}
 	fmt.Fprintf(output, "Path: %s\n", result.ChangePath)
 	fmt.Fprintf(output, "Directory: %s\n", directoryStatus)

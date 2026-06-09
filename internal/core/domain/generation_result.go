@@ -4,6 +4,8 @@ type GenerationResult struct {
 	ChangeID               string
 	Mode                   GenerationMode
 	TemplateName           TemplateName
+	GuidedType             GuidedType
+	GuidedTitle            string
 	ChangePath             string
 	ChangeDirectoryCreated bool
 	createdFiles           []string
@@ -40,6 +42,27 @@ func NewTemplateGenerationResult(
 		ChangeID:               changeID,
 		Mode:                   TemplateMode,
 		TemplateName:           templateName,
+		ChangePath:             changePath,
+		ChangeDirectoryCreated: changeDirectoryCreated,
+		createdFiles:           append([]string(nil), createdFiles...),
+		skippedExistingFiles:   append([]string(nil), skippedExistingFiles...),
+	}
+}
+
+func NewGuidedGenerationResult(
+	changeID string,
+	guidedType GuidedType,
+	guidedTitle string,
+	changePath string,
+	changeDirectoryCreated bool,
+	createdFiles []string,
+	skippedExistingFiles []string,
+) GenerationResult {
+	return GenerationResult{
+		ChangeID:               changeID,
+		Mode:                   GuidedMode,
+		GuidedType:             guidedType,
+		GuidedTitle:            guidedTitle,
 		ChangePath:             changePath,
 		ChangeDirectoryCreated: changeDirectoryCreated,
 		createdFiles:           append([]string(nil), createdFiles...),
