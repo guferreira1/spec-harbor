@@ -42,7 +42,7 @@ go run ./cmd/specharbor generate add-example-feature --blank
 
 `generate <change-id> --blank` creates the expected OpenSpec change structure with blank/manual starter content.
 
-Built-in template generation uses the same command with `--template <template-name>`:
+Built-in template generation uses the same command with `--template <template-name>` and deterministic built-in starter content:
 
 ```bash
 go run ./cmd/specharbor generate <change-id> --template <template-name>
@@ -61,7 +61,22 @@ Supported built-in templates are exactly:
 - `docs`
 - `refactor`
 
-Both blank and built-in template generation create the same required OpenSpec change files:
+Guided generation uses explicit CLI flags:
+
+```bash
+go run ./cmd/specharbor generate <change-id> --guided --type <type> --title "<title>" --summary "<summary>"
+```
+
+Guided generation is deterministic, local, and non-interactive. It does not prompt during command execution; it uses the supplied `--type`, `--title`, and `--summary` values.
+
+Supported guided types are exactly:
+
+- `feature`
+- `bugfix`
+- `docs`
+- `refactor`
+
+Blank, built-in template, and guided generation create the same required OpenSpec change files:
 
 ```text
 openspec/changes/<change-id>/
@@ -72,7 +87,9 @@ openspec/changes/<change-id>/
   risks.md
 ```
 
-Built-in template content is deterministic, local, and generic starter content. It is safe to edit after generation, and it does not mean SpecHarbor inferred project-specific requirements.
+Built-in template content is deterministic, local, and generic starter content. Guided content is deterministic, local starter content that includes the supplied title and summary.
+
+Generated content is safe to edit after generation. Guided output does not mean SpecHarbor inferred project-specific requirements beyond the provided type, title, and summary.
 
 Existing files are skipped and are not overwritten. If a change directory partially exists, running generation again recovers it by creating only the missing required files.
 
@@ -84,6 +101,10 @@ go run ./cmd/specharbor generate add-example-feature --template feature
 go run ./cmd/specharbor generate fix-example-bug --template bugfix
 go run ./cmd/specharbor generate update-example-docs --template docs
 go run ./cmd/specharbor generate refactor-example-flow --template refactor
+go run ./cmd/specharbor generate add-guided-feature --guided --type feature --title "Add guided feature" --summary "Create a guided OpenSpec change from explicit CLI inputs."
+go run ./cmd/specharbor generate fix-guided-bug --guided --type bugfix --title "Fix guided bug" --summary "Describe the bugfix using deterministic guided starter content."
+go run ./cmd/specharbor generate update-guided-docs --guided --type docs --title "Update guided docs" --summary "Document guided generation as implemented behavior."
+go run ./cmd/specharbor generate refactor-guided-flow --guided --type refactor --title "Refactor guided flow" --summary "Describe a behavior-preserving refactor with explicit context."
 ```
 
 ### Validate a Change
@@ -165,7 +186,6 @@ Do not archive a change until the implementation is complete and reviewed.
 
 The following items are product direction, not implemented command behavior:
 
-- guided generation;
 - AI-assisted generation;
 - agent-assisted generation;
 - hybrid generation;
