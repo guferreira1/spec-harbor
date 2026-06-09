@@ -191,6 +191,27 @@ func generateCommand(ctx CommandContext) error {
 		return err
 	}
 
+	if arguments.mode == domain.AgentAssistedMode {
+		promptTemplate := templates.NewAgentAssistedAuthoringPromptTemplate()
+		agentAssistedAuthoring := usecase.NewAgentAssistedAuthoring(promptTemplate)
+
+		result, err := agentAssistedAuthoring.Execute(usecase.AgentAssistedAuthoringInput{
+			ProjectRoot:   root,
+			ChangeID:      arguments.changeID,
+			AgentName:     arguments.agentName,
+			AuthoringType: arguments.guidedType,
+			Title:         arguments.title,
+			Summary:       arguments.summary,
+			Execute:       arguments.execute,
+		})
+		if err != nil {
+			return err
+		}
+
+		printAgentAssistedAuthoringReport(ctx.Output, result)
+		return nil
+	}
+
 	fileSystem := filesystem.NewLocalFileSystem()
 	blankContent := templates.NewDefaultBlankChangeContent()
 	templateContent := templates.NewBuiltInChangeTemplates()
@@ -219,8 +240,10 @@ type generateArguments struct {
 	mode         domain.GenerationMode
 	templateName string
 	guidedType   string
+	agentName    string
 	title        string
 	summary      string
+	execute      bool
 }
 
 func parseGenerateArguments(args []string) (generateArguments, error) {
@@ -228,11 +251,15 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 	blankProvided := false
 	templateProvided := false
 	guidedProvided := false
+	agentAssistedProvided := false
 	guidedTypeProvided := false
+	agentProvided := false
 	titleProvided := false
 	summaryProvided := false
+	executeProvided := false
 	var templateName string
 	var guidedType string
+	var agentName string
 	var title string
 	var summary string
 
@@ -254,6 +281,14 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 			continue
 		}
 
+		if arg == "--agent-assisted" {
+			if agentAssistedProvided {
+				return generateArguments{}, fmt.Errorf("agent-assisted generation flag specified more than once")
+			}
+			agentAssistedProvided = true
+			continue
+		}
+
 		if arg == "--template" {
 			if templateProvided {
 				return generateArguments{}, fmt.Errorf("template generation flag specified more than once")
@@ -271,15 +306,32 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 			continue
 		}
 
-		if arg == "--type" {
-			if guidedTypeProvided {
-				return generateArguments{}, fmt.Errorf("guided type flag specified more than once")
+		if arg == "--agent" {
+			if agentProvided {
+				return generateArguments{}, fmt.Errorf("agent flag specified more than once")
 			}
 			if index+1 >= len(args) {
-				return generateArguments{}, fmt.Errorf("guided type is required")
+				return generateArguments{}, fmt.Errorf("agent name is required")
 			}
 			if strings.HasPrefix(args[index+1], "-") {
-				return generateArguments{}, fmt.Errorf("guided type is required")
+				return generateArguments{}, fmt.Errorf("agent name is required")
+			}
+
+			agentName = args[index+1]
+			agentProvided = true
+			index++
+			continue
+		}
+
+		if arg == "--type" {
+			if guidedTypeProvided {
+				return generateArguments{}, duplicateTypeFlagError(agentAssistedProvided)
+			}
+			if index+1 >= len(args) {
+				return generateArguments{}, requiredTypeError(agentAssistedProvided)
+			}
+			if strings.HasPrefix(args[index+1], "-") {
+				return generateArguments{}, requiredTypeError(agentAssistedProvided)
 			}
 
 			guidedType = args[index+1]
@@ -290,13 +342,13 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 
 		if arg == "--title" {
 			if titleProvided {
-				return generateArguments{}, fmt.Errorf("guided title flag specified more than once")
+				return generateArguments{}, duplicateTitleFlagError(agentAssistedProvided)
 			}
 			if index+1 >= len(args) {
-				return generateArguments{}, fmt.Errorf("guided title is required")
+				return generateArguments{}, requiredTitleError(agentAssistedProvided)
 			}
 			if strings.HasPrefix(args[index+1], "-") {
-				return generateArguments{}, fmt.Errorf("guided title is required")
+				return generateArguments{}, requiredTitleError(agentAssistedProvided)
 			}
 
 			title = args[index+1]
@@ -307,18 +359,26 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 
 		if arg == "--summary" {
 			if summaryProvided {
-				return generateArguments{}, fmt.Errorf("guided summary flag specified more than once")
+				return generateArguments{}, duplicateSummaryFlagError(agentAssistedProvided)
 			}
 			if index+1 >= len(args) {
-				return generateArguments{}, fmt.Errorf("guided summary is required")
+				return generateArguments{}, requiredSummaryError(agentAssistedProvided)
 			}
 			if strings.HasPrefix(args[index+1], "-") {
-				return generateArguments{}, fmt.Errorf("guided summary is required")
+				return generateArguments{}, requiredSummaryError(agentAssistedProvided)
 			}
 
 			summary = args[index+1]
 			summaryProvided = true
 			index++
+			continue
+		}
+
+		if arg == "--execute" {
+			if executeProvided {
+				return generateArguments{}, fmt.Errorf("execute flag specified more than once")
+			}
+			executeProvided = true
 			continue
 		}
 
@@ -338,7 +398,25 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 	if guidedProvided && templateProvided {
 		return generateArguments{}, fmt.Errorf("guided and template generation flags cannot be used together")
 	}
-	if !guidedProvided && (guidedTypeProvided || titleProvided || summaryProvided) {
+	if agentAssistedProvided && blankProvided {
+		return generateArguments{}, fmt.Errorf("agent-assisted and blank generation flags cannot be used together")
+	}
+	if agentAssistedProvided && templateProvided {
+		return generateArguments{}, fmt.Errorf("agent-assisted and template generation flags cannot be used together")
+	}
+	if agentAssistedProvided && guidedProvided {
+		return generateArguments{}, fmt.Errorf("agent-assisted and guided generation flags cannot be used together")
+	}
+	if agentAssistedProvided && executeProvided {
+		return generateArguments{}, usecase.ErrAgentAssistedExecuteUnsupported
+	}
+	if !agentAssistedProvided && executeProvided {
+		return generateArguments{}, fmt.Errorf("unsupported flag: --execute")
+	}
+	if !agentAssistedProvided && agentProvided {
+		return generateArguments{}, fmt.Errorf("agent-assisted input flags require --agent-assisted")
+	}
+	if !guidedProvided && !agentAssistedProvided && (guidedTypeProvided || titleProvided || summaryProvided) {
 		return generateArguments{}, fmt.Errorf("guided input flags require --guided")
 	}
 	if len(positionals) == 0 {
@@ -347,8 +425,37 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 	if len(positionals) > 1 {
 		return generateArguments{}, fmt.Errorf("unexpected argument: %s", positionals[1])
 	}
-	if !blankProvided && !templateProvided && !guidedProvided {
+	if !blankProvided && !templateProvided && !guidedProvided && !agentAssistedProvided {
 		return generateArguments{}, fmt.Errorf("generation mode flag is required")
+	}
+	if agentAssistedProvided {
+		if !agentProvided || strings.TrimSpace(agentName) == "" {
+			return generateArguments{}, fmt.Errorf("agent name is required")
+		}
+		if _, err := domain.ParseAgentName(agentName); err != nil {
+			return generateArguments{}, err
+		}
+		if !guidedTypeProvided || strings.TrimSpace(guidedType) == "" {
+			return generateArguments{}, fmt.Errorf("agent-assisted authoring type is required")
+		}
+		if _, err := domain.ParseAgentAssistedAuthoringType(guidedType); err != nil {
+			return generateArguments{}, err
+		}
+		if !titleProvided || strings.TrimSpace(title) == "" {
+			return generateArguments{}, fmt.Errorf("agent-assisted title is required")
+		}
+		if !summaryProvided || strings.TrimSpace(summary) == "" {
+			return generateArguments{}, fmt.Errorf("agent-assisted summary is required")
+		}
+		return generateArguments{
+			changeID:   positionals[0],
+			mode:       domain.AgentAssistedMode,
+			guidedType: guidedType,
+			agentName:  agentName,
+			title:      title,
+			summary:    summary,
+			execute:    executeProvided,
+		}, nil
 	}
 	if templateProvided {
 		if strings.TrimSpace(templateName) == "" {
@@ -386,6 +493,48 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 		changeID: positionals[0],
 		mode:     domain.BlankMode,
 	}, nil
+}
+
+func duplicateTypeFlagError(agentAssistedProvided bool) error {
+	if agentAssistedProvided {
+		return fmt.Errorf("agent-assisted authoring type flag specified more than once")
+	}
+	return fmt.Errorf("guided type flag specified more than once")
+}
+
+func requiredTypeError(agentAssistedProvided bool) error {
+	if agentAssistedProvided {
+		return fmt.Errorf("agent-assisted authoring type is required")
+	}
+	return fmt.Errorf("guided type is required")
+}
+
+func duplicateTitleFlagError(agentAssistedProvided bool) error {
+	if agentAssistedProvided {
+		return fmt.Errorf("agent-assisted title flag specified more than once")
+	}
+	return fmt.Errorf("guided title flag specified more than once")
+}
+
+func requiredTitleError(agentAssistedProvided bool) error {
+	if agentAssistedProvided {
+		return fmt.Errorf("agent-assisted title is required")
+	}
+	return fmt.Errorf("guided title is required")
+}
+
+func duplicateSummaryFlagError(agentAssistedProvided bool) error {
+	if agentAssistedProvided {
+		return fmt.Errorf("agent-assisted summary flag specified more than once")
+	}
+	return fmt.Errorf("guided summary flag specified more than once")
+}
+
+func requiredSummaryError(agentAssistedProvided bool) error {
+	if agentAssistedProvided {
+		return fmt.Errorf("agent-assisted summary is required")
+	}
+	return fmt.Errorf("guided summary is required")
 }
 
 func printGenerationReport(output io.Writer, result domain.GenerationResult) {
@@ -431,6 +580,52 @@ func printGenerationReport(output io.Writer, result domain.GenerationResult) {
 			fmt.Fprintf(output, "- %s\n", file)
 		}
 	}
+}
+
+func printAgentAssistedAuthoringReport(output io.Writer, result domain.AgentAssistedAuthoringResult) {
+	fmt.Fprintln(output, "SpecHarbor agent-assisted spec authoring dry run.")
+	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
+	fmt.Fprintf(output, "Agent: %s\n", result.AgentName)
+	fmt.Fprintf(output, "Authoring type: %s\n", result.AuthoringType)
+	fmt.Fprintf(output, "Title: %s\n", result.Title)
+	fmt.Fprintf(output, "Summary: %s\n", result.Summary)
+	fmt.Fprintf(output, "Path: %s\n", result.ChangePath)
+	fmt.Fprintf(output, "Dry run: %s\n", yesNo(result.DryRun))
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Required files:")
+	for _, requiredFile := range result.RequiredFiles() {
+		fmt.Fprintf(output, "- %s\n", requiredFile)
+	}
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Plan:")
+	for _, planItem := range result.Plan() {
+		fmt.Fprintf(output, "- %s\n", planItem)
+	}
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Status:")
+	fmt.Fprintf(output, "- No files written: %s\n", yesNo(result.NoFilesWritten))
+	fmt.Fprintf(output, "- No prompt file written: %s\n", yesNo(result.NoPromptFileWritten))
+	fmt.Fprintf(output, "- No agent executed: %s\n", yesNo(result.NoAgentExecuted))
+	fmt.Fprintf(output, "- No external command executed: %s\n", yesNo(result.NoExternalCommandExecuted))
+	fmt.Fprintf(output, "- No agent output parsed or applied: %s\n", yesNo(result.NoAgentOutputParsedOrApplied))
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Generated prompt:")
+	fmt.Fprintln(output)
+	fmt.Fprint(output, result.Prompt)
+	if !strings.HasSuffix(result.Prompt, "\n") {
+		fmt.Fprintln(output)
+	}
+}
+
+func yesNo(value bool) string {
+	if value {
+		return "yes"
+	}
+	return "no"
 }
 
 type promptArguments struct {

@@ -357,6 +357,146 @@ Created:
 	}
 }
 
+func TestExecuteGenerateAgentAssistedPrintsDryRunReport(t *testing.T) {
+	tests := []struct {
+		authoringType string
+		changeID      string
+		title         string
+		summary       string
+	}{
+		{
+			authoringType: "feature",
+			changeID:      "agent-feature",
+			title:         "Add payment retry policy",
+			summary:       "Create a controlled retry policy",
+		},
+		{
+			authoringType: "bugfix",
+			changeID:      "agent-bugfix",
+			title:         "Fix payment retry policy",
+			summary:       "Correct retry classification",
+		},
+		{
+			authoringType: "docs",
+			changeID:      "agent-docs",
+			title:         "Document payment retry policy",
+			summary:       "Describe retry behavior",
+		},
+		{
+			authoringType: "refactor",
+			changeID:      "agent-refactor",
+			title:         "Refactor payment retry policy",
+			summary:       "Simplify retry orchestration",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.authoringType, func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+
+			var output bytes.Buffer
+			err := execute([]string{
+				"generate",
+				test.changeID,
+				"--agent-assisted",
+				"--agent",
+				"codex",
+				"--type",
+				test.authoringType,
+				"--title",
+				test.title,
+				"--summary",
+				test.summary,
+			}, &output)
+			if err != nil {
+				t.Fatalf("execute(generate agent-assisted) error = %v", err)
+			}
+
+			generateOutput := output.String()
+			for _, want := range []string{
+				"SpecHarbor agent-assisted spec authoring dry run.",
+				"Change: " + test.changeID,
+				"Agent: codex",
+				"Authoring type: " + test.authoringType,
+				"Title: " + test.title,
+				"Summary: " + test.summary,
+				"Path: openspec/changes/" + test.changeID,
+				"Dry run: yes",
+				"Required files:",
+				"- proposal.md",
+				"- design.md",
+				"- tasks.md",
+				"- acceptance-criteria.md",
+				"- risks.md",
+				"Plan:",
+				"- Validate the agent-assisted authoring request.",
+				"- Build the OpenSpec authoring plan for openspec/changes/" + test.changeID + ".",
+				"- Render a deterministic, copy-pasteable Markdown authoring prompt.",
+				"- Stop before writing files, executing agents, or running external commands.",
+				"Status:",
+				"- No files written: yes",
+				"- No prompt file written: yes",
+				"- No agent executed: yes",
+				"- No external command executed: yes",
+				"- No agent output parsed or applied: yes",
+				"Generated prompt:",
+				"# Agent-Assisted OpenSpec Authoring Prompt",
+				"Change id: `" + test.changeID + "`",
+				"Authoring type: `" + test.authoringType + "`",
+				"Title: " + test.title,
+				"Summary: " + test.summary,
+				"Create or refine only files under `openspec/changes/" + test.changeID + "/`",
+				"Do not implement production code.",
+				"specharbor validate " + test.changeID,
+			} {
+				if !strings.Contains(generateOutput, want) {
+					t.Fatalf("generate output = %q, want to contain %q", generateOutput, want)
+				}
+			}
+
+			if strings.Contains(generateOutput, root) {
+				t.Fatalf("generate output = %q, want no absolute temp root path", generateOutput)
+			}
+			assertAgentAssistedDryRunOutputSafety(t, generateOutput, root)
+			assertPathDoesNotExist(t, root, "openspec")
+		})
+	}
+}
+
+func TestExecuteGenerateAgentAssistedAcceptsFlagsBeforeChangeID(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	var output bytes.Buffer
+	if err := execute([]string{
+		"generate",
+		"--agent-assisted",
+		"--agent",
+		"codex",
+		"--type",
+		"feature",
+		"--title",
+		"Add reports",
+		"--summary",
+		"Create report support",
+		"order-independent-agent-assisted",
+	}, &output); err != nil {
+		t.Fatalf("execute(generate) error = %v", err)
+	}
+
+	if !strings.Contains(output.String(), "Change: order-independent-agent-assisted") {
+		t.Fatalf("generate output = %q, want change id", output.String())
+	}
+	if !strings.Contains(output.String(), "Agent: codex") {
+		t.Fatalf("generate output = %q, want agent", output.String())
+	}
+	if !strings.Contains(output.String(), "Authoring type: feature") {
+		t.Fatalf("generate output = %q, want authoring type", output.String())
+	}
+	assertPathDoesNotExist(t, root, "openspec")
+}
+
 func TestExecuteGenerateTemplateAcceptsFlagBeforeChangeID(t *testing.T) {
 	root := t.TempDir()
 	t.Chdir(root)
@@ -603,6 +743,96 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 			want: "unknown guided type: maintenance",
 		},
 		{
+			name: "agent-assisted missing agent",
+			args: []string{"generate", "change", "--agent-assisted", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "agent name is required",
+		},
+		{
+			name: "agent-assisted agent without value",
+			args: []string{"generate", "change", "--agent-assisted", "--agent"},
+			want: "agent name is required",
+		},
+		{
+			name: "agent-assisted agent followed by flag",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "agent name is required",
+		},
+		{
+			name: "agent-assisted missing type",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--title", "Title", "--summary", "Summary"},
+			want: "agent-assisted authoring type is required",
+		},
+		{
+			name: "agent-assisted type without value",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type"},
+			want: "agent-assisted authoring type is required",
+		},
+		{
+			name: "agent-assisted type followed by flag",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "--title", "Title", "--summary", "Summary"},
+			want: "agent-assisted authoring type is required",
+		},
+		{
+			name: "agent-assisted missing title",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--summary", "Summary"},
+			want: "agent-assisted title is required",
+		},
+		{
+			name: "agent-assisted title without value",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title"},
+			want: "agent-assisted title is required",
+		},
+		{
+			name: "agent-assisted title followed by flag",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title", "--summary", "Summary"},
+			want: "agent-assisted title is required",
+		},
+		{
+			name: "agent-assisted missing summary",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title", "Title"},
+			want: "agent-assisted summary is required",
+		},
+		{
+			name: "agent-assisted summary without value",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title", "Title", "--summary"},
+			want: "agent-assisted summary is required",
+		},
+		{
+			name: "agent-assisted summary followed by flag",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title", "Title", "--summary", "--blank"},
+			want: "agent-assisted summary is required",
+		},
+		{
+			name: "agent-assisted empty agent",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "agent name is required",
+		},
+		{
+			name: "agent-assisted empty type",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "", "--title", "Title", "--summary", "Summary"},
+			want: "agent-assisted authoring type is required",
+		},
+		{
+			name: "agent-assisted empty title",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title", "", "--summary", "Summary"},
+			want: "agent-assisted title is required",
+		},
+		{
+			name: "agent-assisted empty summary",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title", "Title", "--summary", ""},
+			want: "agent-assisted summary is required",
+		},
+		{
+			name: "unknown agent-assisted authoring type",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "maintenance", "--title", "Title", "--summary", "Summary"},
+			want: "unknown agent-assisted authoring type: maintenance",
+		},
+		{
+			name: "agent-assisted execute unsupported",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title", "Title", "--summary", "Summary", "--execute"},
+			want: "agent-assisted execute mode is unsupported in this version",
+		},
+		{
 			name: "missing template name",
 			args: []string{"generate", "change", "--template"},
 			want: "template name is required",
@@ -658,6 +888,21 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 			want: "guided and template generation flags cannot be used together",
 		},
 		{
+			name: "agent-assisted and blank flags together",
+			args: []string{"generate", "change", "--agent-assisted", "--blank", "--agent", "codex", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "agent-assisted and blank generation flags cannot be used together",
+		},
+		{
+			name: "agent-assisted and template flags together",
+			args: []string{"generate", "change", "--agent-assisted", "--template", "feature", "--agent", "codex", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "agent-assisted and template generation flags cannot be used together",
+		},
+		{
+			name: "agent-assisted and guided flags together",
+			args: []string{"generate", "change", "--agent-assisted", "--guided", "--agent", "codex", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "agent-assisted and guided generation flags cannot be used together",
+		},
+		{
 			name: "duplicate template flag",
 			args: []string{"generate", "change", "--template", "feature", "--template", "bugfix"},
 			want: "template generation flag specified more than once",
@@ -683,9 +928,44 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 			want: "guided summary flag specified more than once",
 		},
 		{
+			name: "duplicate agent-assisted flag",
+			args: []string{"generate", "change", "--agent-assisted", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "agent-assisted generation flag specified more than once",
+		},
+		{
+			name: "duplicate agent flag",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--agent", "claude-code", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "agent flag specified more than once",
+		},
+		{
+			name: "duplicate agent-assisted type flag",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--type", "bugfix", "--title", "Title", "--summary", "Summary"},
+			want: "agent-assisted authoring type flag specified more than once",
+		},
+		{
+			name: "duplicate agent-assisted title flag",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title", "Title", "--title", "Other", "--summary", "Summary"},
+			want: "agent-assisted title flag specified more than once",
+		},
+		{
+			name: "duplicate agent-assisted summary flag",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title", "Title", "--summary", "Summary", "--summary", "Other"},
+			want: "agent-assisted summary flag specified more than once",
+		},
+		{
+			name: "duplicate execute flag",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title", "Title", "--summary", "Summary", "--execute", "--execute"},
+			want: "execute flag specified more than once",
+		},
+		{
 			name: "guided input without guided flag",
 			args: []string{"generate", "change", "--type", "feature"},
 			want: "guided input flags require --guided",
+		},
+		{
+			name: "agent input without agent-assisted flag",
+			args: []string{"generate", "change", "--agent", "codex"},
+			want: "agent-assisted input flags require --agent-assisted",
 		},
 		{
 			name: "unsupported ai flag",
@@ -693,9 +973,9 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 			want: "unsupported flag: --ai",
 		},
 		{
-			name: "unsupported agent flag",
-			args: []string{"generate", "change", "--agent"},
-			want: "unsupported flag: --agent",
+			name: "unsupported execute flag without agent-assisted",
+			args: []string{"generate", "change", "--execute"},
+			want: "unsupported flag: --execute",
 		},
 		{
 			name: "unsupported hybrid flag",
@@ -728,6 +1008,11 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 			want: "unexpected argument: extra",
 		},
 		{
+			name: "agent-assisted extra argument",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title", "Title", "--summary", "Summary", "extra"},
+			want: "unexpected argument: extra",
+		},
+		{
 			name: "unsafe traversal change id",
 			args: []string{"generate", "../unsafe", "--blank"},
 			want: "change id must be a safe single path segment",
@@ -740,6 +1025,11 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 		{
 			name: "unsafe guided traversal change id",
 			args: []string{"generate", "../unsafe", "--guided", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe agent-assisted traversal change id",
+			args: []string{"generate", "../unsafe", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title", "Title", "--summary", "Summary"},
 			want: "change id must be a safe single path segment",
 		},
 		{
@@ -2039,6 +2329,60 @@ func assertPathDoesNotExist(t *testing.T, root string, relativePath string) {
 	}
 	if !os.IsNotExist(err) {
 		t.Fatalf("checking %q existence returned unexpected error: %v", relativePath, err)
+	}
+}
+
+func assertAgentAssistedDryRunOutputSafety(t *testing.T, output string, root string) {
+	t.Helper()
+
+	if strings.Contains(output, root) {
+		t.Fatalf("agent-assisted output = %q, want no absolute project root", output)
+	}
+
+	lowerOutput := strings.ToLower(output)
+	for _, forbidden := range []string{
+		"http://",
+		"https://",
+		"localhost",
+		"127.0.0.1",
+		"api_key",
+		"api key:",
+		"secret:",
+		"token:",
+		"password",
+		"sk-",
+		"github.com/",
+		"gitlab.com/",
+		"registry.npmjs.org",
+		"ghcr.io",
+		"docker.io",
+		"git commit",
+		"git push",
+		"git merge",
+		"gh workflow",
+		"workflow run",
+		"go test",
+		"go run",
+		"curl ",
+		"docker build",
+		"kubectl",
+		"terraform apply",
+		"deploy to",
+		"apply patch",
+		"edit internal/",
+		"modify internal/",
+		"debug:",
+		"trace:",
+		"panic:",
+		"specharbor change is valid",
+		"validation status: valid",
+		"validated: yes",
+		"\nfiles written: yes",
+		"prompt file:",
+	} {
+		if strings.Contains(lowerOutput, forbidden) {
+			t.Fatalf("agent-assisted output contains unsafe dry-run artifact %q:\n%s", forbidden, output)
+		}
 	}
 }
 

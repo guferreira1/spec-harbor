@@ -20,6 +20,12 @@ func TestGuidedGenerationModeValue(t *testing.T) {
 	}
 }
 
+func TestAgentAssistedGenerationModeValue(t *testing.T) {
+	if AgentAssistedMode != "agent-assisted" {
+		t.Fatalf("AgentAssistedMode = %q, want agent-assisted", AgentAssistedMode)
+	}
+}
+
 func TestNewGenerationResultCopiesFileSlices(t *testing.T) {
 	created := []string{"proposal.md"}
 	skipped := []string{"design.md"}
