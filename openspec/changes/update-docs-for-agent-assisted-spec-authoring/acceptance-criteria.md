@@ -1,0 +1,48 @@
+# Acceptance Criteria: Update Docs For Agent-Assisted Spec Authoring
+
+- Documentation accurately describes `go run ./cmd/specharbor generate <change-id> --blank` as implemented behavior.
+- Documentation accurately describes `go run ./cmd/specharbor generate <change-id> --template <template-name>` as implemented behavior.
+- Documentation accurately describes `go run ./cmd/specharbor generate <change-id> --guided --type <type> --title "<title>" --summary "<summary>"` as implemented behavior.
+- Documentation accurately describes `go run ./cmd/specharbor generate <change-id> --agent-assisted --agent <agent-name> --type <type> --title "<title>" --summary "<summary>"` as implemented dry-run behavior.
+- Documentation lists exactly these supported agent-assisted authoring types:
+  - `feature`
+  - `bugfix`
+  - `docs`
+  - `refactor`
+- Documentation explains that agent-assisted spec authoring is dry-run only in this first version.
+- Documentation explains that dry-run prints a deterministic authoring plan to stdout.
+- Documentation explains that dry-run prints a deterministic, copy-pasteable prompt to stdout.
+- Documentation explains that dry-run writes no files.
+- Documentation explains that dry-run writes no prompt file.
+- Documentation explains that dry-run does not create or modify OpenSpec files.
+- Documentation explains that dry-run does not create or modify production code.
+- Documentation explains that dry-run does not execute agents.
+- Documentation explains that dry-run does not call provider APIs.
+- Documentation explains that dry-run does not call local models.
+- Documentation explains that dry-run does not call network APIs.
+- Documentation explains that dry-run does not call source-control APIs.
+- Documentation explains that dry-run does not call workflow tools.
+- Documentation explains that `--execute` is currently unsupported and returns a clear error.
+- Documentation explains that the generated prompt is meant to help an external agent author or refine only the OpenSpec change package.
+- Documentation explains that implementation remains a later step through the normal SpecHarbor workflow.
+- Documentation examples are copy-pasteable from the repository root using `go run ./cmd/specharbor ...`.
+- Documentation keeps implemented behavior clearly separated from planned roadmap behavior.
+- Documentation does not claim AI-assisted generation is implemented.
+- Documentation does not claim agent execution is implemented.
+- Documentation does not claim custom templates are implemented.
+- Documentation does not claim remote templates are implemented.
+- Documentation does not claim config-driven templates are implemented.
+- Documentation does not claim hybrid generation is implemented.
+- Documentation does not claim interactive prompts are implemented.
+- Documentation does not document AI-assisted generation, agent execution, custom templates, remote templates, config-driven templates, hybrid generation, or interactive prompts as current command behavior.
+- The implementation diff modifies only `README.md`, Markdown files under `docs/`, and `openspec/changes/update-docs-for-agent-assisted-spec-authoring/tasks.md`.
+- No Go code is modified.
+- No Go tests are modified.
+- No CLI behavior is modified.
+- `.github/workflows/ci.yml` is not modified.
+- CI configuration is not modified.
+- `.specharbor/config.yml` is not modified.
+- Init templates are not modified.
+- Unrelated OpenSpec changes are not modified.
+- `go test ./...` passes.
+- `go run ./cmd/specharbor validate update-docs-for-agent-assisted-spec-authoring` passes.
