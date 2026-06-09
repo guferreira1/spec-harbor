@@ -1,6 +1,6 @@
 # Generation Modes
 
-SpecHarbor currently implements blank generation and built-in template generation.
+SpecHarbor currently implements blank generation, built-in template generation, and guided generation.
 
 ## Implemented
 
@@ -25,7 +25,26 @@ Implemented built-in templates are exactly:
 - `docs`
 - `refactor`
 
-Both implemented generation modes create the required OpenSpec change files:
+Built-in template generation writes deterministic, local, generic starter content for the selected template.
+
+### Guided Generation
+
+```bash
+go run ./cmd/specharbor generate <change-id> --guided --type <type> --title "<title>" --summary "<summary>"
+```
+
+Implemented guided types are exactly:
+
+- `feature`
+- `bugfix`
+- `docs`
+- `refactor`
+
+Guided generation writes deterministic, local starter content based on explicit CLI inputs. It is non-interactive and does not prompt during command execution.
+
+Guided generated content includes the supplied title and summary. The generated content is safe to edit and does not mean SpecHarbor inferred project-specific requirements beyond the provided inputs.
+
+All implemented generation modes create the required OpenSpec change files:
 
 ```text
 openspec/changes/<change-id>/
@@ -36,15 +55,12 @@ openspec/changes/<change-id>/
   risks.md
 ```
 
-Built-in template generation writes deterministic, local, generic starter content for the selected template. The generated content is safe to edit and does not mean SpecHarbor inferred project-specific requirements.
-
 Existing files are skipped and are not overwritten. Partially existing change directories are recoverable because generation creates only missing required files.
 
 ## Planned
 
 The following items are product direction, not implemented command behavior:
 
-- guided generation;
 - AI-assisted generation;
 - agent-assisted generation;
 - hybrid generation;

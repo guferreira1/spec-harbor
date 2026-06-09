@@ -31,6 +31,7 @@ go run ./cmd/specharbor init
 go run ./cmd/specharbor scan
 go run ./cmd/specharbor generate add-example-feature --blank
 go run ./cmd/specharbor generate add-feature --template feature
+go run ./cmd/specharbor generate add-reports --guided --type feature --title "Add reports" --summary "Create report generation support"
 go run ./cmd/specharbor validate add-example-feature
 go run ./cmd/specharbor prompt add-example-feature --role implementer
 go run ./cmd/specharbor review add-example-feature
@@ -43,6 +44,8 @@ go run ./cmd/specharbor config
 
 Built-in template generation supports exactly `feature`, `bugfix`, `docs`, and `refactor`. See [Usage](docs/usage.md) and [Generation modes](docs/generation-modes.md) for details.
 
+Guided generation is deterministic, local, non-interactive, and supports exactly `feature`, `bugfix`, `docs`, and `refactor`. It uses explicit `--type`, `--title`, and `--summary` flags.
+
 ## Status
 
 Implemented:
@@ -51,6 +54,7 @@ Implemented:
 - Stack-agnostic local project scanning.
 - Blank OpenSpec change generation.
 - Built-in OpenSpec change template generation for `feature`, `bugfix`, `docs`, and `refactor`.
+- Guided OpenSpec change generation for `feature`, `bugfix`, `docs`, and `refactor`.
 - Change validation, review, and archive.
 - Role-based prompt generation with `--role`.
 - Read-only local config display with `config show` and `config`.
@@ -61,8 +65,9 @@ In progress:
 
 Planned:
 
-- Guided, AI-assisted, agent-assisted, and hybrid spec generation.
+- AI-assisted, agent-assisted, and hybrid spec generation.
 - Future template capabilities such as custom, remote, and config-driven templates.
+- Interactive generation prompts.
 - Config mutation commands such as `config get`, `config set`, and `config unset`.
 - AI-provider and workflow connector support.
 
