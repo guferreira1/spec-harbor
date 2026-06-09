@@ -1,0 +1,236 @@
+# Tasks: Implement Agent-Assisted Spec Authoring
+
+## Phase 0: Baseline and Scope
+
+- [x] Read `AGENTS.md`, `.specharbor/rules/global.md`, `.specharbor/rules/implementer.md`, `openspec/project.md`, `openspec/specs/architecture/spec.md`, and all files under `openspec/changes/implement-agent-assisted-spec-authoring/`.
+- [x] Inspect existing `specharbor generate --blank` behavior before editing.
+- [x] Inspect existing `specharbor generate --template <template-name>` behavior before editing.
+- [x] Inspect existing `specharbor generate --guided --type <type> --title "<title>" --summary "<summary>"` behavior before editing.
+- [x] Inspect current CLI parsing and reporting for `specharbor generate`.
+- [x] Inspect current generation domain concepts, guided type validation, required OpenSpec file policy, ports, use cases, template adapters, and tests.
+- [x] Run `go test ./...` to establish the pre-change baseline.
+- [x] Keep the implementation limited to deterministic, dry-run-only agent-assisted OpenSpec spec authoring.
+- [x] Do not implement production code through an agent.
+- [x] Do not execute external commands, local agent commands, provider APIs, local model APIs, network APIs, source-control APIs, or workflow tools.
+- [x] Do not parse, apply, or write agent output, including OpenSpec files.
+- [x] Do not write any files from agent-assisted dry-run, including prompt files.
+- [x] Do not add `AgentRunner`, local command execution adapters, write/apply ports, workflow connector ports, or confirmation flows.
+- [x] Preserve existing `specharbor generate <change-id> --blank` behavior.
+- [x] Preserve existing `specharbor generate <change-id> --template <template-name>` behavior.
+- [x] Preserve existing `specharbor generate <change-id> --guided --type <type> --title "<title>" --summary "<summary>"` behavior.
+- [x] Do not change `init`, `scan`, `validate`, `prompt`, `review`, `archive`, `config`, or CI behavior.
+- [x] Do not modify README files, docs outside this OpenSpec change, `.github/workflows/ci.yml`, `.specharbor/config.yml`, or other CI/config files.
+
+## Phase 1: Domain Concepts
+
+- [x] Add an agent-assisted generation or authoring mode value for `agent-assisted`.
+- [x] Add or reuse a domain value for supported agent-assisted authoring types.
+- [x] Support only `feature`, `bugfix`, `docs`, and `refactor` as valid agent-assisted authoring types.
+- [x] Reject empty authoring type values with a clear error.
+- [x] Reject unknown authoring type values with a clear error.
+- [x] Add or reuse validation for required agent name input.
+- [x] Reject empty agent names with a clear error.
+- [x] Add or reuse validation for required title input.
+- [x] Add or reuse validation for required summary input.
+- [x] Trim agent name, type, title, and summary for validation.
+- [x] Ensure the generated authoring prompt uses normalized values that passed validation.
+- [x] Keep unsafe change id validation consistent with existing generation behavior.
+- [x] Reuse `domain.RequiredOpenSpecChangeFiles()` for the required file list.
+- [x] Add a structured dry-run result that can represent the execution plan, generated prompt, required files, no-external-command-executed status, no-files-written status, no-prompt-file-written status, and no-agent-output-parsed-or-applied status.
+- [x] Do not add agent run request/result domain types in this change.
+- [x] Keep domain code free of adapters, CLI packages, `os`, terminal IO, provider SDKs, network APIs, source-control SDKs, workflow SDKs, external-agent SDKs, external process execution packages, and concrete template engines.
+- [x] Avoid provider, cloud, marketplace, remote registry, source-control, workflow, execution, or SDK-specific domain abstractions.
+
+## Phase 2: Ports and Prompt Template Adapter
+
+- [x] Add a small core-owned authoring prompt port/interface if existing prompt ports do not fit cleanly.
+- [x] Ensure the prompt port renders deterministic content from agent-assisted authoring input.
+- [x] Ensure the prompt port can include every required file from the shared domain policy.
+- [x] Ensure prompt rendering returns clear errors for missing template content or rendering failures.
+- [x] Keep prompt rendering separate from filesystem writes, provider APIs, source-control APIs, workflow APIs, network APIs, terminal IO, and external execution.
+- [x] Do not add an `AgentRunner` port or any local command execution port.
+- [x] Do not add a write/apply port for agent-proposed files.
+- [x] Add a deterministic agent-assisted authoring prompt template adapter, likely under `internal/adapters/templates`.
+- [x] Reuse the existing prompt renderer adapter if it fits the core-owned port contract.
+- [x] Provide prompt content that includes project context.
+- [x] Provide prompt content that includes the change id.
+- [x] Provide prompt content that includes the authoring type.
+- [x] Provide prompt content that includes the title.
+- [x] Provide prompt content that includes the summary.
+- [x] Provide prompt content that lists `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md` from the shared required-file policy.
+- [x] Instruct the agent to create or refine only files under `openspec/changes/<change-id>/`.
+- [x] Instruct the agent not to implement production code.
+- [x] Instruct the agent not to modify unrelated files.
+- [x] For non-docs types, instruct the agent not to change README or docs.
+- [x] For `docs` type, permit documentation scope from the title and summary while still forbidding production code changes.
+- [x] Instruct the agent to leave implementation tasks unchecked.
+- [x] Instruct the agent to preserve architecture boundaries.
+- [x] Include the domain, ports, use case, adapters, core dependency, and CLI business-rule boundaries in the prompt.
+- [x] Instruct the agent to run or recommend `specharbor validate <change-id>` when available.
+- [x] Define clear Markdown-only OpenSpec output expectations.
+- [x] Ensure the prompt is deterministic, local, human-readable, safe to print, and directly copy-pasteable from stdout.
+- [x] Ensure the prompt does not depend on a prompt file or any file written by SpecHarbor.
+- [x] Ensure the prompt does not ask the agent to run implementation, tests, source-control commands, workflow commands, provider setup, credential setup, commits, pushes, merges, deployment, or production code edits.
+- [x] Do not add runtime remote template discovery, provider prompts, network access, source-control access, workflow access, config mutation, credential storage, terminal prompts, external command execution, or prompt-file output to the template adapter.
+
+## Phase 3: Agent-Assisted Authoring Use Case
+
+- [x] Add a use case under `internal/core/usecase` for dry-run-only agent-assisted spec authoring.
+- [x] Validate that required use case dependencies are present.
+- [x] Validate project root without direct `os` access.
+- [x] Validate change id using the same safe single path segment policy as generation.
+- [x] Validate agent name.
+- [x] Validate authoring type.
+- [x] Validate title.
+- [x] Validate summary.
+- [x] Reject unknown authoring types before prompt rendering.
+- [x] Reject unsafe change ids before prompt rendering.
+- [x] Reject any execution mode value as unsupported before prompt rendering, if such a value reaches the use case boundary.
+- [x] Build the target change relative path as `openspec/changes/<change-id>`.
+- [x] Obtain required filenames from `domain.RequiredOpenSpecChangeFiles()`.
+- [x] Build a deterministic dry-run execution plan.
+- [x] Render the authoring prompt through the prompt port.
+- [x] Return a structured dry-run result containing the plan, prompt, required files, no-external-command-executed status, no-files-written status, no-prompt-file-written status, and no-agent-output-parsed-or-applied status.
+- [x] Ensure dry-run does not execute external commands.
+- [x] Ensure dry-run does not write files.
+- [x] Ensure dry-run does not write a prompt file.
+- [x] Ensure dry-run does not create or modify OpenSpec files.
+- [x] Ensure dry-run does not modify production code.
+- [x] Ensure dry-run does not parse, apply, or write agent output.
+- [x] Ensure dry-run does not access network APIs, provider APIs, local model APIs, source-control APIs, or workflow tools.
+- [x] Keep output printing out of the use case.
+- [x] Keep providers, local models, source-control APIs, workflow connectors, network calls, direct external process execution, terminal prompts, config mutation, and adapters out of the use case.
+
+## Phase 4: CLI Parsing and Reporting
+
+- [x] Update `internal/adapters/cli` so `specharbor generate <change-id> --agent-assisted --agent <agent-name> --type <type> --title "<title>" --summary "<summary>"` invokes the agent-assisted authoring use case in dry-run mode.
+- [x] Preserve `specharbor generate <change-id> --blank` parsing and output behavior.
+- [x] Preserve `specharbor generate <change-id> --template <template-name>` parsing and output behavior.
+- [x] Preserve `specharbor generate <change-id> --guided --type <type> --title "<title>" --summary "<summary>"` parsing and output behavior.
+- [x] Reject `--agent-assisted` without `--agent` with a clear missing-agent error.
+- [x] Reject `--agent-assisted` without `--type` with a clear missing-type error.
+- [x] Reject `--agent-assisted` without `--title` with a clear missing-title error.
+- [x] Reject `--agent-assisted` without `--summary` with a clear missing-summary error.
+- [x] Reject `--agent` without a following value with a clear error.
+- [x] Reject `--type` without a following value with a clear error.
+- [x] Reject `--title` without a following value with a clear error.
+- [x] Reject `--summary` without a following value with a clear error.
+- [x] Reject empty agent, type, title, or summary values when representable by the parser.
+- [x] Reject unknown authoring types with a clear error.
+- [x] Reject `--execute` for agent-assisted generation with a clear unsupported flag/mode error.
+- [x] Ensure `--execute` rejection does not render a prompt, run commands, access the network, parse output, apply output, or write files.
+- [x] Reject commands that provide both `--agent-assisted` and `--blank`.
+- [x] Reject commands that provide both `--agent-assisted` and `--template`.
+- [x] Reject commands that provide both `--agent-assisted` and `--guided`.
+- [x] Preserve existing `--blank` and `--template` conflict behavior.
+- [x] Preserve existing guided conflict behavior.
+- [x] Reject guided input flags without the correct generation mode where existing parser behavior requires that.
+- [x] Reject unsupported flags.
+- [x] Reject extra positional arguments.
+- [x] Reject duplicate `--agent-assisted`, `--agent`, `--type`, `--title`, `--summary`, and `--execute` flags where the current parser supports duplicate validation.
+- [x] Preserve existing duplicate flag validation for `--blank`, `--template`, and `--guided`.
+- [x] Preserve unsafe change id error behavior.
+- [x] Obtain the current working directory as project root in the CLI adapter.
+- [x] Construct the agent-assisted authoring use case with concrete prompt template/rendering adapters only.
+- [x] Print a deterministic dry-run report.
+- [x] Print the deterministic, copy-pasteable generated prompt to stdout.
+- [x] Include the change id, agent name, authoring type, title, relative change path, required files, execution plan, generated prompt, no-external-command-executed status, no-files-written status, no-prompt-file-written status, and no-agent-output-parsed-or-applied status in dry-run output.
+- [x] Keep report formatting in the CLI adapter.
+- [x] Avoid absolute local paths, debug output, credentials, provider details, source-control details, workflow details, network details, or validation claims for files that were not written.
+- [x] Return argument errors and unsupported `--execute` errors without panicking.
+- [x] Keep `cmd/specharbor/main.go` limited to existing process bootstrapping unless a minimal error-handling adjustment is strictly required.
+
+## Phase 5: Tests
+
+- [x] Add domain tests for agent-assisted mode behavior.
+- [x] Add domain tests for supported authoring type validation.
+- [x] Add domain tests proving only `feature`, `bugfix`, `docs`, and `refactor` are valid authoring types.
+- [x] Add domain or use case tests for missing agent errors.
+- [x] Add domain or use case tests for missing type errors.
+- [x] Add domain or use case tests for missing title errors.
+- [x] Add domain or use case tests for missing summary errors.
+- [x] Add tests for unknown authoring type errors.
+- [x] Add tests for unsafe change id errors.
+- [x] Add tests proving `--execute` returns a clear unsupported error and runs nothing.
+- [x] Add prompt template adapter tests proving the prompt includes project context.
+- [x] Add prompt template adapter tests proving the prompt includes change id, type, title, and summary.
+- [x] Add prompt template adapter tests proving the prompt lists every file from `domain.RequiredOpenSpecChangeFiles()`.
+- [x] Add prompt template adapter tests proving the prompt instructs the agent to create or refine only OpenSpec files.
+- [x] Add prompt template adapter tests proving the prompt includes "do not implement code" or equivalent explicit production-code prohibition.
+- [x] Add prompt template adapter tests proving the prompt prohibits unrelated files.
+- [x] Add prompt template adapter tests proving non-docs types prohibit README/docs changes.
+- [x] Add prompt template adapter tests proving docs type permits documentation scope from title and summary while still forbidding production code.
+- [x] Add prompt template adapter tests proving the prompt leaves implementation tasks unchecked.
+- [x] Add prompt template adapter tests proving the prompt preserves architecture boundaries.
+- [x] Add prompt template adapter tests proving the prompt mentions `specharbor validate <change-id>` or a clear recommendation to run it when available.
+- [x] Add prompt template adapter tests proving the prompt is copy-pasteable from stdout and does not depend on a prompt file.
+- [x] Add use case tests for dry-run `feature` behavior.
+- [x] Add use case tests for dry-run `bugfix` behavior.
+- [x] Add use case tests for dry-run `docs` behavior.
+- [x] Add use case tests for dry-run `refactor` behavior.
+- [x] Test that dry-run returns a deterministic plan and prompt.
+- [x] Test that dry-run reports no external commands executed.
+- [x] Test that dry-run writes no files.
+- [x] Test that dry-run writes no prompt file.
+- [x] Test that dry-run creates or modifies no OpenSpec files.
+- [x] Test that dry-run parses or applies no agent output.
+- [x] Test that no `AgentRunner`, local command adapter, or write/apply port is introduced.
+- [x] Add CLI tests for successful dry-run `feature` authoring.
+- [x] Add CLI tests for successful dry-run `bugfix` authoring.
+- [x] Add CLI tests for successful dry-run `docs` authoring.
+- [x] Add CLI tests for successful dry-run `refactor` authoring.
+- [x] Add CLI tests proving successful dry-run prints the prompt to stdout.
+- [x] Add CLI tests proving successful dry-run reports no files written, no prompt file written, and no external commands executed.
+- [x] Add CLI tests for clear errors when `--agent-assisted` is missing `--agent`.
+- [x] Add CLI tests for clear errors when `--agent-assisted` is missing `--type`.
+- [x] Add CLI tests for clear errors when `--agent-assisted` is missing `--title`.
+- [x] Add CLI tests for clear errors when `--agent-assisted` is missing `--summary`.
+- [x] Add CLI tests for clear errors on unknown authoring types.
+- [x] Add CLI tests for unsupported `--execute`.
+- [x] Add CLI tests proving unsupported `--execute` does not render a prompt, run commands, or write files.
+- [x] Add CLI tests for clear errors when `--agent-assisted` and `--blank` are provided together.
+- [x] Add CLI tests for clear errors when `--agent-assisted` and `--template` are provided together.
+- [x] Add CLI tests for clear errors when `--agent-assisted` and `--guided` are provided together.
+- [x] Add CLI tests for unsupported flags and extra positional arguments.
+- [x] Add CLI tests for duplicate conflicting flags where supported by the current parser.
+- [x] Add regression tests proving blank generation remains unchanged.
+- [x] Add regression tests proving template generation remains unchanged.
+- [x] Add regression tests proving guided generation remains unchanged.
+- [x] Add CLI tests or regression coverage proving `init`, `scan`, `validate`, `prompt`, `review`, `archive`, `config`, `help`, `version`, and unknown command behavior are not changed.
+
+## Phase 6: Verification and Task Updates
+
+- [x] Run `gofmt` on changed Go files.
+- [x] Run `go test ./...`.
+- [x] Manually verify dry-run prints a deterministic authoring plan and copy-pasteable prompt to stdout for `feature`.
+- [x] Manually verify dry-run prints a deterministic authoring plan and copy-pasteable prompt to stdout for `bugfix`.
+- [x] Manually verify dry-run prints a deterministic authoring plan and copy-pasteable prompt to stdout for `docs`.
+- [x] Manually verify dry-run prints a deterministic authoring plan and copy-pasteable prompt to stdout for `refactor`.
+- [x] Manually verify dry-run does not execute external commands.
+- [x] Manually verify dry-run does not write files.
+- [x] Manually verify dry-run does not write a prompt file.
+- [x] Manually verify dry-run does not create or modify OpenSpec files.
+- [x] Manually verify dry-run does not modify production code.
+- [x] Manually verify dry-run does not parse, apply, or write agent output.
+- [x] Manually verify dry-run does not call provider APIs, local models, network APIs, source-control APIs, or workflow tools.
+- [x] Manually verify `--execute` returns a clear unsupported error and runs nothing.
+- [x] Manually verify missing `--agent` returns a clear error.
+- [x] Manually verify missing `--type` returns a clear error.
+- [x] Manually verify missing `--title` returns a clear error.
+- [x] Manually verify missing `--summary` returns a clear error.
+- [x] Manually verify unknown authoring types return a clear error.
+- [x] Manually verify unsafe change ids are rejected before prompt rendering.
+- [x] Manually verify providing both `--agent-assisted` and `--blank` returns a clear error.
+- [x] Manually verify providing both `--agent-assisted` and `--template` returns a clear error.
+- [x] Manually verify providing both `--agent-assisted` and `--guided` returns a clear error.
+- [x] Manually verify unsupported flags and extra arguments return clear errors.
+- [x] Manually verify no `AgentRunner`, local command adapter, write/apply port, confirmation flow, execute use case path, prompt file output, source-control automation, or workflow automation is included.
+- [x] Manually verify `specharbor generate <change-id> --blank` remains unchanged.
+- [x] Manually verify `specharbor generate <change-id> --template feature` remains unchanged.
+- [x] Manually verify `specharbor generate <change-id> --template bugfix` remains unchanged.
+- [x] Manually verify `specharbor generate <change-id> --template docs` remains unchanged.
+- [x] Manually verify `specharbor generate <change-id> --template refactor` remains unchanged.
+- [x] Manually verify guided generation remains unchanged for `feature`, `bugfix`, `docs`, and `refactor`.
+- [x] Inspect `git status --short`, `git diff --stat`, `git diff --name-only`, and `git diff`.
+- [x] Confirm no README, docs outside this OpenSpec change, CI, `.github/workflows/ci.yml`, or `.specharbor/config.yml` changes are included.
+- [x] Update this `tasks.md` by checking off only implementation tasks actually completed.

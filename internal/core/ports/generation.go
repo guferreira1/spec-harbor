@@ -28,3 +28,9 @@ type TemplateChangeContent interface {
 type GuidedChangeContent interface {
 	ContentFor(guidedType domain.GuidedType, title string, summary string, relativePath string) (string, error)
 }
+
+// AgentAssistedAuthoringPromptRenderer renders deterministic dry-run prompts
+// for agent-assisted OpenSpec authoring.
+type AgentAssistedAuthoringPromptRenderer interface {
+	Render(request domain.AgentAssistedAuthoringPromptRequest) (string, error)
+}
