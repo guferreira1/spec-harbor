@@ -14,6 +14,12 @@ func TestTemplateGenerationModeValue(t *testing.T) {
 	}
 }
 
+func TestGuidedGenerationModeValue(t *testing.T) {
+	if GuidedMode != "guided" {
+		t.Fatalf("GuidedMode = %q, want guided", GuidedMode)
+	}
+}
+
 func TestNewGenerationResultCopiesFileSlices(t *testing.T) {
 	created := []string{"proposal.md"}
 	skipped := []string{"design.md"}
@@ -68,5 +74,27 @@ func TestNewTemplateGenerationResultSetsTemplateModeAndName(t *testing.T) {
 	}
 	if result.TemplateName != FeatureTemplate {
 		t.Fatalf("TemplateName = %q, want %q", result.TemplateName, FeatureTemplate)
+	}
+}
+
+func TestNewGuidedGenerationResultSetsGuidedModeTypeAndTitle(t *testing.T) {
+	result := NewGuidedGenerationResult(
+		"change",
+		FeatureGuidedType,
+		"Add reports",
+		"openspec/changes/change",
+		true,
+		[]string{"proposal.md"},
+		[]string{"design.md"},
+	)
+
+	if result.Mode != GuidedMode {
+		t.Fatalf("Mode = %q, want %q", result.Mode, GuidedMode)
+	}
+	if result.GuidedType != FeatureGuidedType {
+		t.Fatalf("GuidedType = %q, want %q", result.GuidedType, FeatureGuidedType)
+	}
+	if result.GuidedTitle != "Add reports" {
+		t.Fatalf("GuidedTitle = %q, want Add reports", result.GuidedTitle)
 	}
 }

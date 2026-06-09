@@ -109,6 +109,80 @@ func TestGenerateChangeCreatesNewTemplateChange(t *testing.T) {
 	}
 }
 
+func TestGenerateChangeCreatesNewGuidedChange(t *testing.T) {
+	tests := []struct {
+		name       string
+		guidedType domain.GuidedType
+	}{
+		{name: "feature", guidedType: domain.FeatureGuidedType},
+		{name: "bugfix", guidedType: domain.BugfixGuidedType},
+		{name: "docs", guidedType: domain.DocsGuidedType},
+		{name: "refactor", guidedType: domain.RefactorGuidedType},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			changeID := test.name + "-guided-change"
+			fileSystem := newFakeGenerationFileSystem()
+			seedGenerationOpenSpecProject(fileSystem)
+			guidedContent := newFakeGuidedChangeContent()
+			useCase := NewGenerateChangeWithContent(
+				fileSystem,
+				newFakeBlankChangeContent(),
+				newFakeTemplateChangeContent(),
+				guidedContent,
+			)
+
+			result, err := useCase.Execute(GenerateChangeInput{
+				ProjectRoot: "/project",
+				ChangeID:    changeID,
+				Mode:        domain.GuidedMode,
+				GuidedType:  string(test.guidedType),
+				Title:       " Add reports ",
+				Summary:     " Create report generation support ",
+			})
+			if err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+
+			changePath := openspecChangesDirectory + "/" + changeID
+			if result.Mode != domain.GuidedMode {
+				t.Fatalf("Mode = %q, want %q", result.Mode, domain.GuidedMode)
+			}
+			if result.GuidedType != test.guidedType {
+				t.Fatalf("GuidedType = %q, want %q", result.GuidedType, test.guidedType)
+			}
+			if result.GuidedTitle != "Add reports" {
+				t.Fatalf("GuidedTitle = %q, want Add reports", result.GuidedTitle)
+			}
+			if result.ChangePath != changePath {
+				t.Fatalf("ChangePath = %q, want %q", result.ChangePath, changePath)
+			}
+			if !result.ChangeDirectoryCreated {
+				t.Fatalf("ChangeDirectoryCreated = false, want true")
+			}
+			assertStringSlicesEqual(t, result.CreatedFiles(), domain.RequiredOpenSpecChangeFiles())
+			assertStringSlicesEqual(t, result.SkippedExistingFiles(), nil)
+
+			for _, requiredFile := range domain.RequiredOpenSpecChangeFiles() {
+				path := changePath + "/" + requiredFile
+				want := defaultGuidedContent(test.guidedType, "Add reports", "Create report generation support", requiredFile)
+				if fileSystem.files[path] != want {
+					t.Fatalf("file %q content = %q, want %q", path, fileSystem.files[path], want)
+				}
+			}
+			assertGuidedRequestsEqual(
+				t,
+				guidedContent.requests,
+				test.guidedType,
+				"Add reports",
+				"Create report generation support",
+				domain.RequiredOpenSpecChangeFiles(),
+			)
+		})
+	}
+}
+
 func TestGenerateChangeCreatesTargetDirectoryWhenMissing(t *testing.T) {
 	changeID := "missing-directory"
 	fileSystem := newFakeGenerationFileSystem()
@@ -207,6 +281,61 @@ func TestGenerateChangeTemplateFillsMissingFilesAndPreservesExisting(t *testing.
 	}
 }
 
+func TestGenerateChangeGuidedFillsMissingFilesAndPreservesExisting(t *testing.T) {
+	changeID := "partial-guided-change"
+	changePath := openspecChangesDirectory + "/" + changeID
+	fileSystem := newFakeGenerationFileSystem()
+	seedGenerationOpenSpecProject(fileSystem)
+	fileSystem.directories[changePath] = true
+	fileSystem.files[changePath+"/proposal.md"] = "custom proposal"
+	fileSystem.files[changePath+"/tasks.md"] = "custom tasks"
+	guidedContent := newFakeGuidedChangeContent()
+
+	result, err := NewGenerateChangeWithContent(
+		fileSystem,
+		newFakeBlankChangeContent(),
+		newFakeTemplateChangeContent(),
+		guidedContent,
+	).Execute(GenerateChangeInput{
+		ProjectRoot: "/project",
+		ChangeID:    changeID,
+		Mode:        domain.GuidedMode,
+		GuidedType:  string(domain.FeatureGuidedType),
+		Title:       "Add reports",
+		Summary:     "Create report generation support",
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if result.ChangeDirectoryCreated {
+		t.Fatalf("ChangeDirectoryCreated = true, want false")
+	}
+	assertStringSlicesEqual(t, result.CreatedFiles(), []string{"design.md", "acceptance-criteria.md", "risks.md"})
+	assertStringSlicesEqual(t, result.SkippedExistingFiles(), []string{"proposal.md", "tasks.md"})
+	if fileSystem.files[changePath+"/proposal.md"] != "custom proposal" {
+		t.Fatalf("existing proposal.md was overwritten")
+	}
+	if fileSystem.files[changePath+"/tasks.md"] != "custom tasks" {
+		t.Fatalf("existing tasks.md was overwritten")
+	}
+	for _, requiredFile := range []string{"design.md", "acceptance-criteria.md", "risks.md"} {
+		path := changePath + "/" + requiredFile
+		want := defaultGuidedContent(domain.FeatureGuidedType, "Add reports", "Create report generation support", requiredFile)
+		if fileSystem.files[path] != want {
+			t.Fatalf("file %q content = %q, want %q", path, fileSystem.files[path], want)
+		}
+	}
+	assertGuidedRequestsEqual(
+		t,
+		guidedContent.requests,
+		domain.FeatureGuidedType,
+		"Add reports",
+		"Create report generation support",
+		domain.RequiredOpenSpecChangeFiles(),
+	)
+}
+
 func TestGenerateChangeSkipsExistingFilesAndDoesNotOverwrite(t *testing.T) {
 	changeID := "existing-change"
 	changePath := openspecChangesDirectory + "/" + changeID
@@ -251,11 +380,6 @@ func TestGenerateChangeRejectsInvalidInput(t *testing.T) {
 			name:  "empty change id",
 			input: GenerateChangeInput{ProjectRoot: "/project", ChangeID: " ", Mode: domain.BlankMode},
 			want:  "change id is required",
-		},
-		{
-			name:  "unsupported guided mode",
-			input: GenerateChangeInput{ProjectRoot: "/project", ChangeID: "change", Mode: domain.GuidedMode},
-			want:  "unsupported generation mode: guided",
 		},
 		{
 			name:  "unsupported ai-assisted mode",
@@ -384,7 +508,127 @@ func TestGenerateChangeRejectsInvalidTemplateInputBeforeTargetWrites(t *testing.
 	}
 }
 
-func TestGenerateChangeTemplateUsesSameUnsafeChangeIDValidationAsBlankGeneration(t *testing.T) {
+func TestGenerateChangeRejectsMissingGuidedContentDependency(t *testing.T) {
+	fileSystem := newFakeGenerationFileSystem()
+
+	_, err := NewGenerateChangeWithTemplateContent(
+		fileSystem,
+		newFakeBlankChangeContent(),
+		newFakeTemplateChangeContent(),
+	).Execute(GenerateChangeInput{
+		ProjectRoot: "/project",
+		ChangeID:    "change",
+		Mode:        domain.GuidedMode,
+		GuidedType:  string(domain.FeatureGuidedType),
+		Title:       "Add reports",
+		Summary:     "Create report generation support",
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want guided content dependency error")
+	}
+	if !strings.Contains(err.Error(), "guided change content is required") {
+		t.Fatalf("Execute() error = %q, want guided content dependency context", err.Error())
+	}
+	if fileSystem.operationCount() != 0 {
+		t.Fatalf("filesystem operations = %d, want 0 before rejecting missing dependency", fileSystem.operationCount())
+	}
+}
+
+func TestGenerateChangeRejectsInvalidGuidedInputBeforeTargetWrites(t *testing.T) {
+	tests := []struct {
+		name  string
+		input GenerateChangeInput
+		want  string
+	}{
+		{
+			name: "missing guided type",
+			input: GenerateChangeInput{
+				ProjectRoot: "/project",
+				ChangeID:    "change",
+				Mode:        domain.GuidedMode,
+				Title:       "Add reports",
+				Summary:     "Create report generation support",
+			},
+			want: "guided type is required",
+		},
+		{
+			name: "unknown guided type",
+			input: GenerateChangeInput{
+				ProjectRoot: "/project",
+				ChangeID:    "change",
+				Mode:        domain.GuidedMode,
+				GuidedType:  "maintenance",
+				Title:       "Add reports",
+				Summary:     "Create report generation support",
+			},
+			want: "unknown guided type: maintenance",
+		},
+		{
+			name: "missing guided title",
+			input: GenerateChangeInput{
+				ProjectRoot: "/project",
+				ChangeID:    "change",
+				Mode:        domain.GuidedMode,
+				GuidedType:  string(domain.FeatureGuidedType),
+				Title:       " ",
+				Summary:     "Create report generation support",
+			},
+			want: "guided title is required",
+		},
+		{
+			name: "missing guided summary",
+			input: GenerateChangeInput{
+				ProjectRoot: "/project",
+				ChangeID:    "change",
+				Mode:        domain.GuidedMode,
+				GuidedType:  string(domain.FeatureGuidedType),
+				Title:       "Add reports",
+				Summary:     " ",
+			},
+			want: "guided summary is required",
+		},
+		{
+			name: "unsafe guided change id",
+			input: GenerateChangeInput{
+				ProjectRoot: "/project",
+				ChangeID:    "../unsafe",
+				Mode:        domain.GuidedMode,
+				GuidedType:  string(domain.FeatureGuidedType),
+				Title:       "Add reports",
+				Summary:     "Create report generation support",
+			},
+			want: "change id must be a safe single path segment",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fileSystem := newFakeGenerationFileSystem()
+			guidedContent := newFakeGuidedChangeContent()
+
+			_, err := NewGenerateChangeWithContent(
+				fileSystem,
+				newFakeBlankChangeContent(),
+				newFakeTemplateChangeContent(),
+				guidedContent,
+			).Execute(test.input)
+			if err == nil {
+				t.Fatalf("Execute() error = nil, want %q", test.want)
+			}
+			if !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("Execute() error = %q, want %q", err.Error(), test.want)
+			}
+			if fileSystem.operationCount() != 0 {
+				t.Fatalf("filesystem operations = %d, want 0 before rejecting invalid guided input", fileSystem.operationCount())
+			}
+			if len(guidedContent.requests) != 0 {
+				t.Fatalf("guided content requests = %v, want none before rejecting invalid guided input", guidedContent.requests)
+			}
+		})
+	}
+}
+
+func TestGenerateChangeTemplateAndGuidedUseSameUnsafeChangeIDValidationAsBlankGeneration(t *testing.T) {
 	unsafeChangeIDs := []string{
 		".",
 		"..",
@@ -434,6 +678,34 @@ func TestGenerateChangeTemplateUsesSameUnsafeChangeIDValidationAsBlankGeneration
 			}
 			if len(templateContent.requests) != 0 {
 				t.Fatalf("template content requests = %v, want none before rejecting unsafe id", templateContent.requests)
+			}
+
+			guidedFileSystem := newFakeGenerationFileSystem()
+			guidedContent := newFakeGuidedChangeContent()
+			_, guidedErr := NewGenerateChangeWithContent(
+				guidedFileSystem,
+				newFakeBlankChangeContent(),
+				newFakeTemplateChangeContent(),
+				guidedContent,
+			).Execute(GenerateChangeInput{
+				ProjectRoot: "/project",
+				ChangeID:    changeID,
+				Mode:        domain.GuidedMode,
+				GuidedType:  string(domain.FeatureGuidedType),
+				Title:       "Add reports",
+				Summary:     "Create report generation support",
+			})
+			if guidedErr == nil {
+				t.Fatalf("guided Execute() error = nil, want unsafe change id error")
+			}
+			if guidedErr.Error() != blankErr.Error() {
+				t.Fatalf("guided Execute() error = %q, want same unsafe id error as blank %q", guidedErr.Error(), blankErr.Error())
+			}
+			if guidedFileSystem.operationCount() != 0 {
+				t.Fatalf("guided filesystem operations = %d, want 0 before rejecting unsafe id", guidedFileSystem.operationCount())
+			}
+			if len(guidedContent.requests) != 0 {
+				t.Fatalf("guided content requests = %v, want none before rejecting unsafe id", guidedContent.requests)
 			}
 		})
 	}
@@ -547,6 +819,61 @@ func TestGenerateChangeTemplateRejectsMissingOpenSpecProjectBeforeTargetWrites(t
 	}
 }
 
+func TestGenerateChangeGuidedRejectsMissingOpenSpecProjectBeforeTargetWrites(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(fileSystem *fakeGenerationFileSystem)
+	}{
+		{
+			name:  "missing project file",
+			setup: func(fileSystem *fakeGenerationFileSystem) { fileSystem.directories[openspecChangesDirectory] = true },
+		},
+		{
+			name:  "missing changes directory",
+			setup: func(fileSystem *fakeGenerationFileSystem) { fileSystem.files[openspecProjectFile] = "project" },
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fileSystem := newFakeGenerationFileSystem()
+			guidedContent := newFakeGuidedChangeContent()
+			test.setup(fileSystem)
+
+			_, err := NewGenerateChangeWithContent(
+				fileSystem,
+				newFakeBlankChangeContent(),
+				newFakeTemplateChangeContent(),
+				guidedContent,
+			).Execute(GenerateChangeInput{
+				ProjectRoot: "/project",
+				ChangeID:    "change",
+				Mode:        domain.GuidedMode,
+				GuidedType:  string(domain.FeatureGuidedType),
+				Title:       "Add reports",
+				Summary:     "Create report generation support",
+			})
+			if err == nil {
+				t.Fatalf("Execute() error = nil, want missing project structure error")
+			}
+			for _, want := range []string{"OpenSpec project structure is missing", "specharbor init"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("Execute() error = %q, want to contain %q", err.Error(), want)
+				}
+			}
+			if len(fileSystem.createdDirectories) != 0 {
+				t.Fatalf("created directories = %v, want none", fileSystem.createdDirectories)
+			}
+			if len(fileSystem.writtenFiles) != 0 {
+				t.Fatalf("written files = %v, want none", fileSystem.writtenFiles)
+			}
+			if len(guidedContent.requests) != 0 {
+				t.Fatalf("guided content requests = %v, want none before project structure is available", guidedContent.requests)
+			}
+		})
+	}
+}
+
 func TestGenerateChangeTemplateReturnsContentLoadingErrorsBeforeFileWrites(t *testing.T) {
 	wantErr := errors.New("template content unavailable")
 	fileSystem := newFakeGenerationFileSystem()
@@ -582,6 +909,50 @@ func TestGenerateChangeTemplateReturnsContentLoadingErrorsBeforeFileWrites(t *te
 	firstRequiredFile := domain.RequiredOpenSpecChangeFiles()[0]
 	if templateContent.requests[0].templateName != domain.FeatureTemplate || templateContent.requests[0].relativePath != firstRequiredFile {
 		t.Fatalf("template content requests = %v, want first %s request for %s", templateContent.requests, domain.FeatureTemplate, firstRequiredFile)
+	}
+}
+
+func TestGenerateChangeGuidedReturnsContentLoadingErrorsBeforeFileWrites(t *testing.T) {
+	wantErr := errors.New("guided content unavailable")
+	fileSystem := newFakeGenerationFileSystem()
+	seedGenerationOpenSpecProject(fileSystem)
+	guidedContent := newFakeGuidedChangeContent()
+	guidedContent.errors["feature:proposal.md"] = wantErr
+
+	_, err := NewGenerateChangeWithContent(
+		fileSystem,
+		newFakeBlankChangeContent(),
+		newFakeTemplateChangeContent(),
+		guidedContent,
+	).Execute(GenerateChangeInput{
+		ProjectRoot: "/project",
+		ChangeID:    "change",
+		Mode:        domain.GuidedMode,
+		GuidedType:  string(domain.FeatureGuidedType),
+		Title:       "Add reports",
+		Summary:     "Create report generation support",
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want content error")
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Execute() error = %v, want wrapping %v", err, wantErr)
+	}
+	if !strings.Contains(err.Error(), "load feature guided content for proposal.md") {
+		t.Fatalf("Execute() error = %q, want guided content context", err.Error())
+	}
+	if len(fileSystem.writtenFiles) != 0 {
+		t.Fatalf("written files = %v, want none when first guided file content cannot load", fileSystem.writtenFiles)
+	}
+	if len(guidedContent.requests) != 1 {
+		t.Fatalf("guided content requests = %v, want only first required file", guidedContent.requests)
+	}
+	firstRequiredFile := domain.RequiredOpenSpecChangeFiles()[0]
+	if guidedContent.requests[0].guidedType != domain.FeatureGuidedType ||
+		guidedContent.requests[0].title != "Add reports" ||
+		guidedContent.requests[0].summary != "Create report generation support" ||
+		guidedContent.requests[0].relativePath != firstRequiredFile {
+		t.Fatalf("guided content requests = %v, want first feature request for %s", guidedContent.requests, firstRequiredFile)
 	}
 }
 
@@ -819,6 +1190,44 @@ func defaultTemplateContent(templateName domain.TemplateName, relativePath strin
 	return "template:" + string(templateName) + ":" + relativePath
 }
 
+type guidedContentRequest struct {
+	guidedType   domain.GuidedType
+	title        string
+	summary      string
+	relativePath string
+}
+
+type fakeGuidedChangeContent struct {
+	errors   map[string]error
+	requests []guidedContentRequest
+}
+
+func newFakeGuidedChangeContent() *fakeGuidedChangeContent {
+	return &fakeGuidedChangeContent{errors: make(map[string]error)}
+}
+
+func (content *fakeGuidedChangeContent) ContentFor(
+	guidedType domain.GuidedType,
+	title string,
+	summary string,
+	relativePath string,
+) (string, error) {
+	content.requests = append(content.requests, guidedContentRequest{
+		guidedType:   guidedType,
+		title:        title,
+		summary:      summary,
+		relativePath: relativePath,
+	})
+	if err := content.errors[string(guidedType)+":"+relativePath]; err != nil {
+		return "", err
+	}
+	return defaultGuidedContent(guidedType, title, summary, relativePath), nil
+}
+
+func defaultGuidedContent(guidedType domain.GuidedType, title string, summary string, relativePath string) string {
+	return "guided:" + string(guidedType) + ":" + title + ":" + summary + ":" + relativePath
+}
+
 func assertStringSlicesEqual(t *testing.T, got []string, want []string) {
 	t.Helper()
 
@@ -846,6 +1255,30 @@ func assertTemplateRequestsEqual(
 	for index, requiredFile := range requiredFiles {
 		if got[index].templateName != templateName || got[index].relativePath != requiredFile {
 			t.Fatalf("template requests = %v, want %s request for %s at index %d", got, templateName, requiredFile, index)
+		}
+	}
+}
+
+func assertGuidedRequestsEqual(
+	t *testing.T,
+	got []guidedContentRequest,
+	guidedType domain.GuidedType,
+	title string,
+	summary string,
+	requiredFiles []string,
+) {
+	t.Helper()
+
+	if len(got) != len(requiredFiles) {
+		t.Fatalf("guided requests = %v, want %d requests", got, len(requiredFiles))
+	}
+	for index, requiredFile := range requiredFiles {
+		request := got[index]
+		if request.guidedType != guidedType ||
+			request.title != title ||
+			request.summary != summary ||
+			request.relativePath != requiredFile {
+			t.Fatalf("guided requests = %v, want %s request for %s at index %d", got, guidedType, requiredFile, index)
 		}
 	}
 }

@@ -245,6 +245,118 @@ Created:
 	}
 }
 
+func TestExecuteGenerateGuidedPrintsCreatedReport(t *testing.T) {
+	tests := []struct {
+		guidedType   string
+		changeID     string
+		wantProposal string
+		title        string
+		summary      string
+	}{
+		{
+			guidedType:   "feature",
+			changeID:     "guided-feature",
+			wantProposal: "## Proposed Solution",
+			title:        "Add reports",
+			summary:      "Create report generation support",
+		},
+		{
+			guidedType:   "bugfix",
+			changeID:     "guided-bugfix",
+			wantProposal: "## Current Behavior",
+			title:        "Fix validation",
+			summary:      "Correct invalid validation status",
+		},
+		{
+			guidedType:   "docs",
+			changeID:     "guided-docs",
+			wantProposal: "## Documentation Goal",
+			title:        "Update docs",
+			summary:      "Document guided generation",
+		},
+		{
+			guidedType:   "refactor",
+			changeID:     "guided-refactor",
+			wantProposal: "## Refactor Goal",
+			title:        "Simplify generation",
+			summary:      "Refactor generation orchestration",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.guidedType, func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+			createOpenSpecProject(t, root)
+
+			var output bytes.Buffer
+			if err := execute([]string{
+				"generate",
+				test.changeID,
+				"--guided",
+				"--type",
+				test.guidedType,
+				"--title",
+				test.title,
+				"--summary",
+				test.summary,
+			}, &output); err != nil {
+				t.Fatalf("execute(generate) error = %v", err)
+			}
+
+			want := `SpecHarbor guided change generated.
+Change: ` + test.changeID + `
+Guided type: ` + test.guidedType + `
+Title: ` + test.title + `
+Path: openspec/changes/` + test.changeID + `
+Directory: created
+Created files: 5
+Skipped existing files: 0
+
+Created:
+- proposal.md
+- design.md
+- tasks.md
+- acceptance-criteria.md
+- risks.md
+`
+			if output.String() != want {
+				t.Fatalf("generate output = %q, want %q", output.String(), want)
+			}
+
+			changeDirectory := filepath.Join(root, "openspec", "changes", test.changeID)
+			for _, requiredFile := range domain.RequiredOpenSpecChangeFiles() {
+				path := filepath.Join(changeDirectory, requiredFile)
+				contents, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatalf("ReadFile(%q) error = %v", path, err)
+				}
+				generated := string(contents)
+				if strings.TrimSpace(generated) == "" {
+					t.Fatalf("generated file %q is empty", requiredFile)
+				}
+				if !strings.Contains(generated, test.title) {
+					t.Fatalf("%s = %q, want title %q", requiredFile, generated, test.title)
+				}
+				if !strings.Contains(generated, test.summary) {
+					t.Fatalf("%s = %q, want summary %q", requiredFile, generated, test.summary)
+				}
+				if requiredFile == "tasks.md" {
+					assertUncheckedTasksOnly(t, generated)
+				}
+			}
+
+			proposal, err := os.ReadFile(filepath.Join(changeDirectory, "proposal.md"))
+			if err != nil {
+				t.Fatalf("ReadFile(proposal.md) error = %v", err)
+			}
+			if !strings.Contains(string(proposal), test.wantProposal) {
+				t.Fatalf("proposal.md = %q, want to contain %q", string(proposal), test.wantProposal)
+			}
+		})
+	}
+}
+
 func TestExecuteGenerateTemplateAcceptsFlagBeforeChangeID(t *testing.T) {
 	root := t.TempDir()
 	t.Chdir(root)
@@ -260,6 +372,37 @@ func TestExecuteGenerateTemplateAcceptsFlagBeforeChangeID(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "Template: feature") {
 		t.Fatalf("generate output = %q, want template name", output.String())
+	}
+}
+
+func TestExecuteGenerateGuidedAcceptsFlagsBeforeChangeID(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+
+	var output bytes.Buffer
+	if err := execute([]string{
+		"generate",
+		"--guided",
+		"--type",
+		"feature",
+		"--title",
+		"Add reports",
+		"--summary",
+		"Create report generation support",
+		"order-independent-guided",
+	}, &output); err != nil {
+		t.Fatalf("execute(generate) error = %v", err)
+	}
+
+	if !strings.Contains(output.String(), "Change: order-independent-guided") {
+		t.Fatalf("generate output = %q, want change id", output.String())
+	}
+	if !strings.Contains(output.String(), "Guided type: feature") {
+		t.Fatalf("generate output = %q, want guided type", output.String())
+	}
+	if !strings.Contains(output.String(), "Title: Add reports") {
+		t.Fatalf("generate output = %q, want title", output.String())
 	}
 }
 
@@ -395,9 +538,69 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 			want: "blank generation flag specified more than once",
 		},
 		{
-			name: "unsupported flag",
+			name: "guided missing type",
 			args: []string{"generate", "change", "--guided"},
-			want: "unsupported flag: --guided",
+			want: "guided type is required",
+		},
+		{
+			name: "guided type without value",
+			args: []string{"generate", "change", "--guided", "--type"},
+			want: "guided type is required",
+		},
+		{
+			name: "guided type followed by flag",
+			args: []string{"generate", "change", "--guided", "--type", "--title", "Title", "--summary", "Summary"},
+			want: "guided type is required",
+		},
+		{
+			name: "guided missing title",
+			args: []string{"generate", "change", "--guided", "--type", "feature", "--summary", "Summary"},
+			want: "guided title is required",
+		},
+		{
+			name: "guided title without value",
+			args: []string{"generate", "change", "--guided", "--type", "feature", "--title"},
+			want: "guided title is required",
+		},
+		{
+			name: "guided title followed by flag",
+			args: []string{"generate", "change", "--guided", "--type", "feature", "--title", "--summary", "Summary"},
+			want: "guided title is required",
+		},
+		{
+			name: "guided missing summary",
+			args: []string{"generate", "change", "--guided", "--type", "feature", "--title", "Title"},
+			want: "guided summary is required",
+		},
+		{
+			name: "guided summary without value",
+			args: []string{"generate", "change", "--guided", "--type", "feature", "--title", "Title", "--summary"},
+			want: "guided summary is required",
+		},
+		{
+			name: "guided summary followed by flag",
+			args: []string{"generate", "change", "--guided", "--type", "feature", "--title", "Title", "--summary", "--blank"},
+			want: "guided summary is required",
+		},
+		{
+			name: "guided empty type",
+			args: []string{"generate", "change", "--guided", "--type", "", "--title", "Title", "--summary", "Summary"},
+			want: "guided type is required",
+		},
+		{
+			name: "guided empty title",
+			args: []string{"generate", "change", "--guided", "--type", "feature", "--title", "", "--summary", "Summary"},
+			want: "guided title is required",
+		},
+		{
+			name: "guided empty summary",
+			args: []string{"generate", "change", "--guided", "--type", "feature", "--title", "Title", "--summary", ""},
+			want: "guided summary is required",
+		},
+		{
+			name: "unknown guided type",
+			args: []string{"generate", "change", "--guided", "--type", "maintenance", "--title", "Title", "--summary", "Summary"},
+			want: "unknown guided type: maintenance",
 		},
 		{
 			name: "missing template name",
@@ -435,9 +638,54 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 			want: "blank and template generation flags cannot be used together",
 		},
 		{
+			name: "guided and blank flags together",
+			args: []string{"generate", "change", "--guided", "--blank", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "guided and blank generation flags cannot be used together",
+		},
+		{
+			name: "blank and guided flags together",
+			args: []string{"generate", "change", "--blank", "--guided", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "guided and blank generation flags cannot be used together",
+		},
+		{
+			name: "guided and template flags together",
+			args: []string{"generate", "change", "--guided", "--template", "feature", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "guided and template generation flags cannot be used together",
+		},
+		{
+			name: "template and guided flags together",
+			args: []string{"generate", "change", "--template", "feature", "--guided", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "guided and template generation flags cannot be used together",
+		},
+		{
 			name: "duplicate template flag",
 			args: []string{"generate", "change", "--template", "feature", "--template", "bugfix"},
 			want: "template generation flag specified more than once",
+		},
+		{
+			name: "duplicate guided flag",
+			args: []string{"generate", "change", "--guided", "--guided", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "guided generation flag specified more than once",
+		},
+		{
+			name: "duplicate guided type flag",
+			args: []string{"generate", "change", "--guided", "--type", "feature", "--type", "bugfix", "--title", "Title", "--summary", "Summary"},
+			want: "guided type flag specified more than once",
+		},
+		{
+			name: "duplicate guided title flag",
+			args: []string{"generate", "change", "--guided", "--type", "feature", "--title", "Title", "--title", "Other", "--summary", "Summary"},
+			want: "guided title flag specified more than once",
+		},
+		{
+			name: "duplicate guided summary flag",
+			args: []string{"generate", "change", "--guided", "--type", "feature", "--title", "Title", "--summary", "Summary", "--summary", "Other"},
+			want: "guided summary flag specified more than once",
+		},
+		{
+			name: "guided input without guided flag",
+			args: []string{"generate", "change", "--type", "feature"},
+			want: "guided input flags require --guided",
 		},
 		{
 			name: "unsupported ai flag",
@@ -475,6 +723,11 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 			want: "unexpected argument: extra",
 		},
 		{
+			name: "guided extra argument",
+			args: []string{"generate", "change", "--guided", "--type", "feature", "--title", "Title", "--summary", "Summary", "extra"},
+			want: "unexpected argument: extra",
+		},
+		{
 			name: "unsafe traversal change id",
 			args: []string{"generate", "../unsafe", "--blank"},
 			want: "change id must be a safe single path segment",
@@ -482,6 +735,11 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 		{
 			name: "unsafe template traversal change id",
 			args: []string{"generate", "../unsafe", "--template", "feature"},
+			want: "change id must be a safe single path segment",
+		},
+		{
+			name: "unsafe guided traversal change id",
+			args: []string{"generate", "../unsafe", "--guided", "--type", "feature", "--title", "Title", "--summary", "Summary"},
 			want: "change id must be a safe single path segment",
 		},
 		{
@@ -582,6 +840,36 @@ func TestExecuteGenerateTemplateRejectsMissingOpenSpecProjectWithoutCreatingStru
 	assertPathDoesNotExist(t, root, "openspec")
 }
 
+func TestExecuteGenerateGuidedRejectsMissingOpenSpecProjectWithoutCreatingStructure(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	var output bytes.Buffer
+	err := execute([]string{
+		"generate",
+		"missing-project",
+		"--guided",
+		"--type",
+		"feature",
+		"--title",
+		"Add reports",
+		"--summary",
+		"Create report generation support",
+	}, &output)
+	if err == nil {
+		t.Fatalf("execute(generate) error = nil, want missing project structure error")
+	}
+	for _, want := range []string{"OpenSpec project structure is missing", "specharbor init"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("execute(generate) error = %q, want to contain %q", err.Error(), want)
+		}
+	}
+	if output.String() != "" {
+		t.Fatalf("execute(generate) output = %q, want empty output", output.String())
+	}
+	assertPathDoesNotExist(t, root, "openspec")
+}
+
 func TestExecuteGenerateTemplateRejectsUnknownTemplateWithoutCreatingChange(t *testing.T) {
 	root := t.TempDir()
 	t.Chdir(root)
@@ -599,6 +887,35 @@ func TestExecuteGenerateTemplateRejectsUnknownTemplateWithoutCreatingChange(t *t
 		t.Fatalf("execute(generate) output = %q, want empty output", output.String())
 	}
 	assertPathDoesNotExist(t, root, "openspec/changes/unknown-template-change")
+}
+
+func TestExecuteGenerateGuidedRejectsUnknownTypeWithoutCreatingChange(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+
+	var output bytes.Buffer
+	err := execute([]string{
+		"generate",
+		"unknown-guided-change",
+		"--guided",
+		"--type",
+		"maintenance",
+		"--title",
+		"Title",
+		"--summary",
+		"Summary",
+	}, &output)
+	if err == nil {
+		t.Fatalf("execute(generate) error = nil, want unknown guided type error")
+	}
+	if !strings.Contains(err.Error(), "unknown guided type: maintenance") {
+		t.Fatalf("execute(generate) error = %q, want unknown guided type context", err.Error())
+	}
+	if output.String() != "" {
+		t.Fatalf("execute(generate) output = %q, want empty output", output.String())
+	}
+	assertPathDoesNotExist(t, root, "openspec/changes/unknown-guided-change")
 }
 
 func TestExecutePromptPrintsRenderedPromptOnly(t *testing.T) {

@@ -22,3 +22,9 @@ type BlankChangeContent interface {
 type TemplateChangeContent interface {
 	ContentFor(templateName domain.TemplateName, relativePath string) (string, error)
 }
+
+// GuidedChangeContent provides deterministic starter content for guided
+// OpenSpec change files.
+type GuidedChangeContent interface {
+	ContentFor(guidedType domain.GuidedType, title string, summary string, relativePath string) (string, error)
+}
