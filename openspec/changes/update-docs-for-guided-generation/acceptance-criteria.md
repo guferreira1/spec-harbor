@@ -1,0 +1,42 @@
+# Acceptance Criteria: Update Docs For Guided Generation
+
+- Documentation accurately describes `go run ./cmd/specharbor generate <change-id> --blank` as implemented behavior.
+- Documentation accurately describes `go run ./cmd/specharbor generate <change-id> --template <template-name>` as implemented behavior.
+- Documentation accurately describes `go run ./cmd/specharbor generate <change-id> --guided --type <type> --title "<title>" --summary "<summary>"` as implemented behavior.
+- Documentation lists exactly these supported guided types:
+  - `feature`
+  - `bugfix`
+  - `docs`
+  - `refactor`
+- Documentation explains that guided generation is deterministic, local, and non-interactive.
+- Documentation explains that guided generation uses explicit CLI flags and does not prompt during command execution.
+- Documentation explains that guided generation creates the same required OpenSpec change files as blank and built-in template generation:
+  - `proposal.md`
+  - `design.md`
+  - `tasks.md`
+  - `acceptance-criteria.md`
+  - `risks.md`
+- Documentation explains that guided generated content includes the supplied title and summary.
+- Documentation explains that existing files are not overwritten.
+- Documentation explains that partially existing change directories are recoverable by creating only missing required files.
+- Documentation examples are copy-pasteable from the repository root using `go run ./cmd/specharbor ...`.
+- Documentation keeps implemented behavior clearly separated from planned roadmap behavior.
+- Documentation does not claim AI-assisted generation is implemented.
+- Documentation does not claim agent-assisted generation is implemented.
+- Documentation does not claim custom templates are implemented.
+- Documentation does not claim remote templates are implemented.
+- Documentation does not claim config-driven templates are implemented.
+- Documentation does not claim hybrid generation is implemented.
+- Documentation does not claim interactive generation is implemented.
+- Documentation does not document AI-assisted generation, agent-assisted generation, custom templates, remote templates, config-driven templates, hybrid generation, or interactive prompts as current command behavior.
+- The implementation diff modifies only `README.md`, Markdown files under `docs/`, and `openspec/changes/update-docs-for-guided-generation/tasks.md`.
+- No Go code is modified.
+- No Go tests are modified.
+- No CLI behavior is modified.
+- `.github/workflows/ci.yml` is not modified.
+- CI configuration is not modified.
+- `.specharbor/config.yml` is not modified.
+- Init templates are not modified.
+- Unrelated OpenSpec changes are not modified.
+- `go test ./...` passes.
+- `go run ./cmd/specharbor validate update-docs-for-guided-generation` passes.
