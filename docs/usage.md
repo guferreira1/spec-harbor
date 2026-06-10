@@ -76,6 +76,44 @@ Supported guided types are exactly:
 - `docs`
 - `refactor`
 
+Dry-run agent-assisted spec authoring uses explicit CLI flags:
+
+```bash
+go run ./cmd/specharbor generate <change-id> --agent-assisted --agent <agent-name> --type <type> --title "<title>" --summary "<summary>"
+```
+
+For example:
+
+```bash
+go run ./cmd/specharbor generate add-reports --agent-assisted --agent codex --type feature --title "Add reports" --summary "Create report generation support"
+```
+
+Supported agent-assisted authoring types are exactly:
+
+- `feature`
+- `bugfix`
+- `docs`
+- `refactor`
+
+Agent-assisted spec authoring is dry-run only in this first version. It prints a deterministic authoring plan to stdout and prints a deterministic, copy-pasteable prompt to stdout.
+
+The generated prompt is meant to help an external agent author or refine only the OpenSpec change package. Implementation remains a later step through the normal SpecHarbor workflow.
+
+Dry-run agent-assisted spec authoring:
+
+- writes no files;
+- writes no prompt file;
+- does not create or modify OpenSpec files;
+- does not create or modify production code;
+- does not execute agents or local agent commands;
+- does not call provider APIs;
+- does not call local models;
+- does not call network APIs;
+- does not call source-control APIs;
+- does not call workflow tools.
+
+`--execute` is currently unsupported for agent-assisted spec authoring and returns a clear error.
+
 Blank, built-in template, and guided generation create the same required OpenSpec change files:
 
 ```text
@@ -105,6 +143,7 @@ go run ./cmd/specharbor generate add-guided-feature --guided --type feature --ti
 go run ./cmd/specharbor generate fix-guided-bug --guided --type bugfix --title "Fix guided bug" --summary "Describe the bugfix using deterministic guided starter content."
 go run ./cmd/specharbor generate update-guided-docs --guided --type docs --title "Update guided docs" --summary "Document guided generation as implemented behavior."
 go run ./cmd/specharbor generate refactor-guided-flow --guided --type refactor --title "Refactor guided flow" --summary "Describe a behavior-preserving refactor with explicit context."
+go run ./cmd/specharbor generate add-reports --agent-assisted --agent codex --type feature --title "Add reports" --summary "Create report generation support"
 ```
 
 ### Validate a Change
@@ -187,7 +226,7 @@ Do not archive a change until the implementation is complete and reviewed.
 The following items are product direction, not implemented command behavior:
 
 - AI-assisted generation;
-- agent-assisted generation;
+- future agent execution and non-dry-run agent-assisted workflows;
 - hybrid generation;
 - custom, remote, and config-driven templates;
 - interactive generation prompts;
