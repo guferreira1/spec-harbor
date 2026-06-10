@@ -10,6 +10,9 @@ type GenerationResult struct {
 	ConfigTemplateAlias    string
 	ConfigTemplateSource   ConfigTemplateSourceKind
 	ConfigTemplateName     string
+	RemoteTemplateHost     string
+	RemoteTemplateFormat   RemoteTemplateFormat
+	ChecksumAlgorithm      ChecksumAlgorithm
 	GuidedType             GuidedType
 	GuidedTitle            string
 	ChangePath             string
@@ -121,6 +124,30 @@ func NewConfigTemplateCustomGenerationResult(
 		ConfigTemplateAlias:    configTemplateAlias.String(),
 		ConfigTemplateSource:   ConfigTemplateSourceCustom,
 		ConfigTemplateName:     customTemplateName.String(),
+		ChangePath:             changePath,
+		ChangeDirectoryCreated: changeDirectoryCreated,
+		createdFiles:           append([]string(nil), createdFiles...),
+		skippedExistingFiles:   append([]string(nil), skippedExistingFiles...),
+	}
+}
+
+func NewConfigTemplateRemoteGenerationResult(
+	changeID string,
+	configTemplateAlias ConfigTemplateAlias,
+	remoteReference RemoteTemplateReference,
+	changePath string,
+	changeDirectoryCreated bool,
+	createdFiles []string,
+	skippedExistingFiles []string,
+) GenerationResult {
+	return GenerationResult{
+		ChangeID:               changeID,
+		Mode:                   TemplateMode,
+		ConfigTemplateAlias:    configTemplateAlias.String(),
+		ConfigTemplateSource:   ConfigTemplateSourceRemote,
+		RemoteTemplateHost:     remoteReference.URL().Host(),
+		RemoteTemplateFormat:   remoteReference.Format(),
+		ChecksumAlgorithm:      remoteReference.Checksum().Algorithm(),
 		ChangePath:             changePath,
 		ChangeDirectoryCreated: changeDirectoryCreated,
 		createdFiles:           append([]string(nil), createdFiles...),

@@ -33,6 +33,8 @@ type GenerateChange struct {
 	customTemplateFiles ports.CustomTemplateFileSystem
 	configFileSystem    ports.ConfigFileSystem
 	configParser        ports.ConfigParser
+	remoteFetcher       ports.RemoteTemplateFetcher
+	remoteBundleReader  ports.RemoteTemplateBundleReader
 }
 
 func NewGenerateChange(fileSystem ports.GenerationFileSystem, content ports.BlankChangeContent) *GenerateChange {
@@ -104,6 +106,30 @@ func NewGenerateChangeWithConfigTemplates(
 	}
 }
 
+func NewGenerateChangeWithRemoteConfigTemplates(
+	fileSystem ports.GenerationFileSystem,
+	blankContent ports.BlankChangeContent,
+	templateContent ports.TemplateChangeContent,
+	guidedContent ports.GuidedChangeContent,
+	customTemplateFiles ports.CustomTemplateFileSystem,
+	configFileSystem ports.ConfigFileSystem,
+	configParser ports.ConfigParser,
+	remoteFetcher ports.RemoteTemplateFetcher,
+	remoteBundleReader ports.RemoteTemplateBundleReader,
+) *GenerateChange {
+	return &GenerateChange{
+		fileSystem:          fileSystem,
+		blankContent:        blankContent,
+		templateContent:     templateContent,
+		guidedContent:       guidedContent,
+		customTemplateFiles: customTemplateFiles,
+		configFileSystem:    configFileSystem,
+		configParser:        configParser,
+		remoteFetcher:       remoteFetcher,
+		remoteBundleReader:  remoteBundleReader,
+	}
+}
+
 func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.GenerationResult, error) {
 	if useCase == nil {
 		return domain.GenerationResult{}, errors.New("generate change use case is required")
@@ -155,6 +181,8 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 	var customTemplateName domain.CustomTemplateName
 	var configTemplateAlias domain.ConfigTemplateAlias
 	var configTemplateReference domain.ConfigTemplateReference
+	var remoteTemplateReference domain.RemoteTemplateReference
+	remoteTemplateRequested := false
 	var guidedType domain.GuidedType
 	var guidedTitle string
 	var guidedSummary string
@@ -189,6 +217,13 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 					return domain.GenerationResult{}, fmt.Errorf("invalid config template custom reference: %s", configTemplateReference.Template())
 				}
 				customTemplateRequested = true
+			case domain.ConfigTemplateSourceRemote:
+				var ok bool
+				remoteTemplateReference, ok = configTemplateReference.RemoteTemplateReference()
+				if !ok {
+					return domain.GenerationResult{}, fmt.Errorf("invalid config template remote reference")
+				}
+				remoteTemplateRequested = true
 			default:
 				return domain.GenerationResult{}, fmt.Errorf("unsupported config template source: %s", configTemplateReference.SourceKind())
 			}
@@ -217,11 +252,17 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 	default:
 		return domain.GenerationResult{}, fmt.Errorf("unsupported generation mode: %s", input.Mode)
 	}
-	if input.Mode == domain.TemplateMode && !customTemplateRequested && useCase.templateContent == nil {
+	if input.Mode == domain.TemplateMode && !customTemplateRequested && !remoteTemplateRequested && useCase.templateContent == nil {
 		return domain.GenerationResult{}, errors.New("template change content is required")
 	}
 	if customTemplateRequested && useCase.customTemplateFiles == nil {
 		return domain.GenerationResult{}, errors.New("custom template filesystem is required")
+	}
+	if remoteTemplateRequested && useCase.remoteFetcher == nil {
+		return domain.GenerationResult{}, errors.New("remote template fetcher is required")
+	}
+	if remoteTemplateRequested && useCase.remoteBundleReader == nil {
+		return domain.GenerationResult{}, errors.New("remote template bundle reader is required")
 	}
 
 	changePath := openspecChangesDirectory + "/" + changeID
@@ -238,6 +279,13 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 			return domain.GenerationResult{}, err
 		}
 		renderedContents = customTemplate.Render(changeID, input.Title, input.Summary)
+	}
+	if remoteTemplateRequested {
+		remoteBundle, err := useCase.loadRemoteTemplate(configTemplateAlias, remoteTemplateReference)
+		if err != nil {
+			return domain.GenerationResult{}, err
+		}
+		renderedContents = remoteBundle.Files()
 	}
 
 	directoryCreated, err := useCase.ensureChangeDirectory(projectRoot, changePath)
@@ -266,6 +314,17 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 					configTemplateAlias,
 					customTemplateName,
 					templatePath,
+					changePath,
+					directoryCreated,
+					createdFiles,
+					skippedExistingFiles,
+				), nil
+			}
+			if remoteTemplateRequested {
+				return domain.NewConfigTemplateRemoteGenerationResult(
+					changeID,
+					configTemplateAlias,
+					remoteTemplateReference,
 					changePath,
 					directoryCreated,
 					createdFiles,
@@ -323,6 +382,36 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 		createdFiles,
 		skippedExistingFiles,
 	), nil
+}
+
+func (useCase *GenerateChange) loadRemoteTemplate(
+	alias domain.ConfigTemplateAlias,
+	reference domain.RemoteTemplateReference,
+) (domain.RemoteTemplateBundle, error) {
+	fetchResult, err := useCase.remoteFetcher.FetchRemoteTemplate(domain.NewRemoteTemplateFetchRequest(reference.URL()))
+	if err != nil {
+		return domain.RemoteTemplateBundle{}, fmt.Errorf("fetch remote template for alias %s: %w", alias, err)
+	}
+
+	downloadedBytes := fetchResult.Body()
+	actualChecksum, matches := reference.Checksum().MatchesBytes(downloadedBytes)
+	if !matches {
+		return domain.RemoteTemplateBundle{}, fmt.Errorf(
+			"remote template checksum mismatch for alias %s: expected %s, got %s",
+			alias,
+			reference.Checksum(),
+			actualChecksum,
+		)
+	}
+
+	bundle, err := useCase.remoteBundleReader.ReadRemoteTemplateBundle(
+		downloadedBytes,
+		domain.DefaultRemoteTemplateArchivePolicy(),
+	)
+	if err != nil {
+		return domain.RemoteTemplateBundle{}, fmt.Errorf("read remote template archive for alias %s: %w", alias, err)
+	}
+	return domain.NewRemoteTemplateBundle(bundle.Files())
 }
 
 func (useCase *GenerateChange) loadConfigForTemplateGeneration(projectRoot string) (domain.LocalConfig, error) {

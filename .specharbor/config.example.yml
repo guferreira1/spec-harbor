@@ -1,3 +1,13 @@
+version: 1
+
+templates:
+  aliases:
+    service-feature:
+      source: remote
+      url: https://example.com/specharbor/templates/service-feature.zip
+      checksum: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      format: zip
+
 project:
   name: spec-harbor
   default_language: en

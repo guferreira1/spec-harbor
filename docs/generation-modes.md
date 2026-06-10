@@ -72,7 +72,7 @@ Built-in and custom templates resolve from disjoint sources:
 
 Generated changes work with `specharbor validate <change-id>` like any other change; generation does not run validation automatically, and validation findings depend on the template's content quality.
 
-Safety boundaries: templates are local and project-scoped; there are no remote templates, no marketplace, no network or provider calls, no credentials, and no writes outside `openspec/changes/<change-id>/`. Existing files are skipped, never overwritten.
+Safety boundaries for direct custom templates: templates are local and project-scoped; there is no marketplace, no provider call, no credentials, and no writes outside `openspec/changes/<change-id>/`. Existing files are skipped, never overwritten.
 
 ### Config-Driven Template Aliases
 
@@ -81,7 +81,7 @@ go run ./cmd/specharbor generate <change-id> --config-template <alias>
 go run ./cmd/specharbor generate <change-id> --config-template <alias> --title "<title>" --summary "<summary>"
 ```
 
-Config-driven templates let a project define stable aliases for existing built-in or custom templates. The alias map lives in `.specharbor/config.yml`:
+Config-driven templates let a project define stable aliases for built-in, project-local custom, or pinned HTTPS remote templates. Remote templates are used only through `--config-template`; there is no `--remote-template` flag. The alias map lives in `.specharbor/config.yml`:
 
 ```yaml
 version: 1
@@ -95,6 +95,12 @@ templates:
     default-feature:
       source: builtin
       template: feature
+
+    service-feature:
+      source: remote
+      url: https://example.com/specharbor/templates/service-feature.zip
+      checksum: sha256:<64-hex>
+      format: zip
 ```
 
 `version: 1` is required for config-driven generation. Omitted `templates` or omitted `templates.aliases` means there are no aliases. A missing config file, missing version, unsupported version, invalid YAML, invalid alias entry, or missing requested alias returns a clear error.
@@ -103,6 +109,23 @@ Supported source kinds are exactly:
 
 - `builtin`, resolving the named built-in template only.
 - `custom`, resolving `.specharbor/templates/<template-name>/` only.
+- `remote`, fetching one explicit HTTPS ZIP URL with a required `sha256:<64-hex>` checksum.
+
+Remote aliases require `url`, `checksum`, and `format`; only `format: zip` is supported. Remote aliases reject `template` and unknown fields. Built-in and custom aliases continue to require `template` and reject remote-only fields such as `url`, `checksum`, and `format`.
+
+Remote URL rules are intentionally strict: HTTPS only, host and path required, no credentials/userinfo, no query string, no fragment, no redirects, no local file URLs, no SSH or git URLs, and no SCP-style git targets. The checksum is verified over the downloaded ZIP bytes before any archive parsing.
+
+Remote ZIP bundles must contain exactly these five non-empty root-level regular files:
+
+```text
+proposal.md
+design.md
+tasks.md
+acceptance-criteria.md
+risks.md
+```
+
+Nested paths, absolute paths, path traversal, Windows drive paths, symlinks, executable entries, duplicate files, extra files, missing files, empty files, malformed ZIPs, oversized HTTP responses, and oversized uncompressed content are rejected and produce zero writes.
 
 Aliases are safe single path segments: non-empty, at most 128 characters, allowed characters `[A-Za-z0-9._-]`, no `/` or `\`, no absolute paths, no traversal or `..` sequence, no leading `.` or `-`. Invalid CLI aliases fail before template resolution, and invalid alias names in config fail during config validation.
 
@@ -110,13 +133,14 @@ Config-driven generation delegates to the resolved source behavior:
 
 - A built-in alias produces the same files as direct `--template <name>`.
 - A custom alias uses the same custom-template directory, required-file validation, and deterministic `{{change_id}}`, `{{title}}`, and `{{summary}}` substitution as direct `--custom-template <name>`.
+- A remote alias writes the verified ZIP file contents as OpenSpec Markdown; remote archive paths never influence output paths, and no remote scripts or shell commands are executed.
 - Optional `--title` and `--summary` pass through to the resolved generation behavior; built-in templates do not use those values.
 
 Namespaces are disjoint by flag. `--template feature`, `--custom-template feature`, and `--config-template feature` are three different lookups. There is no shadowing, fallback, or source inference.
 
 `--config-template` is mutually exclusive with `--blank`, `--template`, `--custom-template`, `--guided`, `--agent-assisted`, `--ai-assisted`, and `--execute`. It also does not accept `--type`, `--agent`, `--from-file`, or `--overwrite`.
 
-Safety boundaries: config aliases support no `local`, `remote`, `url`, arbitrary `path`, marketplace templates, template scripts, shell execution, network/provider behavior, production code writes, source-control automation, or archive automation. Generated files stay under `openspec/changes/<change-id>/`, use the five required OpenSpec filenames, and skip existing files without overwriting.
+Safety boundaries: remote config aliases have no persistent cache in this first version and do not support credentials, OAuth, auth headers, cookies, environment token expansion, git clone, marketplace discovery, provider APIs, template scripts, shell execution, production code writes, source-control automation, auto-commit, PR creation, merge automation, or archive automation. Generated files stay under `openspec/changes/<change-id>/`, use the five required OpenSpec filenames, and skip existing files without overwriting.
 
 ### Guided Generation
 
@@ -267,7 +291,6 @@ Existing files are skipped and are not overwritten for blank, built-in template,
 The following items are product direction, not implemented command behavior:
 
 - hybrid generation;
-- remote templates;
 - config-driven generic runner commands;
 - interactive prompts.
 

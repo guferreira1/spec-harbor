@@ -154,6 +154,13 @@ func parseConfigTemplateAliasEntry(
 
 	var source string
 	var template string
+	templateFieldProvided := false
+	var remoteURL string
+	remoteURLFieldProvided := false
+	var checksum string
+	checksumFieldProvided := false
+	var format string
+	formatFieldProvided := false
 	var unsupportedFields []string
 	for index := 0; index < len(entryNode.Content); index += 2 {
 		fieldNode := entryNode.Content[index]
@@ -168,21 +175,50 @@ func parseConfigTemplateAliasEntry(
 			}
 			source = value
 		case "template":
+			templateFieldProvided = true
 			value, err := stringYAMLValue(valueNode, "template")
 			if err != nil {
 				return domain.ConfigTemplateReference{}, err
 			}
 			template = value
+		case "url":
+			remoteURLFieldProvided = true
+			value, err := stringYAMLValue(valueNode, "url")
+			if err != nil {
+				return domain.ConfigTemplateReference{}, err
+			}
+			remoteURL = value
+		case "checksum":
+			checksumFieldProvided = true
+			value, err := stringYAMLValue(valueNode, "checksum")
+			if err != nil {
+				return domain.ConfigTemplateReference{}, err
+			}
+			checksum = value
+		case "format":
+			formatFieldProvided = true
+			value, err := stringYAMLValue(valueNode, "format")
+			if err != nil {
+				return domain.ConfigTemplateReference{}, err
+			}
+			format = value
 		default:
 			unsupportedFields = append(unsupportedFields, fieldName)
 		}
 	}
 
 	return domain.NewConfigTemplateReference(domain.ConfigTemplateReferenceInput{
-		Alias:             alias,
-		Source:            source,
-		Template:          template,
-		UnsupportedFields: unsupportedFields,
+		Alias:                 alias,
+		Source:                source,
+		Template:              template,
+		TemplateFieldProvided: templateFieldProvided,
+		URL:                   remoteURL,
+		URLFieldProvided:      remoteURLFieldProvided,
+		Checksum:              checksum,
+		ChecksumFieldProvided: checksumFieldProvided,
+		Format:                format,
+		FormatFieldProvided:   formatFieldProvided,
+		UnsupportedFields:     unsupportedFields,
 	})
 }
 

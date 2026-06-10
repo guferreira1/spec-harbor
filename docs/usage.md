@@ -128,7 +128,7 @@ Custom template behavior:
 - Custom template names must be safe single path segments (characters `[A-Za-z0-9._-]`, no `/` or `\`, no `..` sequences, no leading `.` or `-`, at most 128 characters); invalid names are rejected before any filesystem access.
 - Built-in, custom, and config-driven templates are disjoint: `--template` resolves only the built-in set, `--custom-template` resolves only `.specharbor/templates/`, and `--config-template` resolves only `.specharbor/config.yml` aliases.
 - Files are written only under `openspec/changes/<change-id>/`; existing files are skipped, never overwritten, and any template validation failure produces zero writes.
-- No remote templates, no marketplace, no arbitrary local paths, no template script execution, no shell execution, no network/provider behavior, and no production code writes.
+- Direct custom templates are project-local only: no marketplace, no arbitrary local paths, no template script execution, no shell execution, no network/provider behavior, and no production code writes.
 
 After generation, run `go run ./cmd/specharbor validate <change-id>` to check the generated change; validation findings depend on the template's content quality, exactly as for hand-authored changes.
 
@@ -159,19 +159,29 @@ templates:
     default-feature:
       source: builtin
       template: feature
+
+    service-feature:
+      source: remote
+      url: https://example.com/specharbor/templates/service-feature.zip
+      checksum: sha256:<64-hex>
+      format: zip
 ```
 
 Rules:
 
 - `version: 1` is required when `--config-template` is used; missing config, missing version, unsupported versions, invalid YAML, invalid alias entries, and missing aliases fail clearly.
-- Supported source kinds are exactly `builtin` and `custom`.
+- Supported source kinds are exactly `builtin`, `custom`, and `remote`.
 - `builtin` resolves only supported built-in templates: `feature`, `bugfix`, `docs`, and `refactor`.
 - `custom` resolves only `.specharbor/templates/<template-name>/` and uses the same required-file validation and `{{change_id}}`, `{{title}}`, and `{{summary}}` substitution as direct `--custom-template`.
+- `remote` fetches one explicitly configured HTTPS ZIP URL, verifies the configured `sha256:<64-hex>` checksum before archive parsing, and writes the decoded OpenSpec files without rendering or executing template scripts.
+- Remote aliases require `url`, `checksum`, and `format`; only `format: zip` is supported. `template` is invalid for remote aliases, and `url`, `checksum`, and `format` are invalid for `builtin` and `custom` aliases.
+- Remote URLs must use HTTPS and include a host and path. HTTP, file, SSH, git, git+ssh, FTP, SCP-style targets, credentials/userinfo, query strings, fragments, whitespace/control characters, over-length URLs, and redirects are rejected.
+- Remote ZIP bundles must contain exactly five non-empty root-level regular files: `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md`. Nested paths, absolute paths, traversal, Windows drive paths, symlinks, executable entries, duplicate files, extra files, missing files, empty files, malformed ZIPs, oversized downloads, and oversized uncompressed content are rejected.
 - Alias names must be safe single path segments: non-empty, at most 128 characters, characters `[A-Za-z0-9._-]`, no `/` or `\`, no absolute paths, no traversal or `..` sequence, no leading `.` or `-`.
 - `--title` and `--summary` are optional with `--config-template`; they are passed through to the resolved custom template path and do not change built-in template output.
 - `--config-template` is mutually exclusive with `--blank`, `--template`, `--custom-template`, `--guided`, `--agent-assisted`, `--ai-assisted`, and `--execute`.
 - `--template`, `--custom-template`, and `--config-template` use separate namespaces. A built-in template, custom template, and config alias may share the same name without shadowing, fallback, or guessing.
-- Config aliases do not support `local`, `remote`, `url`, arbitrary `path`, marketplace lookup, script execution, shell execution, network/provider behavior, production code writes, source-control automation, or archive automation.
+- Remote templates have no persistent cache in this first version and do not support credentials, OAuth, auth headers, cookies, environment token expansion, git clone, marketplace search, provider APIs, script execution, shell execution, production code writes, source-control automation, auto-commit, PR, merge, or archive automation.
 - Generated files are still limited to `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md` under `openspec/changes/<change-id>/`; existing files are skipped.
 
 Guided generation uses explicit CLI flags:
@@ -551,7 +561,6 @@ Do not archive a change until the implementation is complete and reviewed.
 The following items are product direction, not implemented command behavior:
 
 - hybrid generation;
-- remote templates;
 - config-driven generic runner commands;
 - interactive generation prompts;
 - AI provider setup;
