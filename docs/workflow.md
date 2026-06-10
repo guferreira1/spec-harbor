@@ -6,6 +6,63 @@ SpecHarbor is built around an OpenSpec change package. The goal is to make the t
 Idea -> OpenSpec change -> Tasks -> Agent prompt -> Implementation -> Review -> Archive
 ```
 
+## Recommended Workflow Command
+
+Run the read-only workflow guide with:
+
+```bash
+go run ./cmd/specharbor workflow
+```
+
+The installed command form is `specharbor workflow`. It prints the recommended nine-step OpenSpec/SDD workflow:
+
+1. Spec Author Agent
+2. Architecture Reviewer Agent
+3. Implementer Agent
+4. Test Engineer Agent
+5. Change Reviewer Agent
+6. Commit
+7. Pull Request
+8. Merge
+9. Archive
+
+Abbreviated output shape:
+
+```text
+SpecHarbor recommended workflow.
+Title: OpenSpec/SDD agent-driven workflow
+
+Steps:
+1. spec-author - Spec Author Agent
+   Mode: agent-assisted
+   Supported by SpecHarbor: yes
+   Advisory only: no
+   Requires: none
+   Purpose: Create or refine the OpenSpec change package.
+   Commands:
+   - specharbor generate <change-id> --guided ...
+   - specharbor prompt <change-id> --role spec-author
+
+6. commit - Commit
+   Mode: manual
+   Supported by SpecHarbor: no
+   Advisory only: yes
+   Commands:
+   - none
+```
+
+The command suggestions are advisory. `specharbor workflow` does not execute commands, does not inspect local workflow status, and does not decide the next step. Status and next-step detection are intentionally deferred.
+
+The workflow relates to existing commands as follows:
+
+- `generate` creates or starts the OpenSpec change package for the Spec Author Agent.
+- `validate` checks required OpenSpec change files before review or implementation.
+- `prompt --role ...` prints prompts for Spec Author Agent, Architecture Reviewer Agent, Implementer Agent, Test Engineer Agent, and Change Reviewer Agent.
+- `review` checks local task checkbox completion and required change files.
+- `archive` explicitly archives an accepted change.
+
+Commit, Pull Request, and Merge remain manual. SpecHarbor does not commit, does not push, does not create PRs, does not merge, does not call GitHub, does not call GitLab, does not inspect CI, does not call provider APIs, does not call agent CLIs, does not run source-control automation, does not run workflow execution, and does not perform remote automation.
+
 ## Change Package
 
 A change lives under `openspec/changes/<change-id>/`:

@@ -34,6 +34,40 @@ go run ./cmd/specharbor scan
 
 The report can include detected ecosystems, package managers, test command hints, CI signals, container or deployment signals, SpecHarbor/OpenSpec signals, and notes. The command does not require flags or arguments.
 
+### Show the Recommended Workflow
+
+```bash
+go run ./cmd/specharbor workflow
+```
+
+The installed command form is `specharbor workflow`. It prints the recommended OpenSpec/SDD workflow as read-only advisory text:
+
+```text
+SpecHarbor recommended workflow.
+Title: OpenSpec/SDD agent-driven workflow
+
+Steps:
+1. spec-author - Spec Author Agent
+2. architecture-reviewer - Architecture Reviewer Agent
+3. implementer - Implementer Agent
+4. test-engineer - Test Engineer Agent
+5. change-reviewer - Change Reviewer Agent
+6. commit - Commit
+7. pull-request - Pull Request
+8. merge - Merge
+9. archive - Archive
+```
+
+The full output includes each step id, display name, purpose, mode, supported/advisory indicators, predecessor step ids, command suggestions, and safety notes. The suggestions connect the workflow to existing commands:
+
+- `generate` creates or starts an OpenSpec change package.
+- `validate` checks required OpenSpec change files and their content quality.
+- `prompt --role ...` prints prompts for Spec Author Agent, Architecture Reviewer Agent, Implementer Agent, Test Engineer Agent, and Change Reviewer Agent.
+- `review` checks the local change package and task checkbox completion.
+- `archive` explicitly moves an accepted change to the archive.
+
+Command suggestions are advisory and `specharbor workflow` does not execute them. Commit, Pull Request, and Merge remain manual steps; SpecHarbor does not commit, does not create PRs, and does not merge. This command is read-only and does not call GitHub, GitLab, CI, provider APIs, agent CLIs, source-control automation, workflow execution, external commands, or remote automation.
+
 ### Generate a Change
 
 ```bash
@@ -203,7 +237,97 @@ go run ./cmd/specharbor generate add-reports --agent-assisted --agent codex --ty
 go run ./cmd/specharbor validate add-example-feature
 ```
 
-`validate <change-id>` checks the change package under `openspec/changes/<change-id>/` for the required OpenSpec files.
+`validate <change-id>` runs deterministic, local, read-only validation over the change package under `openspec/changes/<change-id>/`. It never writes files, never modifies the change, and never calls the network, AI providers, agents, or source-control tooling.
+
+It checks the five required OpenSpec files:
+
+- `proposal.md`
+- `design.md`
+- `tasks.md`
+- `acceptance-criteria.md`
+- `risks.md`
+
+Every finding carries a severity, a stable snake_case rule code, a message (with line numbers where relevant), and the file path.
+
+Error findings (the change package is not usable downstream):
+
+- `project_root_unavailable` - the OpenSpec project structure is missing.
+- `change_directory_missing` - the change id is well formed but unknown.
+- `required_file_missing` - one of the five required files is missing.
+- `file_empty` - a required file is empty or whitespace-only. Other content findings for that file are suppressed.
+- `file_missing_heading` - a required file has no markdown heading.
+- `file_missing_body` - a required file contains only headings.
+- `tasks_checkbox_missing` - `tasks.md` has no valid checkbox task.
+- `tasks_checkbox_malformed` - a checkbox-like line (for example `- []`, `-[ ]`, `- [y]`, or `- [x]` without text) breaks the `- [ ] text` grammar; reported with line numbers.
+- `acceptance_criteria_item_missing` - `acceptance-criteria.md` has no list or checkbox item with meaningful text; placeholder-only items (`N/A`, `...`, `?`, `TBD`, `TODO`, `FIXME`) do not count.
+
+Warning findings (quality gaps that never fail the command):
+
+- `placeholder_content` - standalone `TBD`/`TODO`/`FIXME`, placeholder-only list items (`N/A`, `...`, `?`), or `lorem ipsum`.
+- `boilerplate_only_content` - the file still contains only known starter/boilerplate guidance lines and was never meaningfully edited.
+- `proposal_section_missing` - no Problem, Goal, or Summary section.
+- `design_section_missing` - no Overview, Approach, Design, Architecture, Technical Decisions, or Decisions section.
+- `tasks_phase_heading_missing` - checkbox tasks exist but no level-2 phase heading.
+- `tasks_all_completed` - every checkbox task is checked; confirm implementation evidence before review.
+- `risks_mitigation_missing` - risks are listed without mitigation notes.
+- `design_architecture_section_missing` - change files mention `internal/core`, `internal/adapters`, or `internal/platform` but `design.md` has no Architecture section.
+- `tasks_documentation_task_missing` - `proposal.md` or `design.md` references the `specharbor` CLI but `tasks.md` has no documentation task.
+
+Severity drives status and exit codes:
+
+- Zero error findings: status `valid`, exit code `0`. Warnings alone never fail the command.
+- One or more error findings: status `invalid`, exit code `1`.
+- Missing or unsafe change ids (`..`, separators, absolute paths, leading `.` or `-`, characters outside `[A-Za-z0-9._-]`, more than 128 characters) are rejected with a clear command error before any filesystem access. Internal single dots such as `change.v1` are accepted.
+
+Example valid output:
+
+```text
+SpecHarbor change is valid.
+Change: add-example-feature
+Checked path: openspec/changes/add-example-feature
+Required files: 5
+Errors: 0
+Warnings: 0
+```
+
+Example valid output with warnings (exit code `0`):
+
+```text
+SpecHarbor change is valid.
+Change: add-example-feature
+Checked path: openspec/changes/add-example-feature
+Required files: 5
+Errors: 0
+Warnings: 2
+
+Warnings:
+- [warning] placeholder_content: Placeholder marker "TBD" found (line 12) (openspec/changes/add-example-feature/design.md)
+- [warning] risks_mitigation_missing: Risks are listed without mitigation notes. (openspec/changes/add-example-feature/risks.md)
+```
+
+Example invalid output (exit code `1`):
+
+```text
+SpecHarbor change is invalid.
+Change: add-example-feature
+Checked path: openspec/changes/add-example-feature
+
+Errors:
+- [error] required_file_missing: Missing required file: design.md (openspec/changes/add-example-feature/design.md)
+- [error] tasks_checkbox_missing: No checkbox tasks found. (openspec/changes/add-example-feature/tasks.md)
+
+Warnings:
+- [warning] proposal_section_missing: No Problem, Goal, or Summary section found. (openspec/changes/add-example-feature/proposal.md)
+```
+
+Run validation before implementation (to confirm the change package is structurally ready), before review (to catch content gaps cheaply), and before opening a PR (to keep low-quality packages out of the shared workflow).
+
+Intentional behavior changes from the earlier presence-only validation:
+
+- Unusable change packages now fail: empty required files, files without a heading or body, tasks files without valid checkboxes, malformed checkbox lines, and acceptance-criteria files without a meaningful item produce errors and a non-zero exit.
+- A freshly generated `--blank` or template change now validates as valid with `boilerplate_only_content` (and applicable `placeholder_content`) warnings instead of zero findings; the exit code stays `0`, so the documented `generate -> validate` flow keeps working.
+- Change ids are validated more strictly and rejected before any filesystem access.
+- The report replaces the single `Findings:` count with `Errors:` and `Warnings:` counts and groups findings by severity with file paths appended.
 
 ### Generate a Role Prompt
 
@@ -258,6 +382,12 @@ Current config behavior does not write config files and does not implement:
 
 ```text
 Idea -> OpenSpec change -> Tasks -> Agent prompt -> Implementation -> Review -> Archive
+```
+
+For the detailed recommended nine-step workflow, run:
+
+```bash
+go run ./cmd/specharbor workflow
 ```
 
 A typical local sequence is:

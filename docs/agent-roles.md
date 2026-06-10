@@ -16,6 +16,8 @@ Supported role names:
 - `test-engineer`
 - `change-reviewer`
 
+These five ids are also the agent-assisted step ids shown by `specharbor workflow`.
+
 ## Spec Author Agent
 
 Creates or refines OpenSpec change files. This role focuses on `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md`; it should not implement the change.
@@ -41,6 +43,8 @@ Reviews the final diff against the active OpenSpec change. This role should prio
 ```text
 Spec Author -> Architecture Reviewer -> Implementer -> Test Engineer -> Change Reviewer
 ```
+
+The broader recommended workflow continues manually through Commit, Pull Request, Merge, and Archive. `specharbor workflow` shows that full advisory sequence without executing commands or automating source-control steps.
 
 For small changes:
 

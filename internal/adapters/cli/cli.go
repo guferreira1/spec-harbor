@@ -65,6 +65,7 @@ func commandRegistry() map[string]CommandHandler {
 		"review":   reviewCommand,
 		"archive":  archiveCommand,
 		"config":   configCommand,
+		"workflow": workflowCommand,
 
 		"help":   helpCommand,
 		"-h":     helpCommand,
@@ -842,18 +843,43 @@ func printValidationReport(output io.Writer, result domain.ValidationResult) {
 		fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
 		fmt.Fprintf(output, "Checked path: %s\n", result.CheckedPath)
 		fmt.Fprintf(output, "Required files: %d\n", len(result.RequiredFiles))
-		fmt.Fprintf(output, "Findings: %d\n", len(result.Findings))
+		fmt.Fprintf(output, "Errors: %d\n", result.ErrorCount())
+		fmt.Fprintf(output, "Warnings: %d\n", result.WarningCount())
+		printValidationFindingGroup(output, "Warnings:", findingsBySeverity(result, domain.ValidationFindingSeverityWarning))
 		return
 	}
 
 	fmt.Fprintln(output, "SpecHarbor change is invalid.")
 	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
 	fmt.Fprintf(output, "Checked path: %s\n", result.CheckedPath)
-	fmt.Fprintln(output)
-	fmt.Fprintln(output, "Findings:")
-	for _, finding := range result.Findings {
-		fmt.Fprintf(output, "- [%s] %s: %s\n", finding.Severity, finding.Code, finding.Message)
+	printValidationFindingGroup(output, "Errors:", findingsBySeverity(result, domain.ValidationFindingSeverityError))
+	printValidationFindingGroup(output, "Warnings:", findingsBySeverity(result, domain.ValidationFindingSeverityWarning))
+}
+
+func printValidationFindingGroup(output io.Writer, title string, findings []domain.ValidationFinding) {
+	if len(findings) == 0 {
+		return
 	}
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, title)
+	for _, finding := range findings {
+		line := fmt.Sprintf("- [%s] %s: %s", finding.Severity, finding.Code, finding.Message)
+		if finding.RelativePath != "" {
+			line += fmt.Sprintf(" (%s)", finding.RelativePath)
+		}
+		fmt.Fprintln(output, line)
+	}
+}
+
+func findingsBySeverity(result domain.ValidationResult, severity domain.ValidationFindingSeverity) []domain.ValidationFinding {
+	var findings []domain.ValidationFinding
+	for _, finding := range result.Findings {
+		if finding.Severity == severity {
+			findings = append(findings, finding)
+		}
+	}
+	return findings
 }
 
 type reviewArguments struct {
@@ -1087,6 +1113,100 @@ func printConfigReport(output io.Writer, result domain.ConfigResult) {
 	fmt.Fprintf(output, "- format: %s\n", result.Config.Output.Format)
 }
 
+func workflowCommand(ctx CommandContext) error {
+	if err := parseWorkflowArguments(ctx.Args); err != nil {
+		return err
+	}
+
+	showWorkflow := usecase.NewShowWorkflow()
+	result, err := showWorkflow.Execute()
+	if err != nil {
+		return err
+	}
+
+	printWorkflowReport(ctx.Output, result.Workflow)
+	return nil
+}
+
+func parseWorkflowArguments(args []string) error {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			return fmt.Errorf("unsupported flag: %s", arg)
+		}
+	}
+
+	if len(args) > 0 {
+		return fmt.Errorf("unexpected argument: %s", args[0])
+	}
+
+	return nil
+}
+
+func printWorkflowReport(output io.Writer, workflow domain.Workflow) {
+	fmt.Fprintln(output, "SpecHarbor recommended workflow.")
+	fmt.Fprintf(output, "Title: %s\n", workflow.Title)
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Steps:")
+
+	for index, step := range workflow.Steps() {
+		if index > 0 {
+			fmt.Fprintln(output)
+		}
+		fmt.Fprintf(output, "%d. %s - %s\n", step.Order, step.ID, step.DisplayName)
+		fmt.Fprintf(output, "   Mode: %s\n", step.Mode)
+		fmt.Fprintf(output, "   Supported by SpecHarbor: %s\n", yesNo(step.Supported))
+		fmt.Fprintf(output, "   Advisory only: %s\n", yesNo(step.AdvisoryOnly))
+		fmt.Fprintf(output, "   Requires: %s\n", workflowStepRequirements(step.Requires()))
+		fmt.Fprintf(output, "   Purpose: %s\n", step.Description)
+		printWorkflowCommands(output, step.CommandSuggestions())
+		printWorkflowSafetyNotes(output, step.SafetyNotes())
+	}
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Notes:")
+	fmt.Fprintln(output, "- Command suggestions are advisory and are not executed by this command.")
+	fmt.Fprintln(output, "- This command is read-only and does not inspect Git, GitHub, GitLab, CI, provider APIs, agent CLIs, or remote workflow state.")
+}
+
+func workflowStepRequirements(requirements []domain.WorkflowStepID) string {
+	if len(requirements) == 0 {
+		return "none"
+	}
+
+	values := make([]string, 0, len(requirements))
+	for _, requirement := range requirements {
+		values = append(values, string(requirement))
+	}
+	return strings.Join(values, ", ")
+}
+
+func printWorkflowCommands(output io.Writer, suggestions []domain.WorkflowCommandSuggestion) {
+	fmt.Fprintln(output, "   Commands:")
+	if len(suggestions) == 0 {
+		fmt.Fprintln(output, "   - none")
+		return
+	}
+
+	for _, suggestion := range suggestions {
+		if suggestion.Description == "" {
+			fmt.Fprintf(output, "   - %s\n", suggestion.Command)
+			continue
+		}
+		fmt.Fprintf(output, "   - %s (%s)\n", suggestion.Command, suggestion.Description)
+	}
+}
+
+func printWorkflowSafetyNotes(output io.Writer, safetyNotes []string) {
+	if len(safetyNotes) == 0 {
+		return
+	}
+
+	fmt.Fprintln(output, "   Safety:")
+	for _, note := range safetyNotes {
+		fmt.Fprintf(output, "   - %s\n", note)
+	}
+}
+
 func helpCommand(ctx CommandContext) error {
 	printHelp(ctx.Output)
 	return nil
@@ -1107,6 +1227,7 @@ Commands:
   review      Review implementation against a spec
   archive     Archive a completed OpenSpec change
   config      Manage SpecHarbor configuration
+  workflow    Show the recommended SpecHarbor workflow
   version     Print SpecHarbor version
   help        Show this help message`)
 }
