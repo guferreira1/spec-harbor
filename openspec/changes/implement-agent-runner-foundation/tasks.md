@@ -1,0 +1,353 @@
+# Tasks: Implement Agent Runner Foundation
+
+## Phase 0: Baseline and Scope
+
+- [x] Read `AGENTS.md`, `.specharbor/rules/global.md`, `.specharbor/rules/implementer.md`, `openspec/project.md`, `openspec/specs/architecture/spec.md`, and all files under `openspec/changes/implement-agent-runner-foundation/`.
+- [x] Inspect current agent-assisted dry-run behavior in `internal/core/domain`, `internal/core/usecase`, `internal/core/ports`, `internal/adapters/templates`, and `internal/adapters/cli`.
+- [x] Inspect the current architecture boundary test that forbids agent runner abstractions from the previous dry-run-only change.
+- [x] Run `go test ./...` to establish the pre-change baseline.
+- [x] Keep the implementation limited to explicit `--execute` run-and-report behavior for agent-assisted OpenSpec spec authoring.
+- [x] Preserve dry-run as the default when `--execute` is absent.
+- [x] Preserve existing dry-run report formatting and deterministic prompt output for valid recognized targets when `--execute` is absent.
+- [x] Treat unknown-agent rejection in dry-run as an intentional validation tightening.
+- [x] Do not implement provider APIs, local model APIs, OAuth, credential management, secret storage, cloud execution, remote execution, marketplace behavior, source-control automation, workflow automation, patch application, auto-commit, auto-push, or auto-merge.
+- [x] Do not implement IDE automation, remote agent automation, marketplace integrations, or provider/cloud integrations for any agent target.
+- [x] Do not add config-driven generic runner commands in this change.
+- [x] Do not change `init`, `scan`, `validate`, `prompt`, `review`, `archive`, `config`, `generate --blank`, `generate --template`, or `generate --guided`.
+- [x] Do not modify CI behavior, `.github/workflows/ci.yml`, or `.specharbor/config.yml`.
+
+## Phase 1: Domain Concepts
+
+- [x] Add a domain concept for recognized agent targets or display targets.
+- [x] Define concrete recognized agent targets with stable ids and display names: `codex`/Codex, `claude`/Claude Code, `devin`/Devin, `cursor`/Cursor, `copilot`/GitHub Copilot, `gemini`/Gemini CLI, `roo`/Roo Code, `windsurf`/Windsurf, and `aider`/Aider.
+- [x] Retain `generic`/Generic Agent as a recognized dry-run-only target.
+- [x] Document that `generic` has no executable mapping because generic agents require future config-driven command mapping.
+- [x] Add a separate domain concept for executable local runner targets or supported executable local command mappings.
+- [x] Model the resolved executable target as command name, optional fixed args, display name, and agent id.
+- [x] Keep recognized agent targets and executable local runner mappings owned by `internal/core/domain`.
+- [x] Keep dry-run agent validation based on recognized targets, not executable mappings.
+- [x] Ensure dry-run can render deterministic prompts for `codex`, `claude`, `devin`, `cursor`, `copilot`, `gemini`, `roo`, `windsurf`, `aider`, and `generic` where prompt rendering is supported.
+- [x] Add dry-run validation that rejects unknown agent targets with a clear error.
+- [x] Add execute-mode validation that first validates the selected agent as a recognized target.
+- [x] Add execute-mode validation that rejects unknown agent targets with a clear error.
+- [x] Add execute-mode validation that rejects `generic` with a clear unmapped-target error.
+- [x] Add execute-mode resolution through the built-in executable mapping.
+- [x] Support the executable mapping `codex -> codex`.
+- [x] Support the executable mapping `claude -> claude`.
+- [x] Support the executable mapping `devin -> devin`.
+- [x] Support the executable mapping `cursor -> cursor`.
+- [x] Support the executable mapping `copilot -> copilot`.
+- [x] Support the executable mapping `gemini -> gemini`.
+- [x] Support the executable mapping `roo -> roo`.
+- [x] Support the executable mapping `windsurf -> windsurf`.
+- [x] Support the executable mapping `aider -> aider`.
+- [x] Add a domain request type for local agent runner execution.
+- [x] Include the recognized agent target id or display name in the runner request/result context.
+- [x] Include the resolved command name in the runner request.
+- [x] Include optional fixed args in the runner request.
+- [x] Include the prompt content in the runner request.
+- [x] Include the working directory in the runner request.
+- [x] Add a domain result type for started local agent runner execution.
+- [x] Include stdout in the runner result for started processes.
+- [x] Include stderr in the runner result for started processes.
+- [x] Include the actual exit code in the runner result for started processes.
+- [x] Add an execution status concept with `success` and `non_zero_exit` for started processes.
+- [x] Ensure startup failure is represented as an error path, not as a normal runner result.
+- [x] Ensure startup failure has no execution status result and no exit code.
+- [x] Add or update agent-assisted authoring result concepts so execute reports can include authoring context and started-process runner results.
+- [x] Preserve existing dry-run status fields or provide backward-compatible dry-run result behavior for CLI reporting.
+- [x] Keep result slices and mutable fields defensively copied where applicable.
+- [x] Keep domain code free of adapters, CLI packages, `os`, terminal IO, provider SDKs, network APIs, source-control SDKs, workflow SDKs, external-agent SDKs, and process execution packages.
+
+## Phase 2: Ports
+
+- [x] Add a small core-owned `AgentRunner` port under `internal/core/ports`.
+- [x] Define the port in terms of domain request/result types.
+- [x] Ensure the port accepts normalized prompt, command, optional fixed args, and working-directory inputs.
+- [x] Ensure the port contract captures stdout for started processes.
+- [x] Ensure the port contract captures stderr for started processes.
+- [x] Ensure the port contract captures the actual exit code for started processes.
+- [x] Ensure the port contract captures `success` status for zero exits.
+- [x] Ensure the port contract captures `non_zero_exit` status for non-zero exits.
+- [x] Ensure the port contract returns clear errors for startup failures.
+- [x] Ensure the port contract produces no normal `AgentRunnerResult` for startup failures.
+- [x] Ensure the port contract reports no exit code for startup failures.
+- [x] Ensure the port contract keeps startup failure distinct from a started process that exits non-zero.
+- [x] Keep the existing `AgentAssistedAuthoringPromptRenderer` port for prompt rendering.
+- [x] Do not add write/apply ports for agent output.
+- [x] Do not add source-control ports.
+- [x] Do not add workflow connector ports.
+- [x] Do not add provider API ports.
+- [x] Do not add marketplace, remote registry, credential, OAuth, or secret-storage ports.
+
+## Phase 3: Local Agent Runner Adapter
+
+- [x] Add a concrete local command runner adapter under `internal/adapters`, such as `internal/adapters/agentrunner` or `internal/adapters/agents`.
+- [x] Implement the `AgentRunner` port in the adapter.
+- [x] Receive an already-resolved executable command from the use case.
+- [x] Execute the resolved command directly, not through a shell.
+- [x] Pass optional fixed args directly to the process execution API without shell interpolation.
+- [x] Set the command working directory to the documented project root.
+- [x] Pass the deterministic prompt through stdin.
+- [x] Capture stdout for started processes.
+- [x] Capture stderr for started processes.
+- [x] Capture zero exit status as `success`.
+- [x] Capture non-zero exit status as a completed run with status `non_zero_exit`.
+- [x] Capture the actual exit code for started processes.
+- [x] Return clear errors for command startup failures, including missing executable failures.
+- [x] Include the resolved command and enough diagnostic context in startup failure errors.
+- [x] Return no normal runner result for startup failures.
+- [x] Report no exit code for startup failures.
+- [x] Avoid panics for startup failures and non-zero exits.
+- [x] Do not parse stdout or stderr.
+- [x] Do not write files from stdout or stderr.
+- [x] Do not apply patches.
+- [x] Do not run source-control commands.
+- [x] Do not run workflow tools.
+- [x] Do not use provider SDKs.
+- [x] Do not store credentials.
+- [x] Avoid global mutable state.
+
+## Phase 4: Agent-Assisted Use Case Updates
+
+- [x] Update `internal/core/usecase` agent-assisted authoring orchestration to accept an optional or required runner dependency appropriate to execute mode.
+- [x] Preserve dry-run behavior when `Execute` is false.
+- [x] Ensure dry-run does not require an `AgentRunner`.
+- [x] Ensure dry-run does not call an `AgentRunner`.
+- [x] Ensure dry-run does not resolve executable commands.
+- [x] Ensure dry-run does not execute external commands.
+- [x] Ensure dry-run validates `--agent` against the recognized agent target list.
+- [x] Ensure dry-run rejects unknown agents with a clear validation error.
+- [x] Ensure dry-run returns the existing deterministic authoring plan and prompt style for valid recognized targets.
+- [x] When `Execute` is true, validate all existing agent-assisted inputs before prompt rendering.
+- [x] When `Execute` is true, validate the selected agent against the recognized agent target list.
+- [x] When `Execute` is true, reject unknown agents with a clear error before runner invocation.
+- [x] When `Execute` is true, reject `generic` with a clear unmapped-target error before runner invocation.
+- [x] When `Execute` is true, render the same deterministic prompt as dry-run mode.
+- [x] When `Execute` is true, require the `AgentRunner` dependency.
+- [x] When `Execute` is true, resolve the recognized concrete agent target through the supported executable mapping.
+- [x] When `Execute` is true, build a runner request with command, optional fixed args, prompt, and working directory.
+- [x] When `Execute` is true, invoke the `AgentRunner` port exactly once.
+- [x] Include runner stdout, stderr, exit code, and execution status in the use case result for started processes.
+- [x] Return startup failures from the runner as clear errors.
+- [x] Ensure startup failures do not produce a normal runner result.
+- [x] Ensure startup failures do not report an exit code.
+- [x] Report non-zero runner exits as results with status `non_zero_exit` without panicking.
+- [x] Do not parse runner stdout or stderr.
+- [x] Do not write OpenSpec files from runner output.
+- [x] Do not modify production code from runner output.
+- [x] Do not run validation against unwritten files.
+- [x] Do not run source-control commands.
+- [x] Do not run workflow tools.
+- [x] Do not call provider APIs, local model APIs, or network APIs.
+- [x] Keep output printing out of the use case.
+- [x] Keep adapters, `os`, `os/exec`, terminal IO, provider SDKs, network APIs, source-control SDKs, workflow SDKs, and external-agent SDKs out of core.
+
+## Phase 5: CLI Parsing, Reporting, and Exit Behavior
+
+- [x] Update `internal/adapters/cli` so `--execute` is accepted only with `--agent-assisted`.
+- [x] Preserve the current error for `--execute` used without `--agent-assisted`.
+- [x] Reject `--execute` combined with `--blank`.
+- [x] Reject `--execute` combined with `--template`.
+- [x] Reject `--execute` combined with `--guided`.
+- [x] Preserve existing mode conflict errors for agent-assisted, blank, template, and guided modes.
+- [x] Preserve existing missing argument errors for `--agent`, `--type`, `--title`, and `--summary`.
+- [x] Preserve existing duplicate flag validation where supported by the parser.
+- [x] Preserve existing unsupported flag and extra positional argument behavior.
+- [x] Construct the agent-assisted use case with the existing prompt template adapter and the new local runner adapter.
+- [x] Pass the current project root from the CLI adapter as the runner working directory.
+- [x] Print dry-run output in the existing style for valid recognized targets when `--execute` is absent.
+- [x] Return a clear validation error for unknown agents in dry-run mode.
+- [x] Print execute output as a run-and-report result when `--execute` is present and the process starts.
+- [x] Include change id, recognized agent target id, recognized agent display name, resolved command, optional fixed args, authoring type, title, summary, relative change path, and working directory label in execute output.
+- [x] Ensure CLI output clearly distinguishes recognized agent name from resolved executable command.
+- [x] Include execution status in execute output for started processes.
+- [x] Include exit code in execute output for started processes.
+- [x] Include stdout in execute output for started processes.
+- [x] Include stderr in execute output for started processes.
+- [x] Include clear output when stdout or stderr is empty for started processes.
+- [x] Include status lines that output was not parsed or applied.
+- [x] Include status lines that no OpenSpec files were written from output.
+- [x] Include status lines that production code was not modified by SpecHarbor.
+- [x] Include status lines that SpecHarbor did not auto-commit, auto-push, or auto-merge.
+- [x] Ensure non-zero runner exits print the full run-and-report output, including stdout, stderr, exit code, and status.
+- [x] Ensure the SpecHarbor CLI process exits non-zero after printing the report for a non-zero runner exit.
+- [x] Return startup failures as clear errors.
+- [x] Ensure startup failure errors include the resolved command and enough context to diagnose the missing or failed executable.
+- [x] Ensure startup failures do not print a normal runner result.
+- [x] Ensure startup failures do not report an exit code.
+- [x] Ensure startup failures make the SpecHarbor CLI process exit non-zero.
+- [x] Keep CLI responsibilities limited to parsing, dependency construction, current-working-directory lookup, report formatting, and CLI exit behavior.
+
+## Phase 6: Documentation Updates
+
+- [x] Update `README.md` if the command list, status summary, or examples need changing.
+- [x] Update `docs/usage.md` to document `--execute` for agent-assisted run-and-report mode.
+- [x] Update `docs/generation-modes.md` to describe dry-run default behavior and explicit execute behavior.
+- [x] Update any other relevant Markdown under `docs/`.
+- [x] Document that SpecHarbor supports multiple AI agent targets for OpenSpec/SDD workflows.
+- [x] Document the recognized concrete agent targets: Codex, Claude Code, Devin, Cursor, GitHub Copilot, Gemini CLI, Roo Code, Windsurf, and Aider.
+- [x] Document that `generic` remains a recognized dry-run-only target.
+- [x] Document that `generic` is not executable until a future config-driven runner/templates feature defines a deterministic mapping.
+- [x] Document that dry-run is still default.
+- [x] Document that dry-run never executes external commands.
+- [x] Document that dry-run never requires a runner.
+- [x] Document that dry-run never resolves executable mappings.
+- [x] Document that dry-run generates copy-pasteable deterministic prompts for recognized agents.
+- [x] Document that unknown dry-run agents are rejected as intentional validation tightening.
+- [x] Document that `--execute` is explicit.
+- [x] Document that `--execute` runs a supported local command mapping.
+- [x] Document the supported executable mapping: `codex -> codex`, `claude -> claude`, `devin -> devin`, `cursor -> cursor`, `copilot -> copilot`, `gemini -> gemini`, `roo -> roo`, `windsurf -> windsurf`, and `aider -> aider`.
+- [x] Document that `--execute` is still run-and-report only.
+- [x] Document that missing local commands produce startup errors.
+- [x] Document that startup failures produce no runner result and no exit code.
+- [x] Document that started commands with non-zero exit codes produce a report and then SpecHarbor exits non-zero.
+- [x] Document that the deterministic OpenSpec authoring prompt is sent to the local runner through stdin.
+- [x] Document the working directory used for local runner execution.
+- [x] Document that stdout, stderr, exit code, and execution status are captured and reported for started processes.
+- [x] Document that SpecHarbor does not parse or apply agent output.
+- [x] Document that SpecHarbor does not write OpenSpec files from agent output.
+- [x] Document that SpecHarbor does not modify production code from agent output.
+- [x] Document that SpecHarbor does not auto-commit, auto-push, or auto-merge.
+- [x] Document that provider APIs are not implemented by this feature.
+- [x] Document that no provider API keys, OAuth, credential storage, IDE automation, remote execution, marketplace integrations, source-control automation, or workflow automation are introduced.
+- [x] Keep documentation aligned with implemented behavior and avoid describing planned provider, IDE, cloud, remote, workflow, or file-application features as available.
+
+## Phase 7: Tests
+
+- [x] Add domain tests proving recognized concrete agent targets include Codex, Claude Code, Devin, Cursor, GitHub Copilot, Gemini CLI, Roo Code, Windsurf, and Aider.
+- [x] Add domain tests proving recognized concrete target ids are stable: `codex`, `claude`, `devin`, `cursor`, `copilot`, `gemini`, `roo`, `windsurf`, and `aider`.
+- [x] Add domain tests proving `generic` remains recognized for dry-run.
+- [x] Add domain tests proving `generic` has no executable local runner mapping in this change.
+- [x] Add domain tests for executable local agent mapping.
+- [x] Add domain tests proving `codex` resolves to `codex`.
+- [x] Add domain tests proving `claude` resolves to `claude`.
+- [x] Add domain tests proving `devin` resolves to `devin`.
+- [x] Add domain tests proving `cursor` resolves to `cursor`.
+- [x] Add domain tests proving `copilot` resolves to `copilot`.
+- [x] Add domain tests proving `gemini` resolves to `gemini`.
+- [x] Add domain tests proving `roo` resolves to `roo`.
+- [x] Add domain tests proving `windsurf` resolves to `windsurf`.
+- [x] Add domain tests proving `aider` resolves to `aider`.
+- [x] Add domain tests proving resolved executable targets carry command name, optional fixed args, display name, and agent id.
+- [x] Add domain tests proving dry-run agent display names remain valid for all recognized targets where current behavior allows them.
+- [x] Add domain tests for unknown-agent errors in dry-run and execute mode.
+- [x] Add domain tests for `generic` execute unmapped-target errors.
+- [x] Add domain tests for runner request construction.
+- [x] Add domain tests for runner result stdout, stderr, exit code, and status representation for started processes.
+- [x] Add domain tests proving non-zero exit is represented as status `non_zero_exit`.
+- [x] Add domain tests proving startup failure is an error path, not a normal runner result.
+- [x] Add domain tests proving startup failure has no exit code.
+- [x] Add domain tests for result immutability where slices or mutable fields are exposed.
+- [x] Add port-backed use case tests with a fake `AgentRunner`.
+- [x] Add use case tests proving dry-run remains default.
+- [x] Add use case tests proving dry-run works for recognized targets where prompt rendering is supported.
+- [x] Add use case tests proving dry-run rejects unknown agents.
+- [x] Add use case tests proving dry-run does not require a runner.
+- [x] Add use case tests proving dry-run does not call a runner.
+- [x] Add use case tests proving dry-run does not resolve executable command mappings.
+- [x] Add use case tests proving dry-run output remains unchanged for valid recognized targets when `--execute` is absent.
+- [x] Add use case tests for successful execute with `feature`.
+- [x] Add use case tests for successful execute with `bugfix`.
+- [x] Add use case tests for successful execute with `docs`.
+- [x] Add use case tests for successful execute with `refactor`.
+- [x] Add use case tests proving execute supports `codex`.
+- [x] Add use case tests proving execute supports `claude`.
+- [x] Add use case tests proving execute supports `devin`.
+- [x] Add use case tests proving execute supports `cursor`.
+- [x] Add use case tests proving execute supports `copilot`.
+- [x] Add use case tests proving execute supports `gemini`.
+- [x] Add use case tests proving execute supports `roo`.
+- [x] Add use case tests proving execute supports `windsurf`.
+- [x] Add use case tests proving execute supports `aider`.
+- [x] Add use case tests proving execute renders the same deterministic prompt as dry-run.
+- [x] Add use case tests proving execute sends the prompt to the runner request through stdin-facing request content.
+- [x] Add use case tests proving execute uses the project root as working directory.
+- [x] Add use case tests proving execute invokes the runner exactly once.
+- [x] Add use case tests for zero runner exit reporting.
+- [x] Add use case tests for non-zero runner exit reporting with status `non_zero_exit`.
+- [x] Add use case tests proving non-zero runner exits preserve stdout, stderr, and actual exit code.
+- [x] Add use case tests for startup failure errors.
+- [x] Add use case tests proving startup failure does not produce a normal runner result.
+- [x] Add use case tests proving startup failure has no exit code.
+- [x] Add use case tests proving startup failure is distinct from non-zero runner exit.
+- [x] Add use case tests proving execute rejects `generic` with a clear unmapped-target error.
+- [x] Add use case tests proving execute rejects unknown agents with a clear error.
+- [x] Add use case tests proving stdout and stderr are not parsed.
+- [x] Add use case tests proving no OpenSpec files are written from runner output.
+- [x] Add use case tests proving production code is not modified by SpecHarbor from runner output.
+- [x] Add local runner adapter tests for stdout capture.
+- [x] Add local runner adapter tests for stderr capture.
+- [x] Add local runner adapter tests for zero exit status.
+- [x] Add local runner adapter tests for non-zero exit status.
+- [x] Add local runner adapter tests for startup failure.
+- [x] Add local runner adapter tests proving startup failure returns an error without a normal result.
+- [x] Add local runner adapter tests proving startup failure has no exit code.
+- [x] Add local runner adapter tests proving stdout and stderr are captured only for started processes.
+- [x] Add local runner adapter tests proving the prompt is passed on stdin.
+- [x] Add local runner adapter tests proving the command is executed directly without shell interpretation.
+- [x] Add local runner adapter tests proving fixed args, if present, are passed directly without shell interpolation.
+- [x] Add CLI tests for successful `--execute` reporting.
+- [x] Add CLI tests proving dry-run output remains unchanged for valid recognized targets without `--execute`.
+- [x] Add CLI tests proving dry-run works for recognized targets where prompt rendering is supported.
+- [x] Add CLI tests proving dry-run rejects unknown agents.
+- [x] Add CLI tests proving dry-run does not require, call, or resolve through a runner.
+- [x] Add CLI tests proving `--execute` is rejected outside `--agent-assisted`.
+- [x] Add CLI tests proving execute accepts all mapped local executable targets.
+- [x] Add CLI tests proving execute rejects `generic` with a clear unmapped-target error.
+- [x] Add CLI tests proving execute rejects unknown agents with a clear error.
+- [x] Add CLI tests proving the report distinguishes recognized agent name from resolved executable command.
+- [x] Add CLI tests proving stdout, stderr, exit code, and status are printed for started processes.
+- [x] Add CLI tests proving non-zero runner exits print the full report and then make the SpecHarbor CLI process exit non-zero.
+- [x] Add CLI tests proving startup failures return clear errors.
+- [x] Add CLI tests proving startup failure does not print a normal runner result.
+- [x] Add CLI tests proving startup failure does not report an exit code.
+- [x] Add CLI tests for mode conflicts, missing inputs, duplicate flags, unsupported flags, and extra positional arguments.
+- [x] Add regression tests proving `generate --blank` remains unchanged.
+- [x] Add regression tests proving `generate --template feature`, `bugfix`, `docs`, and `refactor` remain unchanged.
+- [x] Add regression tests proving `generate --guided` remains unchanged for `feature`, `bugfix`, `docs`, and `refactor`.
+- [x] Update architecture tests so the narrow `AgentRunner` port and local command adapter are allowed.
+- [x] Update architecture tests so recognized agent targets and executable mappings remain in core/domain.
+- [x] Add architecture tests or checks proving the local runner adapter receives already-resolved commands and does not own recognized-target policy.
+- [x] Keep architecture tests forbidding core adapter imports, core `os` imports, core `os/exec` imports, write/apply ports, source-control automation, workflow automation, provider APIs, credentials, auto-commit, auto-push, and auto-merge.
+
+## Phase 8: Verification and Task Updates
+
+- [x] Run `gofmt` on changed Go files.
+- [x] Run `go test ./...`.
+- [x] Manually verify dry-run agent-assisted behavior remains unchanged for valid recognized targets with `feature`.
+- [x] Manually verify dry-run agent-assisted behavior remains unchanged for valid recognized targets with `bugfix`.
+- [x] Manually verify dry-run agent-assisted behavior remains unchanged for valid recognized targets with `docs`.
+- [x] Manually verify dry-run agent-assisted behavior remains unchanged for valid recognized targets with `refactor`.
+- [x] Manually verify dry-run rejects unknown agents with a clear validation error.
+- [x] Manually verify recognized concrete agent targets include `codex`, `claude`, `devin`, `cursor`, `copilot`, `gemini`, `roo`, `windsurf`, and `aider`.
+- [x] Manually verify `generic` remains recognized for dry-run only.
+- [x] Manually verify executable mappings are `codex -> codex`, `claude -> claude`, `devin -> devin`, `cursor -> cursor`, `copilot -> copilot`, `gemini -> gemini`, `roo -> roo`, `windsurf -> windsurf`, and `aider -> aider`.
+- [x] Manually verify `--execute` runs a supported local runner command in run-and-report mode.
+- [x] Manually verify the runner receives the deterministic OpenSpec authoring prompt through stdin.
+- [x] Manually verify stdout is captured and printed for started processes.
+- [x] Manually verify stderr is captured and printed for started processes.
+- [x] Manually verify zero exit status is reported clearly.
+- [x] Manually verify non-zero exit status is reported as `non_zero_exit` without panic.
+- [x] Manually verify non-zero runner exits print the full report before the SpecHarbor CLI exits non-zero.
+- [x] Manually verify command startup failure returns a clear error.
+- [x] Manually verify command startup failure produces no normal runner result.
+- [x] Manually verify command startup failure reports no exit code.
+- [x] Manually verify startup failure is distinct from non-zero runner exit.
+- [x] Manually verify execute rejects `generic` with a clear unmapped-target error.
+- [x] Manually verify execute rejects unknown agents with a clear error.
+- [x] Manually verify CLI output distinguishes recognized agent name from resolved executable command.
+- [x] Manually verify `--execute` remains rejected for non-agent-assisted generation modes.
+- [x] Manually verify runner output is displayed only and not parsed.
+- [x] Manually verify no OpenSpec files are written from runner output.
+- [x] Manually verify no production code is modified by SpecHarbor from runner output.
+- [x] Manually verify no source-control commands are run by SpecHarbor.
+- [x] Manually verify no workflow tools are run by SpecHarbor.
+- [x] Manually verify no provider APIs, IDE automation, remote execution, credentials, OAuth, secret storage, marketplace integrations, auto-commit, auto-push, or auto-merge are introduced.
+- [x] Manually verify `generate --blank` remains unchanged.
+- [x] Manually verify `generate --template feature`, `bugfix`, `docs`, and `refactor` remain unchanged.
+- [x] Manually verify `generate --guided` remains unchanged for `feature`, `bugfix`, `docs`, and `refactor`.
+- [x] Inspect `git status --short`, `git diff --stat`, `git diff --name-only`, and `git diff`.
+- [x] Confirm README and docs updates are included in the implementation PR.
+- [x] Confirm no CI, `.github/workflows/ci.yml`, or `.specharbor/config.yml` changes are included.
+- [x] Update this `tasks.md` by checking off only work actually completed.

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/guferreira1/spec-harbor/internal/adapters/agentrunner"
 	configadapter "github.com/guferreira1/spec-harbor/internal/adapters/config"
 	"github.com/guferreira1/spec-harbor/internal/adapters/filesystem"
 	"github.com/guferreira1/spec-harbor/internal/adapters/templates"
@@ -193,7 +194,8 @@ func generateCommand(ctx CommandContext) error {
 
 	if arguments.mode == domain.AgentAssistedMode {
 		promptTemplate := templates.NewAgentAssistedAuthoringPromptTemplate()
-		agentAssistedAuthoring := usecase.NewAgentAssistedAuthoring(promptTemplate)
+		localRunner := agentrunner.NewLocalCommandRunner()
+		agentAssistedAuthoring := usecase.NewAgentAssistedAuthoringWithRunner(promptTemplate, localRunner)
 
 		result, err := agentAssistedAuthoring.Execute(usecase.AgentAssistedAuthoringInput{
 			ProjectRoot:   root,
@@ -209,6 +211,9 @@ func generateCommand(ctx CommandContext) error {
 		}
 
 		printAgentAssistedAuthoringReport(ctx.Output, result)
+		if runnerResult, ok := result.RunnerResult(); ok && runnerResult.Status == domain.AgentRunStatusNonZeroExit {
+			return ExitError{Code: runnerResult.ExitCode}
+		}
 		return nil
 	}
 
@@ -407,9 +412,6 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 	if agentAssistedProvided && guidedProvided {
 		return generateArguments{}, fmt.Errorf("agent-assisted and guided generation flags cannot be used together")
 	}
-	if agentAssistedProvided && executeProvided {
-		return generateArguments{}, usecase.ErrAgentAssistedExecuteUnsupported
-	}
 	if !agentAssistedProvided && executeProvided {
 		return generateArguments{}, fmt.Errorf("unsupported flag: --execute")
 	}
@@ -583,6 +585,11 @@ func printGenerationReport(output io.Writer, result domain.GenerationResult) {
 }
 
 func printAgentAssistedAuthoringReport(output io.Writer, result domain.AgentAssistedAuthoringResult) {
+	if result.Execute {
+		printAgentAssistedAuthoringExecutionReport(output, result)
+		return
+	}
+
 	fmt.Fprintln(output, "SpecHarbor agent-assisted spec authoring dry run.")
 	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
 	fmt.Fprintf(output, "Agent: %s\n", result.AgentName)
@@ -617,6 +624,72 @@ func printAgentAssistedAuthoringReport(output io.Writer, result domain.AgentAssi
 	fmt.Fprintln(output)
 	fmt.Fprint(output, result.Prompt)
 	if !strings.HasSuffix(result.Prompt, "\n") {
+		fmt.Fprintln(output)
+	}
+}
+
+func printAgentAssistedAuthoringExecutionReport(output io.Writer, result domain.AgentAssistedAuthoringResult) {
+	runnerResult, ok := result.RunnerResult()
+	if !ok {
+		return
+	}
+
+	fmt.Fprintln(output, "SpecHarbor agent-assisted spec authoring execute run.")
+	fmt.Fprintln(output, "Mode: execute")
+	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
+	fmt.Fprintf(output, "Agent target id: %s\n", result.AgentName)
+	fmt.Fprintf(output, "Agent display name: %s\n", result.AgentDisplayName)
+	fmt.Fprintf(output, "Resolved command: %s\n", result.ResolvedCommandName)
+	printResolvedArgs(output, result.ResolvedCommandFixedArgs())
+	fmt.Fprintf(output, "Authoring type: %s\n", result.AuthoringType)
+	fmt.Fprintf(output, "Title: %s\n", result.Title)
+	fmt.Fprintf(output, "Summary: %s\n", result.Summary)
+	fmt.Fprintf(output, "Path: %s\n", result.ChangePath)
+	fmt.Fprintf(output, "Working directory: project root (%s)\n", result.WorkingDirectory)
+	fmt.Fprintf(output, "Prompt sent through stdin: %s\n", yesNo(result.PromptSentToRunner))
+	fmt.Fprintf(output, "Execution status: %s\n", runnerResult.Status)
+	fmt.Fprintf(output, "Exit code: %d\n", runnerResult.ExitCode)
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Required files:")
+	for _, requiredFile := range result.RequiredFiles() {
+		fmt.Fprintf(output, "- %s\n", requiredFile)
+	}
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Plan:")
+	for _, planItem := range result.Plan() {
+		fmt.Fprintf(output, "- %s\n", planItem)
+	}
+
+	printCapturedOutput(output, "Stdout:", runnerResult.Stdout)
+	printCapturedOutput(output, "Stderr:", runnerResult.Stderr)
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Status:")
+	fmt.Fprintf(output, "- Output parsed or applied by SpecHarbor: %s\n", yesNo(!result.NoAgentOutputParsedOrApplied))
+	fmt.Fprintf(output, "- OpenSpec files written from runner output: %s\n", yesNo(!result.NoOpenSpecFilesWrittenFromOutput))
+	fmt.Fprintf(output, "- Production code modified by SpecHarbor: %s\n", yesNo(!result.NoProductionCodeModifiedBySpecHarbor))
+	fmt.Fprintf(output, "- Auto-commit, auto-push, or auto-merge by SpecHarbor: %s\n", yesNo(!result.NoAutoCommitPushMerge))
+}
+
+func printResolvedArgs(output io.Writer, args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(output, "Resolved args: (none)")
+		return
+	}
+	fmt.Fprintf(output, "Resolved args: %s\n", strings.Join(args, " "))
+}
+
+func printCapturedOutput(output io.Writer, heading string, contents string) {
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, heading)
+	if contents == "" {
+		fmt.Fprintln(output, "(empty)")
+		return
+	}
+	fmt.Fprint(output, contents)
+	if !strings.HasSuffix(contents, "\n") {
 		fmt.Fprintln(output)
 	}
 }

@@ -161,6 +161,18 @@ func TestAgentAssistedAuthoringRejectsInvalidInputBeforePromptRendering(t *testi
 			want: "agent name is required",
 		},
 		{
+			name: "unknown agent",
+			input: AgentAssistedAuthoringInput{
+				ProjectRoot:   "/project",
+				ChangeID:      "change",
+				AgentName:     "unknown",
+				AuthoringType: string(domain.FeatureAgentAssistedAuthoringType),
+				Title:         "Title",
+				Summary:       "Summary",
+			},
+			want: "unknown agent target: unknown",
+		},
+		{
 			name: "missing type",
 			input: AgentAssistedAuthoringInput{
 				ProjectRoot: "/project",
@@ -238,7 +250,223 @@ func TestAgentAssistedAuthoringRejectsInvalidInputBeforePromptRendering(t *testi
 	}
 }
 
-func TestAgentAssistedAuthoringRejectsExecuteWithoutRenderingPrompt(t *testing.T) {
+func TestAgentAssistedAuthoringDryRunWorksForEveryRecognizedTargetWithoutRunner(t *testing.T) {
+	for _, target := range domain.RecognizedAgentTargets() {
+		t.Run(string(target.ID), func(t *testing.T) {
+			renderer := newFakeAgentAssistedPromptRenderer()
+			result, err := NewAgentAssistedAuthoring(renderer).Execute(AgentAssistedAuthoringInput{
+				ProjectRoot:   "/project",
+				ChangeID:      "change",
+				AgentName:     string(target.ID),
+				AuthoringType: string(domain.FeatureAgentAssistedAuthoringType),
+				Title:         "Title",
+				Summary:       "Summary",
+			})
+			if err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			if !result.DryRun {
+				t.Fatalf("DryRun = false, want true")
+			}
+			if result.AgentName != target.ID {
+				t.Fatalf("AgentName = %q, want %q", result.AgentName, target.ID)
+			}
+			if result.AgentDisplayName != target.DisplayName {
+				t.Fatalf("AgentDisplayName = %q, want %q", result.AgentDisplayName, target.DisplayName)
+			}
+			if len(renderer.requests) != 1 {
+				t.Fatalf("renderer requests = %d, want one", len(renderer.requests))
+			}
+			if _, ok := result.RunnerResult(); ok {
+				t.Fatalf("RunnerResult() ok = true, want false")
+			}
+		})
+	}
+}
+
+func TestAgentAssistedAuthoringExecuteSupportsMappedTargets(t *testing.T) {
+	for _, command := range domain.ExecutableAgentCommands() {
+		t.Run(string(command.AgentID), func(t *testing.T) {
+			renderer := newFakeAgentAssistedPromptRenderer()
+			runner := newFakeAgentRunner(domain.NewAgentRunResult("stdout", "stderr", 0))
+			input := AgentAssistedAuthoringInput{
+				ProjectRoot:   " /project ",
+				ChangeID:      "change",
+				AgentName:     string(command.AgentID),
+				AuthoringType: string(domain.FeatureAgentAssistedAuthoringType),
+				Title:         "Title",
+				Summary:       "Summary",
+				Execute:       true,
+			}
+
+			dryRun, err := NewAgentAssistedAuthoring(renderer).Execute(AgentAssistedAuthoringInput{
+				ProjectRoot:   input.ProjectRoot,
+				ChangeID:      input.ChangeID,
+				AgentName:     input.AgentName,
+				AuthoringType: input.AuthoringType,
+				Title:         input.Title,
+				Summary:       input.Summary,
+			})
+			if err != nil {
+				t.Fatalf("dry-run Execute() error = %v", err)
+			}
+			renderer.requests = nil
+
+			result, err := NewAgentAssistedAuthoringWithRunner(renderer, runner).Execute(input)
+			if err != nil {
+				t.Fatalf("execute Execute() error = %v", err)
+			}
+
+			if result.DryRun {
+				t.Fatalf("DryRun = true, want false")
+			}
+			if !result.Execute {
+				t.Fatalf("Execute = false, want true")
+			}
+			if result.AgentName != command.AgentID {
+				t.Fatalf("AgentName = %q, want %q", result.AgentName, command.AgentID)
+			}
+			if result.AgentDisplayName != command.AgentDisplayName {
+				t.Fatalf("AgentDisplayName = %q, want %q", result.AgentDisplayName, command.AgentDisplayName)
+			}
+			if result.ResolvedCommandName != command.CommandName {
+				t.Fatalf("ResolvedCommandName = %q, want %q", result.ResolvedCommandName, command.CommandName)
+			}
+			if result.WorkingDirectory != "/project" {
+				t.Fatalf("WorkingDirectory = %q, want /project", result.WorkingDirectory)
+			}
+			if result.Prompt != dryRun.Prompt {
+				t.Fatalf("execute prompt = %q, want dry-run prompt %q", result.Prompt, dryRun.Prompt)
+			}
+			if len(renderer.requests) != 1 {
+				t.Fatalf("renderer requests = %d, want one", len(renderer.requests))
+			}
+			if len(runner.requests) != 1 {
+				t.Fatalf("runner requests = %d, want one", len(runner.requests))
+			}
+			runRequest := runner.requests[0]
+			if runRequest.CommandName != command.CommandName {
+				t.Fatalf("runner CommandName = %q, want %q", runRequest.CommandName, command.CommandName)
+			}
+			if runRequest.WorkingDirectory() != "/project" {
+				t.Fatalf("runner WorkingDirectory() = %q, want /project", runRequest.WorkingDirectory())
+			}
+			if runRequest.Prompt() != dryRun.Prompt {
+				t.Fatalf("runner Prompt() = %q, want dry-run prompt", runRequest.Prompt())
+			}
+			runResult, ok := result.RunnerResult()
+			if !ok {
+				t.Fatalf("RunnerResult() ok = false, want true")
+			}
+			if runResult.Status != domain.AgentRunStatusSuccess {
+				t.Fatalf("runner status = %q, want success", runResult.Status)
+			}
+		})
+	}
+}
+
+func TestAgentAssistedAuthoringExecuteReportsNonZeroRunnerExit(t *testing.T) {
+	renderer := newFakeAgentAssistedPromptRenderer()
+	runner := newFakeAgentRunner(domain.NewAgentRunResult("stdout", "stderr", 5))
+
+	result, err := NewAgentAssistedAuthoringWithRunner(renderer, runner).Execute(AgentAssistedAuthoringInput{
+		ProjectRoot:   "/project",
+		ChangeID:      "change",
+		AgentName:     "codex",
+		AuthoringType: string(domain.FeatureAgentAssistedAuthoringType),
+		Title:         "Title",
+		Summary:       "Summary",
+		Execute:       true,
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	runResult, ok := result.RunnerResult()
+	if !ok {
+		t.Fatalf("RunnerResult() ok = false, want true")
+	}
+	if runResult.Status != domain.AgentRunStatusNonZeroExit {
+		t.Fatalf("Status = %q, want non_zero_exit", runResult.Status)
+	}
+	if runResult.Stdout != "stdout" || runResult.Stderr != "stderr" || runResult.ExitCode != 5 {
+		t.Fatalf("RunnerResult() = %#v, want captured stdout/stderr/exit code", runResult)
+	}
+}
+
+func TestAgentAssistedAuthoringExecuteReturnsStartupFailureWithoutNormalResult(t *testing.T) {
+	wantErr := errors.New("start runner")
+	renderer := newFakeAgentAssistedPromptRenderer()
+	runner := newFakeAgentRunner(domain.AgentRunResult{})
+	runner.err = wantErr
+
+	result, err := NewAgentAssistedAuthoringWithRunner(renderer, runner).Execute(AgentAssistedAuthoringInput{
+		ProjectRoot:   "/project",
+		ChangeID:      "change",
+		AgentName:     "codex",
+		AuthoringType: string(domain.FeatureAgentAssistedAuthoringType),
+		Title:         "Title",
+		Summary:       "Summary",
+		Execute:       true,
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Execute() error = %v, want startup failure", err)
+	}
+	if _, ok := result.RunnerResult(); ok {
+		t.Fatalf("RunnerResult() ok = true, want false")
+	}
+	if len(runner.requests) != 1 {
+		t.Fatalf("runner requests = %d, want one", len(runner.requests))
+	}
+}
+
+func TestAgentAssistedAuthoringExecuteRejectsGenericAndUnknownTargetsBeforeRunner(t *testing.T) {
+	tests := []struct {
+		name      string
+		agentName string
+		want      string
+	}{
+		{
+			name:      "generic",
+			agentName: "generic",
+			want:      "agent target has no executable local runner mapping in this change: generic",
+		},
+		{
+			name:      "unknown",
+			agentName: "unknown",
+			want:      "unknown agent target: unknown",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			renderer := newFakeAgentAssistedPromptRenderer()
+			runner := newFakeAgentRunner(domain.NewAgentRunResult("", "", 0))
+			_, err := NewAgentAssistedAuthoringWithRunner(renderer, runner).Execute(AgentAssistedAuthoringInput{
+				ProjectRoot:   "/project",
+				ChangeID:      "change",
+				AgentName:     test.agentName,
+				AuthoringType: string(domain.FeatureAgentAssistedAuthoringType),
+				Title:         "Title",
+				Summary:       "Summary",
+				Execute:       true,
+			})
+			if err == nil {
+				t.Fatalf("Execute() error = nil, want %q", test.want)
+			}
+			if err.Error() != test.want {
+				t.Fatalf("Execute() error = %q, want %q", err.Error(), test.want)
+			}
+			if len(renderer.requests) != 0 {
+				t.Fatalf("renderer requests = %d, want none", len(renderer.requests))
+			}
+			if len(runner.requests) != 0 {
+				t.Fatalf("runner requests = %d, want none", len(runner.requests))
+			}
+		})
+	}
+}
+
+func TestAgentAssistedAuthoringExecuteRequiresRunnerForMappedTargets(t *testing.T) {
 	renderer := newFakeAgentAssistedPromptRenderer()
 	_, err := NewAgentAssistedAuthoring(renderer).Execute(AgentAssistedAuthoringInput{
 		ProjectRoot:   "/project",
@@ -249,11 +477,14 @@ func TestAgentAssistedAuthoringRejectsExecuteWithoutRenderingPrompt(t *testing.T
 		Summary:       "Summary",
 		Execute:       true,
 	})
-	if !errors.Is(err, ErrAgentAssistedExecuteUnsupported) {
-		t.Fatalf("Execute() error = %v, want unsupported execute error", err)
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want missing runner error")
+	}
+	if err.Error() != "agent runner is required for execute mode" {
+		t.Fatalf("Execute() error = %q, want missing runner error", err.Error())
 	}
 	if len(renderer.requests) != 0 {
-		t.Fatalf("renderer requests = %v, want none for unsupported execute", renderer.requests)
+		t.Fatalf("renderer requests = %d, want none", len(renderer.requests))
 	}
 }
 
@@ -338,4 +569,22 @@ func (renderer *fakeAgentAssistedPromptRenderer) Render(
 		request.Title,
 		request.Summary,
 	}, ":"), nil
+}
+
+type fakeAgentRunner struct {
+	requests []domain.AgentRunRequest
+	result   domain.AgentRunResult
+	err      error
+}
+
+func newFakeAgentRunner(result domain.AgentRunResult) *fakeAgentRunner {
+	return &fakeAgentRunner{result: result}
+}
+
+func (runner *fakeAgentRunner) Run(request domain.AgentRunRequest) (domain.AgentRunResult, error) {
+	runner.requests = append(runner.requests, request)
+	if runner.err != nil {
+		return domain.AgentRunResult{}, runner.err
+	}
+	return runner.result, nil
 }

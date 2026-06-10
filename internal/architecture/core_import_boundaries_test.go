@@ -43,18 +43,24 @@ func TestCoreProductionImportsStayInsideArchitectureBoundaries(t *testing.T) {
 	}
 }
 
-func TestAgentAssistedDryRunDoesNotIntroduceExecutionOrWritePorts(t *testing.T) {
+func TestAgentRunnerFoundationDoesNotIntroduceOutputApplicationOrAutomationPorts(t *testing.T) {
 	forbiddenSnippets := []string{
-		"type AgentRunner",
-		"AgentRunner interface",
 		"AgentCommandRunner",
 		"AgentOutputWriter",
 		"AgentOutputApplier",
 		"WriteAgentOutput",
 		"ApplyAgentOutput",
-		"exec.Command",
-		`"os/exec"`,
 		"WorkflowDispatcher",
+		"SourceControl",
+		"GitCommit",
+		"AutoCommitter",
+		"AutoPusher",
+		"AutoMerger",
+		"CommitChanges",
+		"PushChanges",
+		"MergeChanges",
+		"CredentialStore",
+		"OAuth",
 	}
 
 	for _, directory := range []string{
@@ -86,6 +92,53 @@ func TestAgentAssistedDryRunDoesNotIntroduceExecutionOrWritePorts(t *testing.T) 
 				t.Fatalf("WalkDir(%q) error = %v", directory, err)
 			}
 		})
+	}
+}
+
+func TestAgentRunnerPortAndAdapterStayNarrow(t *testing.T) {
+	portPath := filepath.Join("..", "core", "ports", "generation.go")
+	portContents, err := os.ReadFile(portPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", portPath, err)
+	}
+	if !strings.Contains(string(portContents), "type AgentRunner interface") {
+		t.Fatalf("%s does not define the core-owned AgentRunner port", portPath)
+	}
+	if strings.Contains(string(portContents), "WriteAgentOutput") ||
+		strings.Contains(string(portContents), "ApplyAgentOutput") ||
+		strings.Contains(string(portContents), "WorkflowDispatcher") {
+		t.Fatalf("%s contains forbidden output application or workflow port", portPath)
+	}
+
+	adapterPath := filepath.Join("..", "adapters", "agentrunner", "local_command_runner.go")
+	adapterContents, err := os.ReadFile(adapterPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", adapterPath, err)
+	}
+	adapterSource := string(adapterContents)
+	for _, want := range []string{
+		`"os/exec"`,
+		"exec.Command(commandName, request.FixedArgs()...)",
+		"command.Stdin = strings.NewReader(request.Prompt())",
+		"domain.NewAgentRunResult",
+	} {
+		if !strings.Contains(adapterSource, want) {
+			t.Fatalf("%s missing expected narrow local runner behavior %q", adapterPath, want)
+		}
+	}
+	for _, forbidden := range []string{
+		"ResolveExecutableAgentCommand",
+		"RecognizedAgentTarget",
+		"WriteAgentOutput",
+		"ApplyAgentOutput",
+		"WorkflowDispatcher",
+		"git commit",
+		"git push",
+		"git merge",
+	} {
+		if strings.Contains(adapterSource, forbidden) {
+			t.Fatalf("%s contains forbidden runner adapter behavior %q", adapterPath, forbidden)
+		}
 	}
 }
 

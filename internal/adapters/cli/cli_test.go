@@ -497,6 +497,299 @@ func TestExecuteGenerateAgentAssistedAcceptsFlagsBeforeChangeID(t *testing.T) {
 	assertPathDoesNotExist(t, root, "openspec")
 }
 
+func TestExecuteGenerateAgentAssistedDryRunSupportsRecognizedTargets(t *testing.T) {
+	for _, target := range domain.RecognizedAgentTargets() {
+		t.Run(string(target.ID), func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+
+			var output bytes.Buffer
+			err := execute([]string{
+				"generate",
+				"agent-" + string(target.ID),
+				"--agent-assisted",
+				"--agent",
+				string(target.ID),
+				"--type",
+				"feature",
+				"--title",
+				"Title",
+				"--summary",
+				"Summary",
+			}, &output)
+			if err != nil {
+				t.Fatalf("execute(generate agent-assisted) error = %v", err)
+			}
+			generateOutput := output.String()
+			if !strings.Contains(generateOutput, "SpecHarbor agent-assisted spec authoring dry run.") {
+				t.Fatalf("generate output = %q, want dry-run report", generateOutput)
+			}
+			if !strings.Contains(generateOutput, "Agent: "+string(target.ID)) {
+				t.Fatalf("generate output = %q, want target id", generateOutput)
+			}
+			if strings.Contains(generateOutput, "Resolved command:") {
+				t.Fatalf("generate output = %q, want no executable mapping in dry-run", generateOutput)
+			}
+			assertPathDoesNotExist(t, root, "openspec")
+		})
+	}
+}
+
+func TestExecuteGenerateAgentAssistedExecutePrintsRunReport(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	installFakeAgentCommand(t, "codex", `
+input=$(cat)
+case "$input" in
+*"Title: Add reports"*) printf 'stdout prompt received\n' ;;
+*) printf 'stdout prompt missing\n' ;;
+esac
+printf 'stderr captured\n' >&2
+exit 0
+`)
+
+	var output bytes.Buffer
+	err := execute([]string{
+		"generate",
+		"agent-execute",
+		"--agent-assisted",
+		"--agent",
+		"codex",
+		"--type",
+		"feature",
+		"--title",
+		"Add reports",
+		"--summary",
+		"Create report support",
+		"--execute",
+	}, &output)
+	if err != nil {
+		t.Fatalf("execute(generate agent-assisted --execute) error = %v", err)
+	}
+
+	generateOutput := output.String()
+	for _, want := range []string{
+		"SpecHarbor agent-assisted spec authoring execute run.",
+		"Mode: execute",
+		"Change: agent-execute",
+		"Agent target id: codex",
+		"Agent display name: Codex",
+		"Resolved command: codex",
+		"Resolved args: (none)",
+		"Authoring type: feature",
+		"Title: Add reports",
+		"Summary: Create report support",
+		"Path: openspec/changes/agent-execute",
+		"Working directory: project root (" + root + ")",
+		"Prompt sent through stdin: yes",
+		"Execution status: success",
+		"Exit code: 0",
+		"Stdout:",
+		"stdout prompt received",
+		"Stderr:",
+		"stderr captured",
+		"- Output parsed or applied by SpecHarbor: no",
+		"- OpenSpec files written from runner output: no",
+		"- Production code modified by SpecHarbor: no",
+		"- Auto-commit, auto-push, or auto-merge by SpecHarbor: no",
+	} {
+		if !strings.Contains(generateOutput, want) {
+			t.Fatalf("generate output = %q, want to contain %q", generateOutput, want)
+		}
+	}
+	assertPathDoesNotExist(t, root, "openspec")
+}
+
+func TestExecuteGenerateAgentAssistedExecuteAcceptsMappedTargets(t *testing.T) {
+	for _, command := range domain.ExecutableAgentCommands() {
+		t.Run(string(command.AgentID), func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+			installFakeAgentCommand(t, command.CommandName, "printf 'ok\\n'\nexit 0\n")
+
+			var output bytes.Buffer
+			err := execute([]string{
+				"generate",
+				"agent-" + string(command.AgentID),
+				"--agent-assisted",
+				"--agent",
+				string(command.AgentID),
+				"--type",
+				"feature",
+				"--title",
+				"Title",
+				"--summary",
+				"Summary",
+				"--execute",
+			}, &output)
+			if err != nil {
+				t.Fatalf("execute(generate agent-assisted --execute) error = %v", err)
+			}
+			generateOutput := output.String()
+			for _, want := range []string{
+				"Agent target id: " + string(command.AgentID),
+				"Agent display name: " + command.AgentDisplayName,
+				"Resolved command: " + command.CommandName,
+				"Execution status: success",
+				"ok",
+			} {
+				if !strings.Contains(generateOutput, want) {
+					t.Fatalf("generate output = %q, want %q", generateOutput, want)
+				}
+			}
+		})
+	}
+}
+
+func TestExecuteGenerateAgentAssistedExecutePrintsFullReportBeforeNonZeroExit(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	installFakeAgentCommand(t, "codex", `
+printf 'stdout nonzero\n'
+printf 'stderr nonzero\n' >&2
+exit 6
+`)
+
+	var output bytes.Buffer
+	err := execute([]string{
+		"generate",
+		"agent-nonzero",
+		"--agent-assisted",
+		"--agent",
+		"codex",
+		"--type",
+		"bugfix",
+		"--title",
+		"Fix reports",
+		"--summary",
+		"Correct report behavior",
+		"--execute",
+	}, &output)
+	assertExitCode(t, err, 6)
+
+	generateOutput := output.String()
+	for _, want := range []string{
+		"SpecHarbor agent-assisted spec authoring execute run.",
+		"Execution status: non_zero_exit",
+		"Exit code: 6",
+		"stdout nonzero",
+		"stderr nonzero",
+		"- Output parsed or applied by SpecHarbor: no",
+		"- OpenSpec files written from runner output: no",
+		"- Production code modified by SpecHarbor: no",
+		"- Auto-commit, auto-push, or auto-merge by SpecHarbor: no",
+	} {
+		if !strings.Contains(generateOutput, want) {
+			t.Fatalf("generate output = %q, want to contain %q", generateOutput, want)
+		}
+	}
+}
+
+func TestExecuteGenerateAgentAssistedExecuteReportsEmptyStdoutAndStderr(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	installFakeAgentCommand(t, "codex", "exit 0\n")
+
+	var output bytes.Buffer
+	err := execute([]string{
+		"generate",
+		"agent-empty-output",
+		"--agent-assisted",
+		"--agent",
+		"codex",
+		"--type",
+		"docs",
+		"--title",
+		"Document reports",
+		"--summary",
+		"Describe report behavior",
+		"--execute",
+	}, &output)
+	if err != nil {
+		t.Fatalf("execute(generate agent-assisted --execute) error = %v", err)
+	}
+	if count := strings.Count(output.String(), "(empty)"); count != 2 {
+		t.Fatalf("generate output = %q, want two empty output markers", output.String())
+	}
+}
+
+func TestExecuteGenerateAgentAssistedExecuteRejectsGenericAndUnknownAgents(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "generic execute",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "generic", "--type", "feature", "--title", "Title", "--summary", "Summary", "--execute"},
+			want: "agent target has no executable local runner mapping in this change: generic",
+		},
+		{
+			name: "unknown dry run",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "unknown", "--type", "feature", "--title", "Title", "--summary", "Summary"},
+			want: "unknown agent target: unknown",
+		},
+		{
+			name: "unknown execute",
+			args: []string{"generate", "change", "--agent-assisted", "--agent", "unknown", "--type", "feature", "--title", "Title", "--summary", "Summary", "--execute"},
+			want: "unknown agent target: unknown",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+
+			var output bytes.Buffer
+			err := execute(test.args, &output)
+			if err == nil {
+				t.Fatalf("execute(%v) error = nil, want %q", test.args, test.want)
+			}
+			if err.Error() != test.want {
+				t.Fatalf("execute(%v) error = %q, want %q", test.args, err.Error(), test.want)
+			}
+			if output.String() != "" {
+				t.Fatalf("execute(%v) output = %q, want empty output", test.args, output.String())
+			}
+		})
+	}
+}
+
+func TestExecuteGenerateAgentAssistedExecuteStartupFailureDoesNotPrintNormalReport(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	t.Setenv("PATH", t.TempDir())
+
+	var output bytes.Buffer
+	err := execute([]string{
+		"generate",
+		"agent-startup-failure",
+		"--agent-assisted",
+		"--agent",
+		"codex",
+		"--type",
+		"refactor",
+		"--title",
+		"Refactor reports",
+		"--summary",
+		"Simplify report flow",
+		"--execute",
+	}, &output)
+	if err == nil {
+		t.Fatalf("execute(generate agent-assisted --execute) error = nil, want startup failure")
+	}
+	if !strings.Contains(err.Error(), `start agent runner command "codex"`) {
+		t.Fatalf("execute() error = %q, want command context", err.Error())
+	}
+	if strings.Contains(err.Error(), "Exit code:") {
+		t.Fatalf("execute() error = %q, want no exit code for startup failure", err.Error())
+	}
+	if output.String() != "" {
+		t.Fatalf("execute() output = %q, want no normal runner report", output.String())
+	}
+}
+
 func TestExecuteGenerateTemplateAcceptsFlagBeforeChangeID(t *testing.T) {
 	root := t.TempDir()
 	t.Chdir(root)
@@ -828,11 +1121,6 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 			want: "unknown agent-assisted authoring type: maintenance",
 		},
 		{
-			name: "agent-assisted execute unsupported",
-			args: []string{"generate", "change", "--agent-assisted", "--agent", "codex", "--type", "feature", "--title", "Title", "--summary", "Summary", "--execute"},
-			want: "agent-assisted execute mode is unsupported in this version",
-		},
-		{
 			name: "missing template name",
 			args: []string{"generate", "change", "--template"},
 			want: "template name is required",
@@ -975,6 +1263,21 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 		{
 			name: "unsupported execute flag without agent-assisted",
 			args: []string{"generate", "change", "--execute"},
+			want: "unsupported flag: --execute",
+		},
+		{
+			name: "execute flag with blank",
+			args: []string{"generate", "change", "--blank", "--execute"},
+			want: "unsupported flag: --execute",
+		},
+		{
+			name: "execute flag with template",
+			args: []string{"generate", "change", "--template", "feature", "--execute"},
+			want: "unsupported flag: --execute",
+		},
+		{
+			name: "execute flag with guided",
+			args: []string{"generate", "change", "--guided", "--type", "feature", "--title", "Title", "--summary", "Summary", "--execute"},
 			want: "unsupported flag: --execute",
 		},
 		{
@@ -2259,6 +2562,20 @@ func createOpenSpecProject(t *testing.T, root string) {
 	if err := os.WriteFile(filepath.Join(root, "openspec", "project.md"), []byte("project"), 0o644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
+}
+
+func installFakeAgentCommand(t *testing.T, name string, scriptBody string) string {
+	t.Helper()
+
+	directory := t.TempDir()
+	path := filepath.Join(directory, name)
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n"+scriptBody), 0o755); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v", path, err)
+	}
+
+	oldPath := os.Getenv("PATH")
+	t.Setenv("PATH", directory+string(os.PathListSeparator)+oldPath)
+	return path
 }
 
 func createOpenSpecChange(t *testing.T, root string, changeID string, files []string) {

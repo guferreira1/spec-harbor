@@ -34,3 +34,9 @@ type GuidedChangeContent interface {
 type AgentAssistedAuthoringPromptRenderer interface {
 	Render(request domain.AgentAssistedAuthoringPromptRequest) (string, error)
 }
+
+// AgentRunner runs an already-resolved local agent command for explicit
+// run-and-report agent-assisted OpenSpec authoring.
+type AgentRunner interface {
+	Run(request domain.AgentRunRequest) (domain.AgentRunResult, error)
+}

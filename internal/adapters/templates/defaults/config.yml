@@ -12,12 +12,12 @@ agents:
   default: codex
   supported:
     - codex
-    - claude-code
+    - claude
     - cursor
     - devin
-    - github-copilot
-    - gemini-cli
-    - roo-code
+    - copilot
+    - gemini
+    - roo
     - windsurf
     - aider
     - generic
