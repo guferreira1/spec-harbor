@@ -38,13 +38,11 @@ func (useCase *ValidateChange) Execute(input ValidateChangeInput) (domain.Valida
 		return domain.ValidationResult{}, errors.New("project root is required")
 	}
 
-	changeID := strings.TrimSpace(input.ChangeID)
-	if changeID == "" {
-		return domain.ValidationResult{}, errors.New("change id is required")
-	}
-	if err := validateChangeID(changeID); err != nil {
+	parsedChangeID, err := domain.NewChangeID(input.ChangeID)
+	if err != nil {
 		return domain.ValidationResult{}, err
 	}
+	changeID := parsedChangeID.String()
 
 	requiredFiles := domain.RequiredOpenSpecChangeFiles()
 	checkedPath := openspecChangesDirectory + "/" + changeID
@@ -65,19 +63,14 @@ func (useCase *ValidateChange) Execute(input ValidateChangeInput) (domain.Valida
 		}), nil
 	}
 
-	findings, err := useCase.validateRequiredFiles(projectRoot, checkedPath, requiredFiles)
+	findings, loadedFiles, err := useCase.loadRequiredFiles(projectRoot, checkedPath, requiredFiles)
 	if err != nil {
 		return domain.ValidationResult{}, err
 	}
 
-	return domain.NewValidationResult(changeID, checkedPath, requiredFiles, findings), nil
-}
+	findings = append(findings, domain.ValidateChangeFileContents(loadedFiles)...)
 
-func validateChangeID(changeID string) error {
-	if changeID == "." || changeID == ".." || strings.Contains(changeID, "/") || strings.Contains(changeID, "\\") {
-		return errors.New("change id must be a single path segment")
-	}
-	return nil
+	return domain.NewValidationResult(changeID, checkedPath, requiredFiles, findings), nil
 }
 
 func (useCase *ValidateChange) validateProjectStructure(projectRoot string, changeID string, checkedPath string, requiredFiles []string) (domain.ValidationResult, bool, error) {
@@ -100,23 +93,33 @@ func (useCase *ValidateChange) validateProjectStructure(projectRoot string, chan
 	}), false, nil
 }
 
-func (useCase *ValidateChange) validateRequiredFiles(projectRoot string, checkedPath string, requiredFiles []string) ([]domain.ValidationFinding, error) {
+func (useCase *ValidateChange) loadRequiredFiles(projectRoot string, checkedPath string, requiredFiles []string) ([]domain.ValidationFinding, []domain.ChangeFileContent, error) {
 	var findings []domain.ValidationFinding
+	var loadedFiles []domain.ChangeFileContent
 
 	for _, requiredFile := range requiredFiles {
 		relativePath := checkedPath + "/" + requiredFile
 		exists, err := useCase.fileSystem.FileExists(projectRoot, relativePath)
 		if err != nil {
-			return nil, fmt.Errorf("check file %s: %w", relativePath, err)
+			return nil, nil, fmt.Errorf("check file %s: %w", relativePath, err)
 		}
-		if exists {
+		if !exists {
+			findings = append(findings, requiredFileMissingFinding(relativePath, requiredFile))
 			continue
 		}
 
-		findings = append(findings, requiredFileMissingFinding(relativePath, requiredFile))
+		content, err := useCase.fileSystem.ReadFile(projectRoot, relativePath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("read file %s: %w", relativePath, err)
+		}
+		loadedFiles = append(loadedFiles, domain.ChangeFileContent{
+			FileName:     requiredFile,
+			RelativePath: relativePath,
+			Content:      content,
+		})
 	}
 
-	return findings, nil
+	return findings, loadedFiles, nil
 }
 
 func projectRootUnavailableFinding() domain.ValidationFinding {

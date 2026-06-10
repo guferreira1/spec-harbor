@@ -1596,7 +1596,7 @@ func TestExecuteValidatePrintsValidReport(t *testing.T) {
 	root := t.TempDir()
 	t.Chdir(root)
 	createOpenSpecProject(t, root)
-	createOpenSpecChange(t, root, "implement-validation-foundation", domain.RequiredOpenSpecChangeFiles())
+	createAuthoredOpenSpecChange(t, root, "implement-validation-foundation", nil)
 
 	var output bytes.Buffer
 	if err := execute([]string{"validate", "implement-validation-foundation"}, &output); err != nil {
@@ -1607,7 +1607,8 @@ func TestExecuteValidatePrintsValidReport(t *testing.T) {
 Change: implement-validation-foundation
 Checked path: openspec/changes/implement-validation-foundation
 Required files: 5
-Findings: 0
+Errors: 0
+Warnings: 0
 `
 	if output.String() != want {
 		t.Fatalf("validate output = %q, want %q", output.String(), want)
@@ -1618,10 +1619,9 @@ func TestExecuteValidatePrintsInvalidReportForMissingRequiredFiles(t *testing.T)
 	root := t.TempDir()
 	t.Chdir(root)
 	createOpenSpecProject(t, root)
-	createOpenSpecChange(t, root, "implement-validation-foundation", []string{
-		"design.md",
-		"tasks.md",
-		"acceptance-criteria.md",
+	createAuthoredOpenSpecChange(t, root, "implement-validation-foundation", map[string]string{
+		"proposal.md": "",
+		"risks.md":    "",
 	})
 
 	var output bytes.Buffer
@@ -1633,13 +1633,152 @@ func TestExecuteValidatePrintsInvalidReportForMissingRequiredFiles(t *testing.T)
 		"SpecHarbor change is invalid.",
 		"Change: implement-validation-foundation",
 		"Checked path: openspec/changes/implement-validation-foundation",
-		"Findings:",
-		"- [error] required_file_missing: Missing required file: proposal.md",
-		"- [error] required_file_missing: Missing required file: risks.md",
+		"Errors:",
+		"- [error] required_file_missing: Missing required file: proposal.md (openspec/changes/implement-validation-foundation/proposal.md)",
+		"- [error] required_file_missing: Missing required file: risks.md (openspec/changes/implement-validation-foundation/risks.md)",
 	} {
 		if !strings.Contains(validateOutput, want) {
 			t.Fatalf("validate output = %q, want to contain %q", validateOutput, want)
 		}
+	}
+}
+
+func TestExecuteValidatePrintsWarningsAndExitsZeroForWarningsOnlyChange(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	createAuthoredOpenSpecChange(t, root, "warning-change", map[string]string{
+		"risks.md": "# Risks\n\n## Risks\n\n- Strict rules could reject existing changes.\n",
+	})
+
+	var output bytes.Buffer
+	if err := execute([]string{"validate", "warning-change"}, &output); err != nil {
+		t.Fatalf("execute(validate) error = %v, want exit 0 for warnings-only result", err)
+	}
+
+	validateOutput := output.String()
+	for _, want := range []string{
+		"SpecHarbor change is valid.",
+		"Errors: 0",
+		"Warnings: 1",
+		"Warnings:",
+		"- [warning] risks_mitigation_missing: Risks are listed without mitigation notes. (openspec/changes/warning-change/risks.md)",
+	} {
+		if !strings.Contains(validateOutput, want) {
+			t.Fatalf("validate output = %q, want to contain %q", validateOutput, want)
+		}
+	}
+}
+
+func TestExecuteValidateGroupsErrorsAndWarningsAndExitsNonZero(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	createAuthoredOpenSpecChange(t, root, "broken-change", map[string]string{
+		"tasks.md": "",
+		"risks.md": "# Risks\n\n## Risks\n\n- Strict rules could reject existing changes.\n",
+	})
+
+	var output bytes.Buffer
+	err := execute([]string{"validate", "broken-change"}, &output)
+	assertExitCode(t, err, 1)
+
+	validateOutput := output.String()
+	for _, want := range []string{
+		"SpecHarbor change is invalid.",
+		"Errors:",
+		"- [error] required_file_missing: Missing required file: tasks.md (openspec/changes/broken-change/tasks.md)",
+		"Warnings:",
+		"- [warning] risks_mitigation_missing: Risks are listed without mitigation notes. (openspec/changes/broken-change/risks.md)",
+	} {
+		if !strings.Contains(validateOutput, want) {
+			t.Fatalf("validate output = %q, want to contain %q", validateOutput, want)
+		}
+	}
+}
+
+func TestExecuteValidateReportsEmptyFileAsErrorWithSuppressedContentRules(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	createAuthoredOpenSpecChange(t, root, "empty-file-change", nil)
+	emptyPath := filepath.Join(root, "openspec", "changes", "empty-file-change", "design.md")
+	if err := os.WriteFile(emptyPath, []byte("  \n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	var output bytes.Buffer
+	err := execute([]string{"validate", "empty-file-change"}, &output)
+	assertExitCode(t, err, 1)
+
+	validateOutput := output.String()
+	if !strings.Contains(validateOutput, "- [error] file_empty: File is empty. (openspec/changes/empty-file-change/design.md)") {
+		t.Fatalf("validate output = %q, want file_empty error with path", validateOutput)
+	}
+	if strings.Contains(validateOutput, "file_missing_heading") {
+		t.Fatalf("validate output = %q, want same-file content rules suppressed for empty file", validateOutput)
+	}
+}
+
+func TestExecuteValidateReportsFreshBlankChangeAsValidWithBoilerplateWarnings(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+
+	var generateOutput bytes.Buffer
+	if err := execute([]string{"generate", "fresh-blank-change", "--blank"}, &generateOutput); err != nil {
+		t.Fatalf("execute(generate --blank) error = %v", err)
+	}
+
+	var output bytes.Buffer
+	if err := execute([]string{"validate", "fresh-blank-change"}, &output); err != nil {
+		t.Fatalf("execute(validate) error = %v, want exit 0 for fresh blank change", err)
+	}
+
+	validateOutput := output.String()
+	for _, want := range []string{
+		"SpecHarbor change is valid.",
+		"Errors: 0",
+		"Warnings: 5",
+		"- [warning] boilerplate_only_content: Only starter boilerplate content found. (openspec/changes/fresh-blank-change/proposal.md)",
+		"- [warning] boilerplate_only_content: Only starter boilerplate content found. (openspec/changes/fresh-blank-change/tasks.md)",
+	} {
+		if !strings.Contains(validateOutput, want) {
+			t.Fatalf("validate output = %q, want to contain %q", validateOutput, want)
+		}
+	}
+	if strings.Contains(validateOutput, "[error]") {
+		t.Fatalf("validate output = %q, want no error findings for fresh blank change", validateOutput)
+	}
+}
+
+func TestExecuteValidateRejectsUnsafeChangeIDs(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+
+	tests := []struct {
+		name string
+		id   string
+		want string
+	}{
+		{name: "traversal", id: "..", want: "change id must not contain '.' or '..' path sequences"},
+		{name: "separator", id: "a/b", want: "change id must be a single path segment"},
+		{name: "leading dot", id: ".hidden", want: "change id must not start with '.'"},
+		{name: "unsafe character", id: "change$id", want: "change id contains unsupported character"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var output bytes.Buffer
+			err := execute([]string{"validate", test.id}, &output)
+			if err == nil {
+				t.Fatalf("execute(validate %q) error = nil, want %q", test.id, test.want)
+			}
+			if !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("execute(validate %q) error = %q, want %q", test.id, err.Error(), test.want)
+			}
+		})
 	}
 }
 
@@ -2249,6 +2388,133 @@ func TestExecuteScanReturnsZeroWhenReportPrinted(t *testing.T) {
 	}
 }
 
+func TestExecuteWorkflowPrintsRecommendedWorkflow(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	var output bytes.Buffer
+	if err := execute([]string{"workflow"}, &output); err != nil {
+		t.Fatalf("execute(workflow) error = %v", err)
+	}
+
+	if output.String() != expectedWorkflowReport() {
+		t.Fatalf("workflow output = %q, want %q", output.String(), expectedWorkflowReport())
+	}
+
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatalf("ReadDir(%q) error = %v", root, err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("workflow created files in %q: %v", root, entries)
+	}
+}
+
+func TestExecuteWorkflowRejectsInvalidArguments(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "unsupported format flag",
+			args: []string{"workflow", "--format", "json"},
+			want: "unsupported flag: --format",
+		},
+		{
+			name: "unsupported json flag",
+			args: []string{"workflow", "--json"},
+			want: "unsupported flag: --json",
+		},
+		{
+			name: "extra argument",
+			args: []string{"workflow", "extra"},
+			want: "unexpected argument: extra",
+		},
+		{
+			name: "show unsupported",
+			args: []string{"workflow", "show"},
+			want: "unexpected argument: show",
+		},
+		{
+			name: "status unsupported",
+			args: []string{"workflow", "status", "example-change"},
+			want: "unexpected argument: status",
+		},
+		{
+			name: "next unsupported",
+			args: []string{"workflow", "next", "example-change"},
+			want: "unexpected argument: next",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+
+			var output bytes.Buffer
+			err := execute(test.args, &output)
+			if err == nil {
+				t.Fatalf("execute(%v) error = nil, want %q", test.args, test.want)
+			}
+			if !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("execute(%v) error = %q, want %q", test.args, err.Error(), test.want)
+			}
+			if output.String() != "" {
+				t.Fatalf("execute(%v) output = %q, want empty output", test.args, output.String())
+			}
+		})
+	}
+}
+
+func TestExecuteWorkflowOutputContainsRequiredFacts(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	var output bytes.Buffer
+	if err := execute([]string{"workflow"}, &output); err != nil {
+		t.Fatalf("execute(workflow) error = %v", err)
+	}
+
+	workflowOutput := output.String()
+	for _, want := range []string{
+		"Title: OpenSpec/SDD agent-driven workflow",
+		"1. spec-author - Spec Author Agent",
+		"2. architecture-reviewer - Architecture Reviewer Agent",
+		"3. implementer - Implementer Agent",
+		"4. test-engineer - Test Engineer Agent",
+		"5. change-reviewer - Change Reviewer Agent",
+		"6. commit - Commit",
+		"7. pull-request - Pull Request",
+		"8. merge - Merge",
+		"9. archive - Archive",
+		"Mode: agent-assisted",
+		"Mode: manual",
+		"Supported by SpecHarbor: yes",
+		"Supported by SpecHarbor: no",
+		"Advisory only: yes",
+		"Requires: none",
+		"Requires: change-reviewer",
+		"Purpose: Create or refine the OpenSpec change package.",
+		"Purpose: Commit the reviewed local changes manually.",
+		`- specharbor generate <change-id> --guided --type feature --title "<title>" --summary "<summary>"`,
+		"- specharbor validate <change-id>",
+		"- specharbor prompt <change-id> --role implementer",
+		"- specharbor review <change-id>",
+		"- specharbor archive <change-id>",
+		"- none",
+		"SpecHarbor does not commit, stage files, modify branches, push, or sign commits.",
+		"SpecHarbor does not create PRs, call source-control APIs",
+		"SpecHarbor does not merge, approve, inspect CI, trigger CI, or update remote repositories.",
+		"specharbor workflow does not archive automatically",
+		"Command suggestions are advisory and are not executed by this command.",
+		"does not inspect Git, GitHub, GitLab, CI, provider APIs, agent CLIs, or remote workflow state.",
+	} {
+		if !strings.Contains(workflowOutput, want) {
+			t.Fatalf("workflow output = %q, want to contain %q", workflowOutput, want)
+		}
+	}
+}
+
 func writeScanFile(t *testing.T, root string, relativePath string, contents string) {
 	t.Helper()
 
@@ -2282,6 +2548,9 @@ func TestExecutePreservesHelpVersionAndUnknownCommandBehavior(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "Usage:") {
 		t.Fatalf("help output = %q, want Usage", output.String())
+	}
+	if !strings.Contains(output.String(), "workflow    Show the recommended SpecHarbor workflow") {
+		t.Fatalf("help output = %q, want workflow command", output.String())
 	}
 
 	output.Reset()
@@ -2537,6 +2806,109 @@ Output:
 `
 }
 
+func expectedWorkflowReport() string {
+	return `SpecHarbor recommended workflow.
+Title: OpenSpec/SDD agent-driven workflow
+
+Steps:
+1. spec-author - Spec Author Agent
+   Mode: agent-assisted
+   Supported by SpecHarbor: yes
+   Advisory only: no
+   Requires: none
+   Purpose: Create or refine the OpenSpec change package.
+   Commands:
+   - specharbor generate <change-id> --guided --type feature --title "<title>" --summary "<summary>" (Create a guided OpenSpec change package.)
+   - specharbor prompt <change-id> --role spec-author (Generate the spec author role prompt.)
+
+2. architecture-reviewer - Architecture Reviewer Agent
+   Mode: agent-assisted
+   Supported by SpecHarbor: yes
+   Advisory only: no
+   Requires: spec-author
+   Purpose: Review the proposed scope and design against architecture boundaries.
+   Commands:
+   - specharbor validate <change-id> (Check required OpenSpec change files.)
+   - specharbor prompt <change-id> --role architecture-reviewer (Generate the architecture reviewer role prompt.)
+
+3. implementer - Implementer Agent
+   Mode: agent-assisted
+   Supported by SpecHarbor: yes
+   Advisory only: no
+   Requires: architecture-reviewer
+   Purpose: Apply the approved OpenSpec change.
+   Commands:
+   - specharbor prompt <change-id> --role implementer (Generate the implementer role prompt.)
+
+4. test-engineer - Test Engineer Agent
+   Mode: agent-assisted
+   Supported by SpecHarbor: yes
+   Advisory only: no
+   Requires: implementer
+   Purpose: Add or run focused verification for the implemented change.
+   Commands:
+   - specharbor prompt <change-id> --role test-engineer (Generate the test engineer role prompt.)
+
+5. change-reviewer - Change Reviewer Agent
+   Mode: agent-assisted
+   Supported by SpecHarbor: yes
+   Advisory only: no
+   Requires: test-engineer
+   Purpose: Review the final diff, task state, and verification evidence.
+   Commands:
+   - specharbor review <change-id> (Review local task completion and change package state.)
+   - specharbor prompt <change-id> --role change-reviewer (Generate the change reviewer role prompt.)
+
+6. commit - Commit
+   Mode: manual
+   Supported by SpecHarbor: no
+   Advisory only: yes
+   Requires: change-reviewer
+   Purpose: Commit the reviewed local changes manually.
+   Commands:
+   - none
+   Safety:
+   - SpecHarbor does not commit, stage files, modify branches, push, or sign commits.
+
+7. pull-request - Pull Request
+   Mode: manual
+   Supported by SpecHarbor: no
+   Advisory only: yes
+   Requires: commit
+   Purpose: Open a pull request manually in your source-control workflow.
+   Commands:
+   - none
+   Safety:
+   - SpecHarbor does not create PRs, call source-control APIs, set reviewers, edit labels, or inspect remote branches.
+
+8. merge - Merge
+   Mode: manual
+   Supported by SpecHarbor: no
+   Advisory only: yes
+   Requires: pull-request
+   Purpose: Merge manually after your review and CI process passes.
+   Commands:
+   - none
+   Safety:
+   - SpecHarbor does not merge, approve, inspect CI, trigger CI, or update remote repositories.
+
+9. archive - Archive
+   Mode: manual
+   Supported by SpecHarbor: yes
+   Advisory only: no
+   Requires: merge
+   Purpose: Archive the completed OpenSpec change after the work is merged or otherwise accepted.
+   Commands:
+   - specharbor archive <change-id> (Archive the completed OpenSpec change explicitly.)
+   Safety:
+   - specharbor workflow does not archive automatically; specharbor archive <change-id> remains an explicit user command.
+
+Notes:
+- Command suggestions are advisory and are not executed by this command.
+- This command is read-only and does not inspect Git, GitHub, GitLab, CI, provider APIs, agent CLIs, or remote workflow state.
+`
+}
+
 func assertExitCode(t *testing.T, err error, code int) {
 	t.Helper()
 
@@ -2587,6 +2959,75 @@ func createOpenSpecChange(t *testing.T, root string, changeID string, files []st
 	}
 	for _, file := range files {
 		if err := os.WriteFile(filepath.Join(changeDirectory, file), []byte(file), 0o644); err != nil {
+			t.Fatalf("WriteFile() error = %v", err)
+		}
+	}
+}
+
+// createAuthoredOpenSpecChange writes a fully authored change that validates
+// with zero findings. Overrides replace a file's content; an empty override
+// skips creating that file.
+func createAuthoredOpenSpecChange(t *testing.T, root string, changeID string, overrides map[string]string) {
+	t.Helper()
+
+	authored := map[string]string{
+		"proposal.md": `# Proposal: Example
+
+## Problem
+
+Users cannot tell whether a change package is ready for implementation.
+
+## Goal
+
+Validation reports content-quality findings with clear severities.
+`,
+		"design.md": `# Design: Example
+
+## Overview
+
+The validation pipeline reads files once and evaluates deterministic rules.
+
+## Architecture
+
+Rules live in the domain layer and the use case orchestrates them.
+`,
+		"tasks.md": `# Tasks
+
+## Phase 1 - Implementation
+
+- [x] Read the architecture documentation.
+- [ ] Implement the validation rules.
+`,
+		"acceptance-criteria.md": `# Acceptance Criteria
+
+- Validation reports findings with severity and code.
+- Warnings alone keep the exit code at zero.
+`,
+		"risks.md": `# Risks
+
+## Risks
+
+- Strict rules could reject existing changes.
+
+## Mitigations
+
+- Quality findings stay warnings and are covered by tests.
+`,
+	}
+
+	changeDirectory := filepath.Join(root, "openspec", "changes", changeID)
+	if err := os.MkdirAll(changeDirectory, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	for _, file := range domain.RequiredOpenSpecChangeFiles() {
+		contents := authored[file]
+		if override, exists := overrides[file]; exists {
+			if override == "" {
+				continue
+			}
+			contents = override
+		}
+		if err := os.WriteFile(filepath.Join(changeDirectory, file), []byte(contents), 0o644); err != nil {
 			t.Fatalf("WriteFile() error = %v", err)
 		}
 	}

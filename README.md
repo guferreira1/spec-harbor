@@ -40,9 +40,14 @@ go run ./cmd/specharbor review add-example-feature
 go run ./cmd/specharbor archive add-example-feature
 go run ./cmd/specharbor config show
 go run ./cmd/specharbor config
+go run ./cmd/specharbor workflow
 ```
 
 `config` is a read-only alias for `config show`. It reads `.specharbor/config.yml` and prints a local config report when the project has a supported version `1` config file.
+
+`validate <change-id>` runs deterministic, local, read-only validation over the required OpenSpec change files, including content-quality rules with `error` and `warning` severities. Errors (missing or empty files, malformed task checkboxes, missing acceptance criteria) exit non-zero; warnings (placeholders, boilerplate-only starter content, missing recommended sections) never change the exit code, so a freshly generated blank change validates as valid with warnings. See [Usage](docs/usage.md) for the full rule list, exit codes, and example output.
+
+The recommended workflow guide is available as `specharbor workflow`. It prints the nine-step advisory path: Spec Author Agent, Architecture Reviewer Agent, Implementer Agent, Test Engineer Agent, Change Reviewer Agent, Commit, Pull Request, Merge, and Archive. The command is read-only, does not execute command suggestions, does not commit, does not create PRs, does not merge, and does not call GitHub, GitLab, CI, provider APIs, agent CLIs, source-control automation, workflow execution, or remote automation.
 
 Built-in template generation supports exactly `feature`, `bugfix`, `docs`, and `refactor`. See [Usage](docs/usage.md) and [Generation modes](docs/generation-modes.md) for details.
 
@@ -63,9 +68,11 @@ Implemented:
 - Guided OpenSpec change generation for `feature`, `bugfix`, `docs`, and `refactor`.
 - Dry-run agent-assisted spec authoring for `feature`, `bugfix`, `docs`, and `refactor`.
 - Explicit agent-assisted local runner execution in run-and-report mode for supported concrete agent targets.
-- Change validation, review, and archive.
+- Deterministic, local, read-only change validation with content-quality rules, error/warning severities, and grouped reports: errors (missing/empty/unusable files, malformed task checkboxes, missing acceptance criteria) exit non-zero, while quality warnings (placeholders, boilerplate-only starter content, missing recommended sections or mitigations) keep exit code `0`, so freshly generated blank changes stay valid.
+- Change review and archive.
 - Role-based prompt generation with `--role`.
 - Read-only local config display with `config show` and `config`.
+- Read-only advisory workflow guide with `workflow`.
 
 In progress:
 

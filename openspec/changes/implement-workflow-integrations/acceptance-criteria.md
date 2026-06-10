@@ -1,0 +1,99 @@
+# Acceptance Criteria: Implement Workflow Integrations
+
+- Running `specharbor workflow` prints a deterministic recommended workflow report and exits zero.
+- The workflow report title is `OpenSpec/SDD agent-driven workflow` or equivalent wording that clearly identifies the recommended SpecHarbor workflow.
+- The workflow contains exactly these ordered steps:
+  - `spec-author`
+  - `architecture-reviewer`
+  - `implementer`
+  - `test-engineer`
+  - `change-reviewer`
+  - `commit`
+  - `pull-request`
+  - `merge`
+  - `archive`
+- The first five workflow step ids match the canonical prompt role ids in the current codebase.
+- No new agent roles are introduced.
+- Each workflow step has a stable id.
+- Each workflow step has a display name.
+- Each workflow step has a short purpose.
+- Each workflow step has a deterministic order.
+- Each workflow step indicates whether it is `manual` or `agent-assisted`.
+- Each workflow step indicates whether it is currently supported by SpecHarbor.
+- Each workflow step indicates whether it is advisory only.
+- Each workflow step lists required predecessor step ids or `none`.
+- Required predecessor step ids reference known workflow step ids.
+- `spec-author` has no predecessor requirement.
+- `architecture-reviewer` requires `spec-author`.
+- `implementer` requires `architecture-reviewer`.
+- `test-engineer` requires `implementer`.
+- `change-reviewer` requires `test-engineer`.
+- `commit` requires `change-reviewer`.
+- `pull-request` requires `commit`.
+- `merge` requires `pull-request`.
+- `archive` requires `merge`.
+- The workflow output includes advisory SpecHarbor command suggestions where applicable.
+- The `spec-author` step suggests `specharbor generate <change-id> --guided ...` and may also suggest `specharbor prompt <change-id> --role spec-author`.
+- The `architecture-reviewer` step suggests `specharbor validate <change-id>` and `specharbor prompt <change-id> --role architecture-reviewer`.
+- The `implementer` step suggests `specharbor prompt <change-id> --role implementer`.
+- The `test-engineer` step suggests `specharbor prompt <change-id> --role test-engineer`.
+- The `change-reviewer` step suggests `specharbor review <change-id>` and `specharbor prompt <change-id> --role change-reviewer`.
+- The `archive` step suggests `specharbor archive <change-id>`.
+- The `commit`, `pull-request`, and `merge` steps clearly indicate that there is no SpecHarbor command for those actions in this change.
+- The workflow output includes safety notes for commit, pull request, and merge.
+- The commit safety note states that SpecHarbor does not commit, stage files, modify branches, push, or sign commits.
+- The pull request safety note states that SpecHarbor does not create PRs, call source-control APIs, set reviewers, edit labels, or inspect remote branches.
+- The merge safety note states that SpecHarbor does not merge, approve, inspect CI, trigger CI, or update remote repositories.
+- The archive safety note states that `specharbor workflow` does not archive automatically.
+- The output states that suggestions are advisory and are not executed.
+- The output states that the command does not inspect Git, GitHub, GitLab, CI, provider APIs, agent CLIs, or remote workflow state.
+- Running `specharbor workflow --format json` or any other unsupported flag returns a clear unsupported flag error.
+- Running `specharbor workflow extra` returns a clear unexpected argument error.
+- Running `specharbor workflow status <change-id>` returns a clear unexpected argument error because status detection is not included in this change.
+- Running `specharbor workflow next <change-id>` returns a clear unexpected argument error because next-step detection is not included in this change.
+- The workflow command does not require an OpenSpec project to exist because it does not inspect local status.
+- The workflow command does not read local OpenSpec files.
+- The workflow command does not write files.
+- The workflow command does not modify OpenSpec files.
+- The workflow command does not modify production code.
+- The workflow command does not change `tasks.md` checkboxes.
+- The workflow command does not archive automatically.
+- The workflow command does not commit, push, create PRs, or merge.
+- The workflow command does not call GitHub APIs.
+- The workflow command does not call GitLab APIs.
+- The workflow command does not call provider APIs.
+- The workflow command does not call local model APIs.
+- The workflow command does not call agent CLIs.
+- The workflow command does not call source-control SDKs.
+- The workflow command does not call workflow SDKs.
+- The workflow command does not run external commands.
+- The workflow command does not inspect remote branches.
+- The workflow command does not inspect or trigger CI.
+- Workflow step definitions live in `internal/core/domain`.
+- Workflow orchestration lives in `internal/core/usecase`.
+- CLI parsing and output formatting live in `internal/adapters/cli`.
+- Report formatting does not live in core.
+- Core packages do not import adapters.
+- Core packages do not import CLI packages.
+- Core packages do not import `os`.
+- Core packages do not perform terminal IO.
+- Core packages do not import provider SDKs, network APIs, source-control SDKs, workflow SDKs, external-agent SDKs, or process execution packages for workflow behavior.
+- No workflow connector adapter is introduced in this change.
+- No workflow status model is introduced in this change.
+- No `workflow show`, `workflow status`, or `workflow next` command is implemented in this change.
+- Existing `init` behavior is unchanged.
+- Existing `scan` behavior is unchanged.
+- Existing generation modes are unchanged.
+- Existing `validate` behavior is unchanged.
+- Existing `prompt` behavior is unchanged.
+- Existing `review` behavior is unchanged.
+- Existing `archive` behavior is unchanged.
+- Existing `config` behavior is unchanged.
+- `README.md` documents the new workflow command once implemented.
+- `docs/usage.md` documents `specharbor workflow` usage and output.
+- `docs/workflow.md` documents the recommended nine-step workflow.
+- Workflow documentation explains what is advisory vs automated.
+- Workflow documentation states that SpecHarbor does not commit, push, create PRs, merge, call GitHub/GitLab APIs, inspect CI, call provider APIs, call agent CLIs, execute external commands, or trigger workflows as part of this feature.
+- Workflow documentation explains that status and next-step detection are intentionally deferred.
+- Focused tests cover domain behavior, use case behavior, CLI parsing, CLI output, architecture boundaries, safety boundaries, documentation expectations, and existing command regressions.
+- `go test ./...` succeeds after implementation.

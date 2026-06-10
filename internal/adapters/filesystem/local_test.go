@@ -209,6 +209,53 @@ func TestLocalFileSystemReadsReviewFiles(t *testing.T) {
 	}
 }
 
+func TestLocalFileSystemReadsValidationFilesUnderProjectRoot(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+	changePath := filepath.Join(root, "openspec", "changes", "change")
+	if err := os.MkdirAll(changePath, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(changePath, "proposal.md"), []byte("# Proposal\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	relativePath := "openspec/changes/change/proposal.md"
+	fullPath := fileSystem.fullPath(root, relativePath)
+	if !strings.HasPrefix(fullPath, root+string(filepath.Separator)) {
+		t.Fatalf("fullPath(%q) = %q, want path under project root %q", relativePath, fullPath, root)
+	}
+
+	contents, err := fileSystem.ReadFile(root, relativePath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if contents != "# Proposal\n" {
+		t.Fatalf("ReadFile() = %q, want proposal contents", contents)
+	}
+}
+
+func TestLocalFileSystemReportsMissingFilesDistinctlyFromReadErrors(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+
+	exists, err := fileSystem.FileExists(root, "openspec/changes/change/proposal.md")
+	if err != nil {
+		t.Fatalf("FileExists() error = %v, want missing file reported without error", err)
+	}
+	if exists {
+		t.Fatalf("FileExists() = true, want false")
+	}
+
+	_, err = fileSystem.ReadFile(root, "openspec/changes/change/proposal.md")
+	if err == nil {
+		t.Fatalf("ReadFile() error = nil, want read error for missing file")
+	}
+	if !os.IsNotExist(err) {
+		t.Fatalf("ReadFile() error = %v, want not-exist error", err)
+	}
+}
+
 func TestLocalFileSystemReadsLocalConfigFile(t *testing.T) {
 	root := t.TempDir()
 	fileSystem := NewLocalFileSystem()
