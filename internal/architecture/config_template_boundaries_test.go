@@ -49,6 +49,8 @@ func TestConfigTemplateGenerationUsesPortsAndNoExecutionAPIs(t *testing.T) {
 	for _, want := range []string{
 		"ports.ConfigFileSystem",
 		"ports.ConfigParser",
+		"ports.RemoteTemplateFetcher",
+		"ports.RemoteTemplateBundleReader",
 		"loadConfigForTemplateGeneration",
 		"ConfigTemplateAlias",
 	} {
@@ -60,6 +62,7 @@ func TestConfigTemplateGenerationUsesPortsAndNoExecutionAPIs(t *testing.T) {
 		`"os"`,
 		`"os/exec"`,
 		`"net/http"`,
+		`"archive/zip"`,
 		"exec.Command",
 		"gopkg.in/yaml",
 		"internal/adapters",
@@ -69,5 +72,55 @@ func TestConfigTemplateGenerationUsesPortsAndNoExecutionAPIs(t *testing.T) {
 		if strings.Contains(source, forbidden) {
 			t.Fatalf("%s contains forbidden dependency or behavior %q", useCasePath, forbidden)
 		}
+	}
+}
+
+func TestRemoteTemplateAdaptersOwnHTTPAndZipImplementations(t *testing.T) {
+	portPath := filepath.Join("..", "core", "ports", "generation.go")
+	portContents, err := os.ReadFile(portPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", portPath, err)
+	}
+	portSource := string(portContents)
+	for _, want := range []string{
+		"type RemoteTemplateFetcher interface",
+		"type RemoteTemplateBundleReader interface",
+		"domain.RemoteTemplateFetchRequest",
+		"domain.RemoteTemplateBundle",
+	} {
+		if !strings.Contains(portSource, want) {
+			t.Fatalf("%s missing remote template port boundary %q", portPath, want)
+		}
+	}
+	for _, forbidden := range []string{
+		`"net/http"`,
+		`"archive/zip"`,
+		"http.Client",
+		"zip.Reader",
+	} {
+		if strings.Contains(portSource, forbidden) {
+			t.Fatalf("%s exposes adapter implementation detail %q", portPath, forbidden)
+		}
+	}
+
+	httpAdapterPath := filepath.Join("..", "adapters", "remote", "http_fetcher.go")
+	httpAdapterContents, err := os.ReadFile(httpAdapterPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", httpAdapterPath, err)
+	}
+	if !strings.Contains(string(httpAdapterContents), `"net/http"`) ||
+		!strings.Contains(string(httpAdapterContents), "CheckRedirect") ||
+		!strings.Contains(string(httpAdapterContents), "http.MethodGet") {
+		t.Fatalf("%s missing expected adapter-owned HTTP behavior", httpAdapterPath)
+	}
+
+	zipAdapterPath := filepath.Join("..", "adapters", "remote", "zip_reader.go")
+	zipAdapterContents, err := os.ReadFile(zipAdapterPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", zipAdapterPath, err)
+	}
+	if !strings.Contains(string(zipAdapterContents), `"archive/zip"`) ||
+		!strings.Contains(string(zipAdapterContents), "ValidateRemoteTemplateArchiveEntry") {
+		t.Fatalf("%s missing expected adapter-owned ZIP behavior", zipAdapterPath)
 	}
 }

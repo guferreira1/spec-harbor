@@ -11,8 +11,10 @@ import (
 	"github.com/guferreira1/spec-harbor/internal/adapters/agentrunner"
 	configadapter "github.com/guferreira1/spec-harbor/internal/adapters/config"
 	"github.com/guferreira1/spec-harbor/internal/adapters/filesystem"
+	remoteadapter "github.com/guferreira1/spec-harbor/internal/adapters/remote"
 	"github.com/guferreira1/spec-harbor/internal/adapters/templates"
 	"github.com/guferreira1/spec-harbor/internal/core/domain"
+	"github.com/guferreira1/spec-harbor/internal/core/ports"
 	"github.com/guferreira1/spec-harbor/internal/core/usecase"
 	"github.com/guferreira1/spec-harbor/internal/platform/version"
 )
@@ -23,6 +25,14 @@ type CommandContext struct {
 }
 
 type CommandHandler func(ctx CommandContext) error
+
+var newRemoteTemplateFetcher = func() ports.RemoteTemplateFetcher {
+	return remoteadapter.NewHTTPTemplateFetcher()
+}
+
+var newRemoteTemplateBundleReader = func() ports.RemoteTemplateBundleReader {
+	return remoteadapter.NewZIPTemplateBundleReader()
+}
 
 type ExitError struct {
 	Code int
@@ -251,7 +261,7 @@ func generateCommand(ctx CommandContext) error {
 	templateContent := templates.NewBuiltInChangeTemplates()
 	guidedContent := templates.NewGuidedChangeTemplates()
 	configParser := configadapter.NewYAMLParser()
-	generateChange := usecase.NewGenerateChangeWithConfigTemplates(
+	generateChange := usecase.NewGenerateChangeWithRemoteConfigTemplates(
 		fileSystem,
 		blankContent,
 		templateContent,
@@ -259,6 +269,8 @@ func generateCommand(ctx CommandContext) error {
 		fileSystem,
 		fileSystem,
 		configParser,
+		newRemoteTemplateFetcher(),
+		newRemoteTemplateBundleReader(),
 	)
 
 	generateInput := usecase.GenerateChangeInput{
@@ -861,7 +873,13 @@ func printConfigTemplateGenerationReport(output io.Writer, result domain.Generat
 	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
 	fmt.Fprintf(output, "Config template: %s\n", result.ConfigTemplateAlias)
 	fmt.Fprintf(output, "Resolved source: %s\n", result.ConfigTemplateSource)
-	fmt.Fprintf(output, "Resolved template: %s\n", result.ConfigTemplateName)
+	if result.ConfigTemplateSource == domain.ConfigTemplateSourceRemote {
+		fmt.Fprintf(output, "Remote host: %s\n", result.RemoteTemplateHost)
+		fmt.Fprintf(output, "Remote format: %s\n", result.RemoteTemplateFormat)
+		fmt.Fprintf(output, "Checksum: %s\n", result.ChecksumAlgorithm)
+	} else {
+		fmt.Fprintf(output, "Resolved template: %s\n", result.ConfigTemplateName)
+	}
 	if result.ConfigTemplateSource == domain.ConfigTemplateSourceCustom {
 		fmt.Fprintf(output, "Template source: %s\n", result.TemplatePath)
 	}
@@ -882,6 +900,13 @@ func printConfigTemplateGenerationReport(output io.Writer, result domain.Generat
 		}
 	}
 
+	if result.ConfigTemplateSource == domain.ConfigTemplateSourceRemote {
+		fmt.Fprintln(output, "Safety:")
+		fmt.Fprintln(output, "- Remote access used only the explicit configured alias.")
+		fmt.Fprintln(output, "- Checksum was verified before archive parsing.")
+		fmt.Fprintf(output, "- Only OpenSpec change files under %s/ were written.\n", result.ChangePath)
+		return
+	}
 	fmt.Fprintf(output, "Only OpenSpec change files under %s/ were written.\n", result.ChangePath)
 }
 

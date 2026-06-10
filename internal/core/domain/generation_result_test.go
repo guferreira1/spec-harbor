@@ -156,6 +156,54 @@ func TestNewCustomTemplateGenerationResultCopiesFileSlices(t *testing.T) {
 	}
 }
 
+func TestNewConfigTemplateRemoteGenerationResultSetsRemoteFieldsAndCopiesSlices(t *testing.T) {
+	alias, err := NewConfigTemplateAlias("service-feature")
+	if err != nil {
+		t.Fatalf("NewConfigTemplateAlias() error = %v", err)
+	}
+	reference, err := NewRemoteTemplateReference(
+		"https://example.com/templates/service-feature.zip",
+		"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"zip",
+	)
+	if err != nil {
+		t.Fatalf("NewRemoteTemplateReference() error = %v", err)
+	}
+	created := []string{"proposal.md"}
+	skipped := []string{"design.md"}
+
+	result := NewConfigTemplateRemoteGenerationResult(
+		"change",
+		alias,
+		reference,
+		"openspec/changes/change",
+		true,
+		created,
+		skipped,
+	)
+	created[0] = "mutated.md"
+	skipped[0] = "mutated.md"
+
+	if result.Mode != TemplateMode {
+		t.Fatalf("Mode = %q, want template", result.Mode)
+	}
+	if result.ConfigTemplateSource != ConfigTemplateSourceRemote {
+		t.Fatalf("ConfigTemplateSource = %q, want remote", result.ConfigTemplateSource)
+	}
+	if result.RemoteTemplateHost != "example.com" {
+		t.Fatalf("RemoteTemplateHost = %q, want example.com", result.RemoteTemplateHost)
+	}
+	if result.RemoteTemplateFormat != RemoteTemplateFormatZip {
+		t.Fatalf("RemoteTemplateFormat = %q, want zip", result.RemoteTemplateFormat)
+	}
+	if result.ChecksumAlgorithm != ChecksumAlgorithmSHA256 {
+		t.Fatalf("ChecksumAlgorithm = %q, want sha256", result.ChecksumAlgorithm)
+	}
+	if result.CreatedFiles()[0] != "proposal.md" || result.SkippedExistingFiles()[0] != "design.md" {
+		t.Fatalf("remote result did not copy file slices")
+	}
+}
+
 func TestNewGuidedGenerationResultSetsGuidedModeTypeAndTitle(t *testing.T) {
 	result := NewGuidedGenerationResult(
 		"change",

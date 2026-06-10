@@ -50,6 +50,7 @@ type ConfigTemplateSourceKind string
 const (
 	ConfigTemplateSourceBuiltin ConfigTemplateSourceKind = "builtin"
 	ConfigTemplateSourceCustom  ConfigTemplateSourceKind = "custom"
+	ConfigTemplateSourceRemote  ConfigTemplateSourceKind = "remote"
 )
 
 func ParseConfigTemplateSourceKind(raw string) (ConfigTemplateSourceKind, error) {
@@ -58,7 +59,7 @@ func ParseConfigTemplateSourceKind(raw string) (ConfigTemplateSourceKind, error)
 		return "", errors.New("config template source is required")
 	}
 	switch value {
-	case ConfigTemplateSourceBuiltin, ConfigTemplateSourceCustom:
+	case ConfigTemplateSourceBuiltin, ConfigTemplateSourceCustom, ConfigTemplateSourceRemote:
 		return value, nil
 	default:
 		return "", fmt.Errorf("unsupported config template source: %s", value)
@@ -66,10 +67,17 @@ func ParseConfigTemplateSourceKind(raw string) (ConfigTemplateSourceKind, error)
 }
 
 type ConfigTemplateReferenceInput struct {
-	Alias             ConfigTemplateAlias
-	Source            string
-	Template          string
-	UnsupportedFields []string
+	Alias                 ConfigTemplateAlias
+	Source                string
+	Template              string
+	TemplateFieldProvided bool
+	URL                   string
+	URLFieldProvided      bool
+	Checksum              string
+	ChecksumFieldProvided bool
+	Format                string
+	FormatFieldProvided   bool
+	UnsupportedFields     []string
 }
 
 type ConfigTemplateReference struct {
@@ -78,6 +86,7 @@ type ConfigTemplateReference struct {
 	template           string
 	builtInTemplate    TemplateName
 	customTemplateName CustomTemplateName
+	remoteReference    RemoteTemplateReference
 }
 
 func NewConfigTemplateReference(input ConfigTemplateReferenceInput) (ConfigTemplateReference, error) {
@@ -94,30 +103,61 @@ func NewConfigTemplateReference(input ConfigTemplateReferenceInput) (ConfigTempl
 		return ConfigTemplateReference{}, fmt.Errorf("unsupported config template field %q", input.UnsupportedFields[0])
 	}
 
-	template := strings.TrimSpace(input.Template)
-	if template == "" {
-		return ConfigTemplateReference{}, errors.New("config template reference template is required")
-	}
-
 	reference := ConfigTemplateReference{
 		alias:      input.Alias,
 		sourceKind: sourceKind,
-		template:   template,
 	}
 
 	switch sourceKind {
 	case ConfigTemplateSourceBuiltin:
+		if input.URLFieldProvided {
+			return ConfigTemplateReference{}, errors.New(`unsupported config template field "url"`)
+		}
+		if input.ChecksumFieldProvided {
+			return ConfigTemplateReference{}, errors.New(`unsupported config template field "checksum"`)
+		}
+		if input.FormatFieldProvided {
+			return ConfigTemplateReference{}, errors.New(`unsupported config template field "format"`)
+		}
+		template := strings.TrimSpace(input.Template)
+		if template == "" {
+			return ConfigTemplateReference{}, errors.New("config template reference template is required")
+		}
+		reference.template = template
 		builtInTemplate, err := ParseTemplateName(template)
 		if err != nil {
 			return ConfigTemplateReference{}, err
 		}
 		reference.builtInTemplate = builtInTemplate
 	case ConfigTemplateSourceCustom:
+		if input.URLFieldProvided {
+			return ConfigTemplateReference{}, errors.New(`unsupported config template field "url"`)
+		}
+		if input.ChecksumFieldProvided {
+			return ConfigTemplateReference{}, errors.New(`unsupported config template field "checksum"`)
+		}
+		if input.FormatFieldProvided {
+			return ConfigTemplateReference{}, errors.New(`unsupported config template field "format"`)
+		}
+		template := strings.TrimSpace(input.Template)
+		if template == "" {
+			return ConfigTemplateReference{}, errors.New("config template reference template is required")
+		}
+		reference.template = template
 		customTemplateName, err := NewCustomTemplateName(template)
 		if err != nil {
 			return ConfigTemplateReference{}, err
 		}
 		reference.customTemplateName = customTemplateName
+	case ConfigTemplateSourceRemote:
+		if input.TemplateFieldProvided {
+			return ConfigTemplateReference{}, errors.New(`unsupported config template field "template"`)
+		}
+		remoteReference, err := NewRemoteTemplateReference(input.URL, input.Checksum, input.Format)
+		if err != nil {
+			return ConfigTemplateReference{}, err
+		}
+		reference.remoteReference = remoteReference
 	}
 
 	return reference, nil
@@ -147,6 +187,13 @@ func (reference ConfigTemplateReference) CustomTemplateName() (CustomTemplateNam
 		return CustomTemplateName{}, false
 	}
 	return reference.customTemplateName, true
+}
+
+func (reference ConfigTemplateReference) RemoteTemplateReference() (RemoteTemplateReference, bool) {
+	if reference.sourceKind != ConfigTemplateSourceRemote {
+		return RemoteTemplateReference{}, false
+	}
+	return reference.remoteReference, true
 }
 
 type ConfigTemplateAliases struct {

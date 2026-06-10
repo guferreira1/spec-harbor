@@ -50,6 +50,18 @@ type GuidedChangeContent interface {
 	ContentFor(guidedType domain.GuidedType, title string, summary string, relativePath string) (string, error)
 }
 
+// RemoteTemplateFetcher downloads one already-validated remote template
+// reference and returns downloaded bytes plus safe response metadata.
+type RemoteTemplateFetcher interface {
+	FetchRemoteTemplate(request domain.RemoteTemplateFetchRequest) (domain.RemoteTemplateFetchResult, error)
+}
+
+// RemoteTemplateBundleReader decodes verified remote template bytes into the
+// approved OpenSpec change files without exposing archive implementation types.
+type RemoteTemplateBundleReader interface {
+	ReadRemoteTemplateBundle(contents []byte, policy domain.RemoteTemplateArchivePolicy) (domain.RemoteTemplateBundle, error)
+}
+
 // AgentAssistedAuthoringPromptRenderer renders deterministic dry-run prompts
 // for agent-assisted OpenSpec authoring.
 type AgentAssistedAuthoringPromptRenderer interface {

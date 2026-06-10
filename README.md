@@ -62,7 +62,23 @@ Config-driven template generation uses project-owned aliases from `.specharbor/c
 specharbor generate <change-id> --config-template <alias> [--title "<title>"] [--summary "<summary>"]
 ```
 
-Aliases live under `version: 1` config as `templates.aliases.<alias>` and resolve only to `source: builtin` or `source: custom` with a `template` name. `--template`, `--custom-template`, and `--config-template` are disjoint namespaces; the same name can exist in all three without shadowing or fallback. Config aliases are local and static: no remote templates, no marketplace, no arbitrary local paths, no template or script execution, no network/provider calls, no production code writes, and no source-control automation.
+Aliases live under `version: 1` config as `templates.aliases.<alias>` and resolve to `source: builtin`, `source: custom`, or `source: remote`. Remote aliases are available only through `--config-template`; there is no `--remote-template` flag.
+
+```yaml
+version: 1
+
+templates:
+  aliases:
+    service-feature:
+      source: remote
+      url: https://example.com/specharbor/templates/service-feature.zip
+      checksum: sha256:<64-hex>
+      format: zip
+```
+
+Remote templates require HTTPS URLs with no credentials, query strings, fragments, redirects, auth headers, cookies, OAuth, or environment token expansion. The required `sha256` checksum is verified over the downloaded ZIP bytes before archive parsing. ZIP bundles must contain exactly `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md` as non-empty root-level files. This first version has no persistent cache, marketplace discovery, git clone, provider APIs, script/shell execution, production code writes, source-control automation, auto-commit, PR, merge, or archive automation.
+
+`--template`, `--custom-template`, and `--config-template` are disjoint namespaces; the same name can exist in all three without shadowing or fallback.
 
 Guided generation is deterministic, local, non-interactive, and supports exactly `feature`, `bugfix`, `docs`, and `refactor`. It uses explicit `--type`, `--title`, and `--summary` flags.
 
@@ -87,7 +103,7 @@ Implemented:
 - Blank OpenSpec change generation.
 - Built-in OpenSpec change template generation for `feature`, `bugfix`, `docs`, and `refactor`.
 - Project-local custom template generation from `.specharbor/templates/<template-name>/` with deterministic variable substitution and OpenSpec-only writes.
-- Config-driven template aliases for built-in and project-local custom templates.
+- Config-driven template aliases for built-in, project-local custom, and pinned HTTPS remote ZIP templates.
 - Guided OpenSpec change generation for `feature`, `bugfix`, `docs`, and `refactor`.
 - AI-assisted from-file OpenSpec generation with strict local delimiter blocks, default skip behavior, explicit overwrite, validation integration, and no provider/API/runner/source-control automation.
 - Dry-run agent-assisted spec authoring for `feature`, `bugfix`, `docs`, and `refactor`.
@@ -106,7 +122,6 @@ Planned:
 
 - Hybrid spec generation.
 - Future config-driven generic runner mappings and richer templates.
-- Future template capabilities such as remote templates.
 - Interactive generation prompts.
 - Config mutation commands such as `config get`, `config set`, and `config unset`.
 - AI-provider and workflow connector support.

@@ -50,12 +50,15 @@ func TestValidationFileSystemPortStaysReadOnly(t *testing.T) {
 func TestDomainValidationStaysPureAndTemplateFree(t *testing.T) {
 	domainDirectory := filepath.Join("..", "core", "domain")
 	allowedImports := map[string]bool{
-		"errors":  true,
-		"fmt":     true,
-		"regexp":  true,
-		"sort":    true,
-		"strings": true,
-		"unicode": true,
+		"crypto/sha256": true,
+		"encoding/hex":  true,
+		"errors":        true,
+		"fmt":           true,
+		"net/url":       true,
+		"regexp":        true,
+		"sort":          true,
+		"strings":       true,
+		"unicode":       true,
 	}
 
 	entries, err := os.ReadDir(domainDirectory)

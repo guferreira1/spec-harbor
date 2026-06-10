@@ -78,6 +78,7 @@ func TestParseConfigTemplateSourceKind(t *testing.T) {
 	}{
 		{name: "builtin", raw: "builtin", want: ConfigTemplateSourceBuiltin},
 		{name: "custom", raw: "custom", want: ConfigTemplateSourceCustom},
+		{name: "remote", raw: "remote", want: ConfigTemplateSourceRemote},
 		{name: "trimmed", raw: " builtin ", want: ConfigTemplateSourceBuiltin},
 	}
 
@@ -101,7 +102,6 @@ func TestParseConfigTemplateSourceKindRejectsUnsupportedValues(t *testing.T) {
 		want string
 	}{
 		{name: "empty", raw: "", want: "config template source is required"},
-		{name: "remote", raw: "remote", want: "unsupported config template source: remote"},
 		{name: "local", raw: "local", want: "unsupported config template source: local"},
 		{name: "url like", raw: "https://example.invalid/template", want: "unsupported config template source: https://example.invalid/template"},
 	}
@@ -171,6 +171,45 @@ func TestNewConfigTemplateReferenceValidatesCustomReferences(t *testing.T) {
 	}
 }
 
+func TestNewConfigTemplateReferenceValidatesRemoteReferences(t *testing.T) {
+	alias := mustConfigTemplateAlias(t, "service-feature")
+	checksum := "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+	reference, err := NewConfigTemplateReference(ConfigTemplateReferenceInput{
+		Alias:                 alias,
+		Source:                "remote",
+		URL:                   "https://example.com/templates/service-feature.zip",
+		URLFieldProvided:      true,
+		Checksum:              checksum,
+		ChecksumFieldProvided: true,
+		Format:                "zip",
+		FormatFieldProvided:   true,
+	})
+	if err != nil {
+		t.Fatalf("NewConfigTemplateReference() error = %v", err)
+	}
+
+	if reference.SourceKind() != ConfigTemplateSourceRemote {
+		t.Fatalf("SourceKind = %q, want remote", reference.SourceKind())
+	}
+	remoteReference, ok := reference.RemoteTemplateReference()
+	if !ok {
+		t.Fatalf("RemoteTemplateReference() ok = false, want true")
+	}
+	if remoteReference.URL().Host() != "example.com" {
+		t.Fatalf("Remote host = %q, want example.com", remoteReference.URL().Host())
+	}
+	if remoteReference.Format() != RemoteTemplateFormatZip {
+		t.Fatalf("Format = %q, want zip", remoteReference.Format())
+	}
+	if remoteReference.Checksum().Algorithm() != ChecksumAlgorithmSHA256 {
+		t.Fatalf("Checksum algorithm = %q, want sha256", remoteReference.Checksum().Algorithm())
+	}
+	if reference.Template() != "" {
+		t.Fatalf("Template = %q, want empty for remote", reference.Template())
+	}
+}
+
 func TestNewConfigTemplateReferenceRejectsInvalidReferences(t *testing.T) {
 	alias := mustConfigTemplateAlias(t, "api-feature")
 	tests := []struct {
@@ -194,6 +233,11 @@ func TestNewConfigTemplateReferenceRejectsInvalidReferences(t *testing.T) {
 			want:  "config template reference template is required",
 		},
 		{
+			name:  "missing custom template",
+			input: ConfigTemplateReferenceInput{Alias: alias, Source: "custom"},
+			want:  "config template reference template is required",
+		},
+		{
 			name:  "unknown builtin",
 			input: ConfigTemplateReferenceInput{Alias: alias, Source: "builtin", Template: "maintenance"},
 			want:  "unknown template name: maintenance",
@@ -205,8 +249,130 @@ func TestNewConfigTemplateReferenceRejectsInvalidReferences(t *testing.T) {
 		},
 		{
 			name:  "unsupported source",
-			input: ConfigTemplateReferenceInput{Alias: alias, Source: "remote", Template: "feature"},
-			want:  "unsupported config template source: remote",
+			input: ConfigTemplateReferenceInput{Alias: alias, Source: "local", Template: "feature"},
+			want:  "unsupported config template source: local",
+		},
+		{
+			name:  "remote with template field",
+			input: ConfigTemplateReferenceInput{Alias: alias, Source: "remote", Template: "feature", TemplateFieldProvided: true},
+			want:  `unsupported config template field "template"`,
+		},
+		{
+			name: "remote missing url",
+			input: ConfigTemplateReferenceInput{
+				Alias:                 alias,
+				Source:                "remote",
+				Checksum:              "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				ChecksumFieldProvided: true,
+				Format:                "zip",
+				FormatFieldProvided:   true,
+			},
+			want: "remote template URL is required",
+		},
+		{
+			name: "remote missing checksum",
+			input: ConfigTemplateReferenceInput{
+				Alias:               alias,
+				Source:              "remote",
+				URL:                 "https://example.com/template.zip",
+				URLFieldProvided:    true,
+				Format:              "zip",
+				FormatFieldProvided: true,
+			},
+			want: "remote template checksum is required",
+		},
+		{
+			name: "remote missing format",
+			input: ConfigTemplateReferenceInput{
+				Alias:                 alias,
+				Source:                "remote",
+				URL:                   "https://example.com/template.zip",
+				URLFieldProvided:      true,
+				Checksum:              "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				ChecksumFieldProvided: true,
+			},
+			want: "remote template format is required",
+		},
+		{
+			name: "remote with unknown field",
+			input: ConfigTemplateReferenceInput{
+				Alias:                 alias,
+				Source:                "remote",
+				URL:                   "https://example.com/template.zip",
+				URLFieldProvided:      true,
+				Checksum:              "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				ChecksumFieldProvided: true,
+				Format:                "zip",
+				FormatFieldProvided:   true,
+				UnsupportedFields:     []string{"headers"},
+			},
+			want: `unsupported config template field "headers"`,
+		},
+		{
+			name: "builtin with remote url field",
+			input: ConfigTemplateReferenceInput{
+				Alias:            alias,
+				Source:           "builtin",
+				Template:         "feature",
+				URL:              "https://example.com/template.zip",
+				URLFieldProvided: true,
+			},
+			want: `unsupported config template field "url"`,
+		},
+		{
+			name: "builtin with remote checksum field",
+			input: ConfigTemplateReferenceInput{
+				Alias:                 alias,
+				Source:                "builtin",
+				Template:              "feature",
+				Checksum:              "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				ChecksumFieldProvided: true,
+			},
+			want: `unsupported config template field "checksum"`,
+		},
+		{
+			name: "builtin with remote format field",
+			input: ConfigTemplateReferenceInput{
+				Alias:               alias,
+				Source:              "builtin",
+				Template:            "feature",
+				Format:              "zip",
+				FormatFieldProvided: true,
+			},
+			want: `unsupported config template field "format"`,
+		},
+		{
+			name: "custom with remote url field",
+			input: ConfigTemplateReferenceInput{
+				Alias:            alias,
+				Source:           "custom",
+				Template:         "api-feature",
+				URL:              "https://example.com/template.zip",
+				URLFieldProvided: true,
+			},
+			want: `unsupported config template field "url"`,
+		},
+		{
+			name: "custom with remote checksum field",
+			input: ConfigTemplateReferenceInput{
+				Alias:                 alias,
+				Source:                "custom",
+				Template:              "api-feature",
+				Checksum:              "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				ChecksumFieldProvided: true,
+			},
+			want: `unsupported config template field "checksum"`,
+		},
+		{
+			name: "custom with remote format field",
+			input: ConfigTemplateReferenceInput{
+				Alias:               alias,
+				Source:              "custom",
+				Template:            "api-feature",
+				Format:              "zip",
+				FormatFieldProvided: true,
+			},
+			want: `unsupported config template field "format"`,
 		},
 		{
 			name: "unsupported path field",
@@ -230,6 +396,39 @@ func TestNewConfigTemplateReferenceRejectsInvalidReferences(t *testing.T) {
 				t.Fatalf("NewConfigTemplateReference() error = %q, want %q", err.Error(), test.want)
 			}
 		})
+	}
+}
+
+func TestNewConfigTemplateReferenceRejectsUnsupportedFieldsForBuiltinAndCustom(t *testing.T) {
+	alias := mustConfigTemplateAlias(t, "api-feature")
+	sources := []struct {
+		name     string
+		source   string
+		template string
+	}{
+		{name: "builtin", source: "builtin", template: "feature"},
+		{name: "custom", source: "custom", template: "api-feature"},
+	}
+	unsupportedFields := []string{"path", "headers", "auth", "branch", "tag", "ref", "command", "script"}
+
+	for _, source := range sources {
+		for _, field := range unsupportedFields {
+			t.Run(source.name+" "+field, func(t *testing.T) {
+				_, err := NewConfigTemplateReference(ConfigTemplateReferenceInput{
+					Alias:             alias,
+					Source:            source.source,
+					Template:          source.template,
+					UnsupportedFields: []string{field},
+				})
+				if err == nil {
+					t.Fatalf("NewConfigTemplateReference() error = nil, want unsupported field %q", field)
+				}
+				want := `unsupported config template field "` + field + `"`
+				if err.Error() != want {
+					t.Fatalf("NewConfigTemplateReference() error = %q, want %q", err.Error(), want)
+				}
+			})
+		}
 	}
 }
 
