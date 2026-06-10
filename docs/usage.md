@@ -184,6 +184,104 @@ Rules:
 - Remote templates have no persistent cache in this first version and do not support credentials, OAuth, auth headers, cookies, environment token expansion, git clone, marketplace search, provider APIs, script execution, shell execution, production code writes, source-control automation, auto-commit, PR, merge, or archive automation.
 - Generated files are still limited to `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md` under `openspec/changes/<change-id>/`; existing files are skipped.
 
+Hybrid generation combines one deterministic template source with required title and summary metadata:
+
+```bash
+go run ./cmd/specharbor generate <change-id> --hybrid --template <name> --title "<title>" --summary "<summary>" [--type <feature|bugfix|docs|refactor>]
+go run ./cmd/specharbor generate <change-id> --hybrid --custom-template <name> --title "<title>" --summary "<summary>" [--type <feature|bugfix|docs|refactor>]
+go run ./cmd/specharbor generate <change-id> --hybrid --config-template <alias> --title "<title>" --summary "<summary>" [--type <feature|bugfix|docs|refactor>]
+```
+
+Hybrid source selection is explicit:
+
+- `--template <name>` resolves only built-in templates.
+- `--custom-template <name>` resolves only `.specharbor/templates/<name>/`.
+- `--config-template <alias>` resolves only `.specharbor/config.yml` aliases.
+- Exactly one source selector is required. Missing or multiple selectors fail before writes.
+- There is no source guessing, fallback, or namespace shadowing. The same name may exist in all three namespaces because the flag selects the namespace.
+
+Hybrid metadata rules:
+
+- `--title` is required and must be non-empty after trimming.
+- `--summary` is required and must be non-empty after trimming.
+- `--type` is optional, but when provided must be exactly `feature`, `bugfix`, `docs`, or `refactor`.
+- Direct built-in sources derive omitted type from the selected template. For example, `--hybrid --template feature` derives `type=feature`.
+- Config aliases resolving to built-in templates derive omitted type from the resolved built-in template.
+- A provided type must match a direct or resolved built-in template. `--hybrid --template feature --type feature` succeeds; `--hybrid --template feature --type bugfix` fails clearly and writes nothing.
+- Custom sources, config custom aliases, and config remote aliases do not infer omitted type. If `--type` is omitted, `{{type}}` remains unresolved in those template contents. If `--type` is provided, `{{type}}` is replaced with that value.
+
+Hybrid rendering replaces `{{change_id}}`, `{{title}}`, and `{{summary}}`. It replaces `{{type}}` only when a provided or built-in-derived effective type exists. Unknown or unresolved `{{...}}` tokens remain verbatim. Hybrid does not add conditionals, loops, functions, includes, hooks, shell commands, scripts, or executable template behavior.
+
+Hybrid examples:
+
+```bash
+go run ./cmd/specharbor generate add-login \
+  --hybrid \
+  --template feature \
+  --title "Add login" \
+  --summary "Add an OpenSpec change for login"
+```
+
+The built-in example derives `type=feature`.
+
+```bash
+go run ./cmd/specharbor generate add-login \
+  --hybrid \
+  --template feature \
+  --type bugfix \
+  --title "Add login" \
+  --summary "Add an OpenSpec change for login"
+```
+
+The mismatch example fails because `bugfix` does not match built-in template `feature`.
+
+```bash
+go run ./cmd/specharbor generate add-payment-flow \
+  --hybrid \
+  --custom-template api-feature \
+  --title "Add payments" \
+  --summary "Adds a payment flow."
+```
+
+The custom example does not infer type, so `{{type}}` remains unresolved unless `--type` is provided.
+
+Config built-in example:
+
+```bash
+go run ./cmd/specharbor generate add-login \
+  --hybrid \
+  --config-template default-feature \
+  --title "Add login" \
+  --summary "Add login support"
+```
+
+Config custom example:
+
+```bash
+go run ./cmd/specharbor generate add-payment-flow \
+  --hybrid \
+  --config-template api-feature \
+  --title "Add payments" \
+  --summary "Adds a payment flow." \
+  --type feature
+```
+
+Config remote example:
+
+```bash
+go run ./cmd/specharbor generate add-service \
+  --hybrid \
+  --config-template service-feature \
+  --title "Add service" \
+  --summary "Adds a service workflow."
+```
+
+Remote templates are available to hybrid only through `--config-template <alias>`. The alias must resolve to `source: remote` and keeps the existing remote safeguards unchanged: HTTPS only, no credentials, no query strings, no fragments, no redirects, checksum required, checksum verified before ZIP parsing, ZIP only, strict archive safety, no cache, no shell or script execution, no production code writes, and only the five OpenSpec change files are written.
+
+After successful hybrid writes or a skip-only rerun, SpecHarbor runs the existing validation logic. The hybrid report includes validation status, required file count, error count, warning count, and findings. Validation warnings keep exit code `0`; validation errors are printed after the generation report and then the command exits non-zero. Validation never auto-fixes files.
+
+Hybrid rejects `--blank`, `--guided`, `--ai-assisted`, `--agent-assisted`, `--from-file`, `--overwrite`, `--agent`, and `--execute`. AI overlay and live runner output application are intentionally out of scope for this first version. Hybrid does not call provider APIs, LLM APIs, local model APIs, agents, source-control tools, workflow tools, shell commands, or scripts. It writes no production code and performs no auto-commit, auto-push, pull request, merge, or archive automation.
+
 Guided generation uses explicit CLI flags:
 
 ```bash
@@ -346,7 +444,7 @@ Execute mode is run-and-report only:
 
 Provider APIs, IDE automation, OAuth, credentials, marketplace integrations, remote execution, source-control automation, and workflow automation remain out of scope. Local agent command behavior is controlled by the installed local tool.
 
-Blank, built-in template, custom template, guided, and AI-assisted generation create the same required OpenSpec change files:
+Blank, built-in template, custom template, config-template, hybrid, guided, and AI-assisted generation create the same required OpenSpec change files:
 
 ```text
 openspec/changes/<change-id>/
@@ -357,11 +455,11 @@ openspec/changes/<change-id>/
   risks.md
 ```
 
-Built-in template content is deterministic, local, and generic starter content. Guided content is deterministic, local starter content that includes the supplied title and summary. AI-assisted content comes only from the explicit local `--from-file` source after strict parsing.
+Built-in template content is deterministic, local, and generic starter content. Hybrid content starts from exactly one deterministic template source and applies explicit metadata substitution before validation. Guided content is deterministic, local starter content that includes the supplied title and summary. AI-assisted content comes only from the explicit local `--from-file` source after strict parsing.
 
 Generated content is safe to edit after generation. Guided output does not mean SpecHarbor inferred project-specific requirements beyond the provided type, title, and summary.
 
-Blank, built-in template, custom template, and guided generation skip existing files and do not overwrite them. AI-assisted generation also skips existing files by default, and overwrites only with explicit `--overwrite`. If a change directory partially exists, running generation again recovers it by creating only the missing required files.
+Blank, built-in template, custom template, config-template, hybrid, and guided generation skip existing files and do not overwrite them. AI-assisted generation also skips existing files by default, and overwrites only with explicit `--overwrite`. If a change directory partially exists, running generation again recovers it by creating only the missing required files.
 
 Copy-pasteable examples from the repository root:
 
@@ -375,6 +473,9 @@ go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature
 go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature --title "Add payments" --summary "Adds a payment flow."
 go run ./cmd/specharbor generate add-payment-flow --config-template api-feature
 go run ./cmd/specharbor generate add-payment-flow --config-template api-feature --title "Add payments" --summary "Adds a payment flow."
+go run ./cmd/specharbor generate add-login --hybrid --template feature --title "Add login" --summary "Add an OpenSpec change for login"
+go run ./cmd/specharbor generate add-payment-flow --hybrid --custom-template api-feature --title "Add payments" --summary "Adds a payment flow."
+go run ./cmd/specharbor generate add-service --hybrid --config-template service-feature --title "Add service" --summary "Adds a service workflow."
 go run ./cmd/specharbor generate add-guided-feature --guided --type feature --title "Add guided feature" --summary "Create a guided OpenSpec change from explicit CLI inputs."
 go run ./cmd/specharbor generate fix-guided-bug --guided --type bugfix --title "Fix guided bug" --summary "Describe the bugfix using deterministic guided starter content."
 go run ./cmd/specharbor generate update-guided-docs --guided --type docs --title "Update guided docs" --summary "Document guided generation as implemented behavior."
@@ -560,7 +661,6 @@ Do not archive a change until the implementation is complete and reviewed.
 
 The following items are product direction, not implemented command behavior:
 
-- hybrid generation;
 - config-driven generic runner commands;
 - interactive generation prompts;
 - AI provider setup;

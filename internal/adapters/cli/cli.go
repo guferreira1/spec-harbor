@@ -257,6 +257,42 @@ func generateCommand(ctx CommandContext) error {
 	}
 
 	fileSystem := filesystem.NewLocalFileSystem()
+	if arguments.mode == domain.HybridMode {
+		templateContent := templates.NewBuiltInChangeTemplates()
+		configParser := configadapter.NewYAMLParser()
+		validateChange := usecase.NewValidateChange(fileSystem)
+		generateHybrid := usecase.NewGenerateHybridChange(
+			fileSystem,
+			templateContent,
+			fileSystem,
+			fileSystem,
+			configParser,
+			newRemoteTemplateFetcher(),
+			newRemoteTemplateBundleReader(),
+			validateChange,
+		)
+
+		result, err := generateHybrid.Execute(usecase.GenerateHybridChangeInput{
+			ProjectRoot:         root,
+			ChangeID:            arguments.changeID,
+			TemplateName:        arguments.templateName,
+			CustomTemplateName:  arguments.customTemplateName,
+			ConfigTemplateAlias: arguments.configTemplateAlias,
+			Title:               arguments.title,
+			Summary:             arguments.summary,
+			Type:                arguments.guidedType,
+		})
+		if err != nil {
+			return err
+		}
+
+		printHybridGenerationReport(ctx.Output, result)
+		if validationResult, ok := result.ValidationResult(); ok && validationResult.Status == domain.ValidationStatusInvalid {
+			return ExitError{Code: 1}
+		}
+		return nil
+	}
+
 	blankContent := templates.NewDefaultBlankChangeContent()
 	templateContent := templates.NewBuiltInChangeTemplates()
 	guidedContent := templates.NewGuidedChangeTemplates()
@@ -319,6 +355,7 @@ type generateArguments struct {
 
 func parseGenerateArguments(args []string) (generateArguments, error) {
 	var positionals []string
+	hybridProvided := false
 	blankProvided := false
 	templateProvided := false
 	customTemplateProvided := false
@@ -344,6 +381,14 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
+		if arg == "--hybrid" {
+			if hybridProvided {
+				return generateArguments{}, fmt.Errorf("hybrid generation flag specified more than once")
+			}
+			hybridProvided = true
+			continue
+		}
+
 		if arg == "--blank" {
 			if blankProvided {
 				return generateArguments{}, fmt.Errorf("blank generation flag specified more than once")
@@ -463,13 +508,13 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 
 		if arg == "--type" {
 			if guidedTypeProvided {
-				return generateArguments{}, duplicateTypeFlagError(agentAssistedProvided)
+				return generateArguments{}, duplicateTypeFlagError(agentAssistedProvided, hybridProvided)
 			}
 			if index+1 >= len(args) {
-				return generateArguments{}, requiredTypeError(agentAssistedProvided)
+				return generateArguments{}, requiredTypeError(agentAssistedProvided, hybridProvided)
 			}
 			if strings.HasPrefix(args[index+1], "-") {
-				return generateArguments{}, requiredTypeError(agentAssistedProvided)
+				return generateArguments{}, requiredTypeError(agentAssistedProvided, hybridProvided)
 			}
 
 			guidedType = args[index+1]
@@ -480,13 +525,13 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 
 		if arg == "--title" {
 			if titleProvided {
-				return generateArguments{}, duplicateTitleFlagError(agentAssistedProvided, configTemplateProvided)
+				return generateArguments{}, duplicateTitleFlagError(agentAssistedProvided, configTemplateProvided, hybridProvided)
 			}
 			if index+1 >= len(args) {
-				return generateArguments{}, requiredTitleError(agentAssistedProvided, configTemplateProvided)
+				return generateArguments{}, requiredTitleError(agentAssistedProvided, configTemplateProvided, hybridProvided)
 			}
 			if strings.HasPrefix(args[index+1], "-") {
-				return generateArguments{}, requiredTitleError(agentAssistedProvided, configTemplateProvided)
+				return generateArguments{}, requiredTitleError(agentAssistedProvided, configTemplateProvided, hybridProvided)
 			}
 
 			title = args[index+1]
@@ -497,13 +542,13 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 
 		if arg == "--summary" {
 			if summaryProvided {
-				return generateArguments{}, duplicateSummaryFlagError(agentAssistedProvided, configTemplateProvided)
+				return generateArguments{}, duplicateSummaryFlagError(agentAssistedProvided, configTemplateProvided, hybridProvided)
 			}
 			if index+1 >= len(args) {
-				return generateArguments{}, requiredSummaryError(agentAssistedProvided, configTemplateProvided)
+				return generateArguments{}, requiredSummaryError(agentAssistedProvided, configTemplateProvided, hybridProvided)
 			}
 			if strings.HasPrefix(args[index+1], "-") {
-				return generateArguments{}, requiredSummaryError(agentAssistedProvided, configTemplateProvided)
+				return generateArguments{}, requiredSummaryError(agentAssistedProvided, configTemplateProvided, hybridProvided)
 			}
 
 			summary = args[index+1]
@@ -533,6 +578,31 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 		}
 
 		positionals = append(positionals, arg)
+	}
+
+	if hybridProvided {
+		return parseHybridGenerateArguments(positionals, hybridArgumentState{
+			blankProvided:          blankProvided,
+			templateProvided:       templateProvided,
+			customTemplateProvided: customTemplateProvided,
+			configTemplateProvided: configTemplateProvided,
+			guidedProvided:         guidedProvided,
+			aiAssistedProvided:     aiAssistedProvided,
+			agentAssistedProvided:  agentAssistedProvided,
+			agentProvided:          agentProvided,
+			fromFileProvided:       fromFileProvided,
+			titleProvided:          titleProvided,
+			summaryProvided:        summaryProvided,
+			guidedTypeProvided:     guidedTypeProvided,
+			executeProvided:        executeProvided,
+			overwriteProvided:      overwriteProvided,
+			templateName:           templateName,
+			customTemplateName:     customTemplateName,
+			configTemplateAlias:    configTemplateAlias,
+			guidedType:             guidedType,
+			title:                  title,
+			summary:                summary,
+		})
 	}
 
 	if blankProvided && templateProvided {
@@ -753,23 +823,146 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 	}, nil
 }
 
-func duplicateTypeFlagError(agentAssistedProvided bool) error {
+type hybridArgumentState struct {
+	blankProvided          bool
+	templateProvided       bool
+	customTemplateProvided bool
+	configTemplateProvided bool
+	guidedProvided         bool
+	aiAssistedProvided     bool
+	agentAssistedProvided  bool
+	agentProvided          bool
+	fromFileProvided       bool
+	titleProvided          bool
+	summaryProvided        bool
+	guidedTypeProvided     bool
+	executeProvided        bool
+	overwriteProvided      bool
+	templateName           string
+	customTemplateName     string
+	configTemplateAlias    string
+	guidedType             string
+	title                  string
+	summary                string
+}
+
+func parseHybridGenerateArguments(positionals []string, state hybridArgumentState) (generateArguments, error) {
+	if state.blankProvided {
+		return generateArguments{}, fmt.Errorf("hybrid and blank generation flags cannot be used together")
+	}
+	if state.guidedProvided {
+		return generateArguments{}, fmt.Errorf("hybrid and guided generation flags cannot be used together")
+	}
+	if state.aiAssistedProvided {
+		return generateArguments{}, fmt.Errorf("hybrid and ai-assisted generation flags cannot be used together")
+	}
+	if state.agentAssistedProvided {
+		return generateArguments{}, fmt.Errorf("hybrid and agent-assisted generation flags cannot be used together")
+	}
+	if state.fromFileProvided {
+		return generateArguments{}, fmt.Errorf("hybrid and from-file flags cannot be used together")
+	}
+	if state.overwriteProvided {
+		return generateArguments{}, fmt.Errorf("hybrid and overwrite flags cannot be used together")
+	}
+	if state.agentProvided {
+		return generateArguments{}, fmt.Errorf("hybrid and agent flags cannot be used together")
+	}
+	if state.executeProvided {
+		return generateArguments{}, fmt.Errorf("hybrid and execute flags cannot be used together")
+	}
+
+	sourceCount := 0
+	if state.templateProvided {
+		sourceCount++
+	}
+	if state.customTemplateProvided {
+		sourceCount++
+	}
+	if state.configTemplateProvided {
+		sourceCount++
+	}
+	if sourceCount == 0 {
+		return generateArguments{}, fmt.Errorf("hybrid source selector is required")
+	}
+	if sourceCount > 1 {
+		return generateArguments{}, fmt.Errorf("hybrid requires exactly one source selector")
+	}
+
+	if len(positionals) == 0 {
+		return generateArguments{}, fmt.Errorf("change id is required")
+	}
+	if len(positionals) > 1 {
+		return generateArguments{}, fmt.Errorf("unexpected argument: %s", positionals[1])
+	}
+	if !state.titleProvided || strings.TrimSpace(state.title) == "" {
+		return generateArguments{}, fmt.Errorf("hybrid title is required")
+	}
+	if !state.summaryProvided || strings.TrimSpace(state.summary) == "" {
+		return generateArguments{}, fmt.Errorf("hybrid summary is required")
+	}
+	if state.guidedTypeProvided {
+		if _, err := domain.ParseHybridType(state.guidedType); err != nil {
+			return generateArguments{}, err
+		}
+	}
+
+	arguments := generateArguments{
+		changeID:   positionals[0],
+		mode:       domain.HybridMode,
+		guidedType: state.guidedType,
+		title:      state.title,
+		summary:    state.summary,
+	}
+	if state.templateProvided {
+		if strings.TrimSpace(state.templateName) == "" {
+			return generateArguments{}, fmt.Errorf("template name is required")
+		}
+		arguments.templateName = state.templateName
+	}
+	if state.customTemplateProvided {
+		if strings.TrimSpace(state.customTemplateName) == "" {
+			return generateArguments{}, fmt.Errorf("custom template name is required")
+		}
+		arguments.customTemplate = true
+		arguments.customTemplateName = state.customTemplateName
+	}
+	if state.configTemplateProvided {
+		if strings.TrimSpace(state.configTemplateAlias) == "" {
+			return generateArguments{}, fmt.Errorf("config template alias is required")
+		}
+		arguments.configTemplate = true
+		arguments.configTemplateAlias = state.configTemplateAlias
+	}
+	return arguments, nil
+}
+
+func duplicateTypeFlagError(agentAssistedProvided bool, hybridProvided bool) error {
 	if agentAssistedProvided {
 		return fmt.Errorf("agent-assisted authoring type flag specified more than once")
+	}
+	if hybridProvided {
+		return fmt.Errorf("hybrid type flag specified more than once")
 	}
 	return fmt.Errorf("guided type flag specified more than once")
 }
 
-func requiredTypeError(agentAssistedProvided bool) error {
+func requiredTypeError(agentAssistedProvided bool, hybridProvided bool) error {
 	if agentAssistedProvided {
 		return fmt.Errorf("agent-assisted authoring type is required")
+	}
+	if hybridProvided {
+		return fmt.Errorf("hybrid type is required")
 	}
 	return fmt.Errorf("guided type is required")
 }
 
-func duplicateTitleFlagError(agentAssistedProvided bool, configTemplateProvided bool) error {
+func duplicateTitleFlagError(agentAssistedProvided bool, configTemplateProvided bool, hybridProvided bool) error {
 	if agentAssistedProvided {
 		return fmt.Errorf("agent-assisted title flag specified more than once")
+	}
+	if hybridProvided {
+		return fmt.Errorf("hybrid title flag specified more than once")
 	}
 	if configTemplateProvided {
 		return fmt.Errorf("config-template title flag specified more than once")
@@ -777,9 +970,12 @@ func duplicateTitleFlagError(agentAssistedProvided bool, configTemplateProvided 
 	return fmt.Errorf("guided title flag specified more than once")
 }
 
-func requiredTitleError(agentAssistedProvided bool, configTemplateProvided bool) error {
+func requiredTitleError(agentAssistedProvided bool, configTemplateProvided bool, hybridProvided bool) error {
 	if agentAssistedProvided {
 		return fmt.Errorf("agent-assisted title is required")
+	}
+	if hybridProvided {
+		return fmt.Errorf("hybrid title is required")
 	}
 	if configTemplateProvided {
 		return fmt.Errorf("config-template title is required")
@@ -787,9 +983,12 @@ func requiredTitleError(agentAssistedProvided bool, configTemplateProvided bool)
 	return fmt.Errorf("guided title is required")
 }
 
-func duplicateSummaryFlagError(agentAssistedProvided bool, configTemplateProvided bool) error {
+func duplicateSummaryFlagError(agentAssistedProvided bool, configTemplateProvided bool, hybridProvided bool) error {
 	if agentAssistedProvided {
 		return fmt.Errorf("agent-assisted summary flag specified more than once")
+	}
+	if hybridProvided {
+		return fmt.Errorf("hybrid summary flag specified more than once")
 	}
 	if configTemplateProvided {
 		return fmt.Errorf("config-template summary flag specified more than once")
@@ -797,9 +996,12 @@ func duplicateSummaryFlagError(agentAssistedProvided bool, configTemplateProvide
 	return fmt.Errorf("guided summary flag specified more than once")
 }
 
-func requiredSummaryError(agentAssistedProvided bool, configTemplateProvided bool) error {
+func requiredSummaryError(agentAssistedProvided bool, configTemplateProvided bool, hybridProvided bool) error {
 	if agentAssistedProvided {
 		return fmt.Errorf("agent-assisted summary is required")
+	}
+	if hybridProvided {
+		return fmt.Errorf("hybrid summary is required")
 	}
 	if configTemplateProvided {
 		return fmt.Errorf("config-template summary is required")
@@ -908,6 +1110,69 @@ func printConfigTemplateGenerationReport(output io.Writer, result domain.Generat
 		return
 	}
 	fmt.Fprintf(output, "Only OpenSpec change files under %s/ were written.\n", result.ChangePath)
+}
+
+func printHybridGenerationReport(output io.Writer, result domain.HybridGenerationResult) {
+	directoryStatus := "existing"
+	if result.ChangeDirectoryCreated {
+		directoryStatus = "created"
+	}
+
+	fmt.Fprintln(output, "SpecHarbor hybrid change generated.")
+	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
+	fmt.Fprintln(output, "Mode: hybrid")
+	fmt.Fprintf(output, "Source kind: %s\n", result.SelectedSourceKind)
+	fmt.Fprintf(output, "Source: %s\n", result.SelectedSourceName)
+	fmt.Fprintf(output, "Resolved source: %s\n", result.ResolvedSourceKind)
+	if result.ResolvedSourceKind == domain.HybridResolvedSourceRemote {
+		fmt.Fprintf(output, "Resolved source name: %s\n", result.ResolvedSourceName)
+		fmt.Fprintf(output, "Remote host: %s\n", result.RemoteFacts.Host)
+		fmt.Fprintf(output, "Remote format: %s\n", result.RemoteFacts.Format)
+		fmt.Fprintf(output, "Checksum: %s\n", result.RemoteFacts.ChecksumAlgorithm)
+	} else {
+		fmt.Fprintf(output, "Resolved template: %s\n", result.ResolvedSourceName)
+	}
+	fmt.Fprintf(output, "Title: %s\n", result.Title)
+	fmt.Fprintf(output, "Summary: %s\n", result.Summary)
+	if result.TypeAvailable {
+		fmt.Fprintf(output, "Type: %s\n", result.EffectiveType)
+	}
+	fmt.Fprintf(output, "Change path: %s\n", result.ChangePath)
+	fmt.Fprintf(output, "Change directory: %s\n", directoryStatus)
+	printHybridFileList(output, "Created files:", result.CreatedFiles())
+	printHybridFileList(output, "Skipped existing files:", result.SkippedExistingFiles())
+
+	if validationResult, ok := result.ValidationResult(); ok {
+		fmt.Fprintln(output)
+		fmt.Fprintln(output, "Validation:")
+		fmt.Fprintf(output, "Status: %s\n", validationResult.Status)
+		fmt.Fprintf(output, "Required files: %d\n", len(validationResult.RequiredFiles))
+		fmt.Fprintf(output, "Errors: %d\n", validationResult.ErrorCount())
+		fmt.Fprintf(output, "Warnings: %d\n", validationResult.WarningCount())
+		printValidationFindingGroup(output, "Errors:", findingsBySeverity(validationResult, domain.ValidationFindingSeverityError))
+		printValidationFindingGroup(output, "Warnings:", findingsBySeverity(validationResult, domain.ValidationFindingSeverityWarning))
+	}
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Safety:")
+	fmt.Fprintln(output, "- Provider APIs called: no")
+	fmt.Fprintln(output, "- LLM APIs called: no")
+	fmt.Fprintln(output, "- Agent commands executed: no")
+	fmt.Fprintln(output, "- AI output file imported: no")
+	fmt.Fprintln(output, "- Production code modified: no")
+	fmt.Fprintln(output, "- Source-control commands run: no")
+	fmt.Fprintln(output, "- Auto-commit, auto-push, PR, merge, or archive: no")
+}
+
+func printHybridFileList(output io.Writer, title string, files []string) {
+	fmt.Fprintln(output, title)
+	if len(files) == 0 {
+		fmt.Fprintln(output, "- none")
+		return
+	}
+	for _, file := range files {
+		fmt.Fprintf(output, "- %s\n", file)
+	}
 }
 
 func printCustomTemplateGenerationReport(output io.Writer, result domain.GenerationResult) {

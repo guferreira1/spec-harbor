@@ -1133,6 +1133,14 @@ func (fileSystem *fakeGenerationFileSystem) WriteFileIfAbsent(_ string, relative
 	return true, nil
 }
 
+func (fileSystem *fakeGenerationFileSystem) ReadFile(_ string, relativePath string) (string, error) {
+	fileSystem.checkedFiles = append(fileSystem.checkedFiles, relativePath)
+	if err := fileSystem.fileErrors[relativePath]; err != nil {
+		return "", err
+	}
+	return fileSystem.files[relativePath], nil
+}
+
 func (fileSystem *fakeGenerationFileSystem) operationCount() int {
 	return len(fileSystem.checkedDirectories) +
 		len(fileSystem.checkedFiles) +

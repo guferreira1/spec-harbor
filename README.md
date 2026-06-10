@@ -33,6 +33,7 @@ go run ./cmd/specharbor generate add-example-feature --blank
 go run ./cmd/specharbor generate add-feature --template feature
 go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature
 go run ./cmd/specharbor generate add-payment-flow --config-template api-feature
+go run ./cmd/specharbor generate add-login --hybrid --template feature --title "Add login" --summary "Add an OpenSpec change for login"
 go run ./cmd/specharbor generate add-reports --guided --type feature --title "Add reports" --summary "Create report generation support"
 go run ./cmd/specharbor generate add-reports --ai-assisted --from-file agent-output.txt
 go run ./cmd/specharbor generate add-reports --agent-assisted --agent codex --type feature --title "Add reports" --summary "Create report generation support"
@@ -80,6 +81,16 @@ Remote templates require HTTPS URLs with no credentials, query strings, fragment
 
 `--template`, `--custom-template`, and `--config-template` are disjoint namespaces; the same name can exist in all three without shadowing or fallback.
 
+Hybrid generation composes exactly one deterministic template source with required guided metadata, writes only the five OpenSpec change files, skips existing files, and then runs validation:
+
+```bash
+specharbor generate <change-id> --hybrid --template <name> --title "<title>" --summary "<summary>" [--type <feature|bugfix|docs|refactor>]
+specharbor generate <change-id> --hybrid --custom-template <name> --title "<title>" --summary "<summary>" [--type <feature|bugfix|docs|refactor>]
+specharbor generate <change-id> --hybrid --config-template <alias> --title "<title>" --summary "<summary>" [--type <feature|bugfix|docs|refactor>]
+```
+
+Hybrid requires exactly one of `--template`, `--custom-template`, or `--config-template`. Direct built-in sources and config aliases resolving to built-ins derive type from the built-in template when `--type` is omitted, and a provided type must match that built-in template. Custom, config custom, and config remote sources do not infer type; omitted `{{type}}` tokens remain verbatim unless `--type` is provided. Remote templates remain available only through config aliases and keep the HTTPS, checksum, ZIP, no-credential, no-redirect, no-cache, no-script, and OpenSpec-only write safeguards. Hybrid intentionally has no AI overlay, no `--blank`, no `--from-file`, no `--overwrite`, no `--agent`, no `--execute`, no provider or LLM API calls, no shell or script execution, no production code writes, and no auto-commit, auto-push, PR, merge, or archive automation.
+
 Guided generation is deterministic, local, non-interactive, and supports exactly `feature`, `bugfix`, `docs`, and `refactor`. It uses explicit `--type`, `--title`, and `--summary` flags.
 
 AI-assisted generation imports AI-authored OpenSpec Markdown from a local file only:
@@ -104,6 +115,7 @@ Implemented:
 - Built-in OpenSpec change template generation for `feature`, `bugfix`, `docs`, and `refactor`.
 - Project-local custom template generation from `.specharbor/templates/<template-name>/` with deterministic variable substitution and OpenSpec-only writes.
 - Config-driven template aliases for built-in, project-local custom, and pinned HTTPS remote ZIP templates.
+- Hybrid generation from one built-in, custom, or config-template source with required title and summary metadata, optional type metadata, validation integration, and OpenSpec-only writes.
 - Guided OpenSpec change generation for `feature`, `bugfix`, `docs`, and `refactor`.
 - AI-assisted from-file OpenSpec generation with strict local delimiter blocks, default skip behavior, explicit overwrite, validation integration, and no provider/API/runner/source-control automation.
 - Dry-run agent-assisted spec authoring for `feature`, `bugfix`, `docs`, and `refactor`.
@@ -120,7 +132,6 @@ In progress:
 
 Planned:
 
-- Hybrid spec generation.
 - Future config-driven generic runner mappings and richer templates.
 - Interactive generation prompts.
 - Config mutation commands such as `config get`, `config set`, and `config unset`.
