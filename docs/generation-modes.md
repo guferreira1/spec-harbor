@@ -1,6 +1,6 @@
 # Generation Modes
 
-SpecHarbor currently implements blank generation, built-in template generation, project-local custom template generation, config-driven template aliases, guided generation, AI-assisted from-file generation, dry-run agent-assisted spec authoring, and explicit agent-assisted local runner execution in run-and-report mode.
+SpecHarbor currently implements blank generation, built-in template generation, project-local custom template generation, config-driven template aliases, hybrid generation, guided generation, AI-assisted from-file generation, dry-run agent-assisted spec authoring, and explicit agent-assisted local runner execution in run-and-report mode.
 
 ## Implemented
 
@@ -142,6 +142,56 @@ Namespaces are disjoint by flag. `--template feature`, `--custom-template featur
 
 Safety boundaries: remote config aliases have no persistent cache in this first version and do not support credentials, OAuth, auth headers, cookies, environment token expansion, git clone, marketplace discovery, provider APIs, template scripts, shell execution, production code writes, source-control automation, auto-commit, PR creation, merge automation, or archive automation. Generated files stay under `openspec/changes/<change-id>/`, use the five required OpenSpec filenames, and skip existing files without overwriting.
 
+### Hybrid Generation
+
+```bash
+go run ./cmd/specharbor generate <change-id> --hybrid --template <name> --title "<title>" --summary "<summary>" [--type <feature|bugfix|docs|refactor>]
+go run ./cmd/specharbor generate <change-id> --hybrid --custom-template <name> --title "<title>" --summary "<summary>" [--type <feature|bugfix|docs|refactor>]
+go run ./cmd/specharbor generate <change-id> --hybrid --config-template <alias> --title "<title>" --summary "<summary>" [--type <feature|bugfix|docs|refactor>]
+```
+
+Hybrid generation composes exactly one deterministic template source with required guided metadata, then validates the generated OpenSpec change. It is useful when a team wants a reusable template source and explicit title/summary metadata in one safe command.
+
+Supported source selectors are exactly:
+
+- `--template <name>` for built-in templates.
+- `--custom-template <name>` for `.specharbor/templates/<name>/`.
+- `--config-template <alias>` for `.specharbor/config.yml` aliases.
+
+Exactly one source selector is required. Missing or multiple selectors fail before writes. There is no source guessing, fallback, shadowing, or precedence ordering.
+
+Hybrid requires `--title` and `--summary`; both are trimmed and must be non-empty. `--type` is optional and must be one of `feature`, `bugfix`, `docs`, or `refactor` when provided.
+
+Type behavior is source-specific:
+
+- Direct `--template feature`, `bugfix`, `docs`, or `refactor` derives omitted type from the selected built-in template.
+- A config alias resolving to a built-in template derives omitted type from the resolved built-in template.
+- A provided type must match a selected or resolved built-in template. `--hybrid --template feature --type feature` succeeds; `--hybrid --template feature --type bugfix` fails and writes nothing.
+- Custom templates, config custom aliases, and config remote aliases do not infer type. If type is omitted, `{{type}}` remains verbatim. If type is provided, it is rendered.
+
+Hybrid rendering replaces `{{change_id}}`, `{{title}}`, and `{{summary}}`, and replaces `{{type}}` only when an effective type exists. Unknown and unresolved `{{...}}` tokens remain verbatim. Hybrid adds no conditionals, loops, functions, includes, hooks, scripts, shell commands, or executable template behavior.
+
+Examples:
+
+```bash
+go run ./cmd/specharbor generate add-login --hybrid --template feature --title "Add login" --summary "Add an OpenSpec change for login"
+go run ./cmd/specharbor generate add-login --hybrid --template feature --type bugfix --title "Add login" --summary "Add an OpenSpec change for login"
+go run ./cmd/specharbor generate add-payment-flow --hybrid --custom-template api-feature --title "Add payments" --summary "Adds a payment flow."
+go run ./cmd/specharbor generate add-login --hybrid --config-template default-feature --title "Add login" --summary "Add login support"
+go run ./cmd/specharbor generate add-payment-flow --hybrid --config-template api-feature --title "Add payments" --summary "Adds a payment flow." --type feature
+go run ./cmd/specharbor generate add-service --hybrid --config-template service-feature --title "Add service" --summary "Adds a service workflow."
+```
+
+The first example derives `type=feature`. The second example fails because `bugfix` does not match built-in template `feature`. The custom example does not infer type, so `{{type}}` remains unresolved unless `--type` is provided.
+
+Remote hybrid generation is available only through `--config-template <alias>` resolving to `source: remote`. It reuses the existing remote-template safeguards unchanged: HTTPS only, no credentials, no query strings, no fragments, no redirects, checksum required, checksum verified before ZIP parsing, ZIP only, strict archive safety, no cache, no shell/script execution, no production code writes, and no arbitrary output paths.
+
+Hybrid writes only `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md` under `openspec/changes/<change-id>/`. Existing files are skipped and preserved; `--overwrite` is rejected in this first version.
+
+Validation runs after successful writes or successful skip-only completion. The report includes status, required file count, error count, warning count, and findings. Warnings keep exit code `0`; validation errors make the CLI exit non-zero after the report is printed. Hybrid never auto-fixes validation findings.
+
+Out of scope for hybrid generation: `--blank`, AI overlay, `--from-file`, live runner output application, `--agent`, `--execute`, provider APIs, LLM APIs, local model APIs, source-control tools, workflow tools, shell commands, scripts, production code writes, auto-commit, auto-push, PR creation, merge automation, and archive automation.
+
 ### Guided Generation
 
 ```bash
@@ -273,7 +323,7 @@ Execute mode is still run-and-report only:
 
 Provider APIs, IDE automation, OAuth, credentials, marketplace integrations, remote execution, source-control automation, and workflow automation remain out of scope. Local agent command behavior is controlled by the installed local tool.
 
-Blank, built-in template, custom template, guided, and AI-assisted generation create the required OpenSpec change files:
+Blank, built-in template, custom template, config-template, hybrid, guided, and AI-assisted generation create the required OpenSpec change files:
 
 ```text
 openspec/changes/<change-id>/
@@ -284,13 +334,12 @@ openspec/changes/<change-id>/
   risks.md
 ```
 
-Existing files are skipped and are not overwritten for blank, built-in template, custom template, and guided generation. AI-assisted generation also skips existing files by default, and replaces them only with explicit `--overwrite`. Partially existing change directories are recoverable because generation creates only missing required files.
+Existing files are skipped and are not overwritten for blank, built-in template, custom template, config-template, hybrid, and guided generation. AI-assisted generation also skips existing files by default, and replaces them only with explicit `--overwrite`. Partially existing change directories are recoverable because generation creates only missing required files.
 
 ## Planned
 
 The following items are product direction, not implemented command behavior:
 
-- hybrid generation;
 - config-driven generic runner commands;
 - interactive prompts.
 

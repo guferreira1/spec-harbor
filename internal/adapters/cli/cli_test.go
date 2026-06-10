@@ -1579,9 +1579,9 @@ func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 			want: "unsupported flag: --execute",
 		},
 		{
-			name: "unsupported hybrid flag",
+			name: "hybrid missing source selector",
 			args: []string{"generate", "change", "--hybrid"},
-			want: "unsupported flag: --hybrid",
+			want: "hybrid source selector is required",
 		},
 		{
 			name: "unsupported format flag",
