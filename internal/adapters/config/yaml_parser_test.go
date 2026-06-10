@@ -1,6 +1,7 @@
 package config
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -34,9 +35,10 @@ func TestYAMLParserParsesCompleteVersionOneConfig(t *testing.T) {
 		Output: domain.ConfigOutput{
 			Format: "text",
 		},
+		Templates: domain.NewConfigTemplates(domain.EmptyConfigTemplateAliases()),
 	}
 
-	if config != want {
+	if !reflect.DeepEqual(config, want) {
 		t.Fatalf("ParseLocalConfig() = %#v, want %#v", config, want)
 	}
 }
@@ -136,6 +138,9 @@ func TestYAMLParserUsesZeroValuesForOmittedOptionalSectionsAndFields(t *testing.
 	if config.Output != (domain.ConfigOutput{}) {
 		t.Fatalf("Output = %#v, want zero value", config.Output)
 	}
+	if config.Templates.Aliases().Len() != 0 {
+		t.Fatalf("Template aliases = %d, want 0", config.Templates.Aliases().Len())
+	}
 }
 
 func TestYAMLParserDoesNotDefaultMissingVersion(t *testing.T) {
@@ -151,6 +156,224 @@ func TestYAMLParserDoesNotDefaultMissingVersion(t *testing.T) {
 	}
 	if config.Defaults.AgentRole != "implementer" {
 		t.Fatalf("Defaults.AgentRole = %q, want implementer", config.Defaults.AgentRole)
+	}
+}
+
+func TestYAMLParserParsesTemplateAliases(t *testing.T) {
+	contents := `version: 1
+
+templates:
+  aliases:
+    api-feature:
+      source: custom
+      template: api-feature
+    default-feature:
+      source: builtin
+      template: feature
+`
+
+	config, err := NewYAMLParser().ParseLocalConfig(contents)
+	if err != nil {
+		t.Fatalf("ParseLocalConfig() error = %v", err)
+	}
+
+	aliases := config.Templates.Aliases()
+	if aliases.Len() != 2 {
+		t.Fatalf("alias count = %d, want 2", aliases.Len())
+	}
+
+	customReference, err := aliases.Lookup(mustConfigTemplateAlias(t, "api-feature"))
+	if err != nil {
+		t.Fatalf("Lookup(api-feature) error = %v", err)
+	}
+	if customReference.SourceKind() != domain.ConfigTemplateSourceCustom || customReference.Template() != "api-feature" {
+		t.Fatalf("custom reference = %#v, want custom api-feature", customReference)
+	}
+
+	builtInReference, err := aliases.Lookup(mustConfigTemplateAlias(t, "default-feature"))
+	if err != nil {
+		t.Fatalf("Lookup(default-feature) error = %v", err)
+	}
+	if builtInReference.SourceKind() != domain.ConfigTemplateSourceBuiltin || builtInReference.Template() != "feature" {
+		t.Fatalf("builtin reference = %#v, want builtin feature", builtInReference)
+	}
+}
+
+func TestYAMLParserTreatsOmittedTemplatesAsEmptyAliases(t *testing.T) {
+	tests := []struct {
+		name     string
+		contents string
+	}{
+		{name: "omitted templates", contents: "version: 1\n"},
+		{name: "omitted aliases", contents: "version: 1\ntemplates: {}\n"},
+		{name: "null aliases", contents: "version: 1\ntemplates:\n  aliases:\n"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			config, err := NewYAMLParser().ParseLocalConfig(test.contents)
+			if err != nil {
+				t.Fatalf("ParseLocalConfig() error = %v", err)
+			}
+			if config.Templates.Aliases().Len() != 0 {
+				t.Fatalf("alias count = %d, want 0", config.Templates.Aliases().Len())
+			}
+		})
+	}
+}
+
+func TestYAMLParserRejectsInvalidTemplateAliasConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		contents string
+		want     string
+	}{
+		{
+			name: "templates not mapping",
+			contents: `version: 1
+templates: []
+`,
+			want: "templates must be a mapping",
+		},
+		{
+			name: "aliases not mapping",
+			contents: `version: 1
+templates:
+  aliases: []
+`,
+			want: "templates.aliases must be a mapping",
+		},
+		{
+			name: "invalid alias name",
+			contents: `version: 1
+templates:
+  aliases:
+    nested/template:
+      source: builtin
+      template: feature
+`,
+			want: `invalid config template alias "nested/template": config template alias must be a single path segment`,
+		},
+		{
+			name: "alias entry not mapping",
+			contents: `version: 1
+templates:
+  aliases:
+    api-feature: true
+`,
+			want: `invalid config template alias "api-feature": config template alias entry must be a mapping`,
+		},
+		{
+			name: "missing source",
+			contents: `version: 1
+templates:
+  aliases:
+    api-feature:
+      template: feature
+`,
+			want: `invalid config template alias "api-feature": config template source is required`,
+		},
+		{
+			name: "missing template",
+			contents: `version: 1
+templates:
+  aliases:
+    api-feature:
+      source: builtin
+`,
+			want: `invalid config template alias "api-feature": config template reference template is required`,
+		},
+		{
+			name: "unsupported source",
+			contents: `version: 1
+templates:
+  aliases:
+    api-feature:
+      source: remote
+      template: feature
+`,
+			want: `invalid config template alias "api-feature": unsupported config template source: remote`,
+		},
+		{
+			name: "unsupported path field",
+			contents: `version: 1
+templates:
+  aliases:
+    api-feature:
+      source: builtin
+      template: feature
+      path: ../templates/feature
+`,
+			want: `invalid config template alias "api-feature": unsupported config template field "path"`,
+		},
+		{
+			name: "unsupported url field",
+			contents: `version: 1
+templates:
+  aliases:
+    api-feature:
+      source: builtin
+      template: feature
+      url: https://example.invalid/template
+`,
+			want: `invalid config template alias "api-feature": unsupported config template field "url"`,
+		},
+		{
+			name: "source not string",
+			contents: `version: 1
+templates:
+  aliases:
+    api-feature:
+      source: 1
+      template: feature
+`,
+			want: `invalid config template alias "api-feature": config template source must be a string`,
+		},
+		{
+			name: "template not string",
+			contents: `version: 1
+templates:
+  aliases:
+    api-feature:
+      source: builtin
+      template: 1
+`,
+			want: `invalid config template alias "api-feature": config template template must be a string`,
+		},
+		{
+			name: "unknown builtin template",
+			contents: `version: 1
+templates:
+  aliases:
+    api-feature:
+      source: builtin
+      template: maintenance
+`,
+			want: `invalid config template alias "api-feature": unknown template name: maintenance`,
+		},
+		{
+			name: "invalid custom template reference",
+			contents: `version: 1
+templates:
+  aliases:
+    api-feature:
+      source: custom
+      template: ../escape
+`,
+			want: `invalid config template alias "api-feature": custom template name must be a single path segment`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := NewYAMLParser().ParseLocalConfig(test.contents)
+			if err == nil {
+				t.Fatalf("ParseLocalConfig() error = nil, want %q", test.want)
+			}
+			if err.Error() != test.want {
+				t.Fatalf("ParseLocalConfig() error = %q, want %q", err.Error(), test.want)
+			}
+		})
 	}
 }
 
@@ -176,4 +399,14 @@ scan:
 output:
   format: text
 `
+}
+
+func mustConfigTemplateAlias(t *testing.T, value string) domain.ConfigTemplateAlias {
+	t.Helper()
+
+	alias, err := domain.NewConfigTemplateAlias(value)
+	if err != nil {
+		t.Fatalf("NewConfigTemplateAlias(%q) error = %v", value, err)
+	}
+	return alias
 }

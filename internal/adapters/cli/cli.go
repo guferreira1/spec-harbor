@@ -250,7 +250,16 @@ func generateCommand(ctx CommandContext) error {
 	blankContent := templates.NewDefaultBlankChangeContent()
 	templateContent := templates.NewBuiltInChangeTemplates()
 	guidedContent := templates.NewGuidedChangeTemplates()
-	generateChange := usecase.NewGenerateChangeWithCustomTemplates(fileSystem, blankContent, templateContent, guidedContent, fileSystem)
+	configParser := configadapter.NewYAMLParser()
+	generateChange := usecase.NewGenerateChangeWithConfigTemplates(
+		fileSystem,
+		blankContent,
+		templateContent,
+		guidedContent,
+		fileSystem,
+		fileSystem,
+		configParser,
+	)
 
 	generateInput := usecase.GenerateChangeInput{
 		ProjectRoot:  root,
@@ -265,6 +274,10 @@ func generateCommand(ctx CommandContext) error {
 		generateInput.TemplateSource = domain.CustomTemplateSource
 		generateInput.CustomTemplateName = arguments.customTemplateName
 	}
+	if arguments.configTemplate {
+		generateInput.ConfigTemplate = true
+		generateInput.ConfigTemplateAlias = arguments.configTemplateAlias
+	}
 
 	result, err := generateChange.Execute(generateInput)
 	if err != nil {
@@ -276,18 +289,20 @@ func generateCommand(ctx CommandContext) error {
 }
 
 type generateArguments struct {
-	changeID           string
-	mode               domain.GenerationMode
-	templateName       string
-	customTemplate     bool
-	customTemplateName string
-	guidedType         string
-	agentName          string
-	fromFile           string
-	title              string
-	summary            string
-	execute            bool
-	overwrite          bool
+	changeID            string
+	mode                domain.GenerationMode
+	templateName        string
+	customTemplate      bool
+	customTemplateName  string
+	configTemplate      bool
+	configTemplateAlias string
+	guidedType          string
+	agentName           string
+	fromFile            string
+	title               string
+	summary             string
+	execute             bool
+	overwrite           bool
 }
 
 func parseGenerateArguments(args []string) (generateArguments, error) {
@@ -295,6 +310,7 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 	blankProvided := false
 	templateProvided := false
 	customTemplateProvided := false
+	configTemplateProvided := false
 	guidedProvided := false
 	aiAssistedProvided := false
 	agentAssistedProvided := false
@@ -307,6 +323,7 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 	overwriteProvided := false
 	var templateName string
 	var customTemplateName string
+	var configTemplateAlias string
 	var guidedType string
 	var agentName string
 	var fromFile string
@@ -381,6 +398,23 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 			continue
 		}
 
+		if arg == "--config-template" {
+			if configTemplateProvided {
+				return generateArguments{}, fmt.Errorf("config-template generation flag specified more than once")
+			}
+			if index+1 >= len(args) {
+				return generateArguments{}, fmt.Errorf("config template alias is required")
+			}
+			if strings.HasPrefix(args[index+1], "-") {
+				return generateArguments{}, fmt.Errorf("config template alias is required")
+			}
+
+			configTemplateAlias = args[index+1]
+			configTemplateProvided = true
+			index++
+			continue
+		}
+
 		if arg == "--agent" {
 			if agentProvided {
 				return generateArguments{}, fmt.Errorf("agent flag specified more than once")
@@ -434,13 +468,13 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 
 		if arg == "--title" {
 			if titleProvided {
-				return generateArguments{}, duplicateTitleFlagError(agentAssistedProvided)
+				return generateArguments{}, duplicateTitleFlagError(agentAssistedProvided, configTemplateProvided)
 			}
 			if index+1 >= len(args) {
-				return generateArguments{}, requiredTitleError(agentAssistedProvided)
+				return generateArguments{}, requiredTitleError(agentAssistedProvided, configTemplateProvided)
 			}
 			if strings.HasPrefix(args[index+1], "-") {
-				return generateArguments{}, requiredTitleError(agentAssistedProvided)
+				return generateArguments{}, requiredTitleError(agentAssistedProvided, configTemplateProvided)
 			}
 
 			title = args[index+1]
@@ -451,13 +485,13 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 
 		if arg == "--summary" {
 			if summaryProvided {
-				return generateArguments{}, duplicateSummaryFlagError(agentAssistedProvided)
+				return generateArguments{}, duplicateSummaryFlagError(agentAssistedProvided, configTemplateProvided)
 			}
 			if index+1 >= len(args) {
-				return generateArguments{}, requiredSummaryError(agentAssistedProvided)
+				return generateArguments{}, requiredSummaryError(agentAssistedProvided, configTemplateProvided)
 			}
 			if strings.HasPrefix(args[index+1], "-") {
-				return generateArguments{}, requiredSummaryError(agentAssistedProvided)
+				return generateArguments{}, requiredSummaryError(agentAssistedProvided, configTemplateProvided)
 			}
 
 			summary = args[index+1]
@@ -534,6 +568,39 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 	if customTemplateProvided && agentAssistedProvided {
 		return generateArguments{}, fmt.Errorf("custom-template and agent-assisted generation flags cannot be used together")
 	}
+	if configTemplateProvided && blankProvided {
+		return generateArguments{}, fmt.Errorf("config-template and blank generation flags cannot be used together")
+	}
+	if configTemplateProvided && templateProvided {
+		return generateArguments{}, fmt.Errorf("config-template and template generation flags cannot be used together")
+	}
+	if configTemplateProvided && customTemplateProvided {
+		return generateArguments{}, fmt.Errorf("config-template and custom-template generation flags cannot be used together")
+	}
+	if configTemplateProvided && guidedProvided {
+		return generateArguments{}, fmt.Errorf("config-template and guided generation flags cannot be used together")
+	}
+	if configTemplateProvided && agentAssistedProvided {
+		return generateArguments{}, fmt.Errorf("config-template and agent-assisted generation flags cannot be used together")
+	}
+	if configTemplateProvided && aiAssistedProvided {
+		return generateArguments{}, fmt.Errorf("config-template and ai-assisted generation flags cannot be used together")
+	}
+	if configTemplateProvided && executeProvided {
+		return generateArguments{}, fmt.Errorf("config-template and execute flags cannot be used together")
+	}
+	if configTemplateProvided && guidedTypeProvided {
+		return generateArguments{}, fmt.Errorf("config-template and type flags cannot be used together")
+	}
+	if configTemplateProvided && agentProvided {
+		return generateArguments{}, fmt.Errorf("config-template and agent flags cannot be used together")
+	}
+	if configTemplateProvided && fromFileProvided {
+		return generateArguments{}, fmt.Errorf("config-template and from-file flags cannot be used together")
+	}
+	if configTemplateProvided && overwriteProvided {
+		return generateArguments{}, fmt.Errorf("config-template and overwrite flags cannot be used together")
+	}
 	if aiAssistedProvided && executeProvided {
 		return generateArguments{}, fmt.Errorf("ai-assisted and execute flags cannot be used together")
 	}
@@ -558,7 +625,7 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 	if !guidedProvided && !agentAssistedProvided && !aiAssistedProvided && guidedTypeProvided {
 		return generateArguments{}, fmt.Errorf("guided input flags require --guided")
 	}
-	if !guidedProvided && !agentAssistedProvided && !aiAssistedProvided && !customTemplateProvided && (titleProvided || summaryProvided) {
+	if !guidedProvided && !agentAssistedProvided && !aiAssistedProvided && !customTemplateProvided && !configTemplateProvided && (titleProvided || summaryProvided) {
 		return generateArguments{}, fmt.Errorf("guided input flags require --guided")
 	}
 	if len(positionals) == 0 {
@@ -567,7 +634,7 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 	if len(positionals) > 1 {
 		return generateArguments{}, fmt.Errorf("unexpected argument: %s", positionals[1])
 	}
-	if !blankProvided && !templateProvided && !customTemplateProvided && !guidedProvided && !aiAssistedProvided && !agentAssistedProvided {
+	if !blankProvided && !templateProvided && !customTemplateProvided && !configTemplateProvided && !guidedProvided && !aiAssistedProvided && !agentAssistedProvided {
 		return generateArguments{}, fmt.Errorf("generation mode flag is required")
 	}
 	if aiAssistedProvided {
@@ -633,6 +700,19 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 			summary:            summary,
 		}, nil
 	}
+	if configTemplateProvided {
+		if strings.TrimSpace(configTemplateAlias) == "" {
+			return generateArguments{}, fmt.Errorf("config template alias is required")
+		}
+		return generateArguments{
+			changeID:            positionals[0],
+			mode:                domain.TemplateMode,
+			configTemplate:      true,
+			configTemplateAlias: configTemplateAlias,
+			title:               title,
+			summary:             summary,
+		}, nil
+	}
 	if guidedProvided {
 		if !guidedTypeProvided || strings.TrimSpace(guidedType) == "" {
 			return generateArguments{}, fmt.Errorf("guided type is required")
@@ -675,35 +755,51 @@ func requiredTypeError(agentAssistedProvided bool) error {
 	return fmt.Errorf("guided type is required")
 }
 
-func duplicateTitleFlagError(agentAssistedProvided bool) error {
+func duplicateTitleFlagError(agentAssistedProvided bool, configTemplateProvided bool) error {
 	if agentAssistedProvided {
 		return fmt.Errorf("agent-assisted title flag specified more than once")
+	}
+	if configTemplateProvided {
+		return fmt.Errorf("config-template title flag specified more than once")
 	}
 	return fmt.Errorf("guided title flag specified more than once")
 }
 
-func requiredTitleError(agentAssistedProvided bool) error {
+func requiredTitleError(agentAssistedProvided bool, configTemplateProvided bool) error {
 	if agentAssistedProvided {
 		return fmt.Errorf("agent-assisted title is required")
+	}
+	if configTemplateProvided {
+		return fmt.Errorf("config-template title is required")
 	}
 	return fmt.Errorf("guided title is required")
 }
 
-func duplicateSummaryFlagError(agentAssistedProvided bool) error {
+func duplicateSummaryFlagError(agentAssistedProvided bool, configTemplateProvided bool) error {
 	if agentAssistedProvided {
 		return fmt.Errorf("agent-assisted summary flag specified more than once")
+	}
+	if configTemplateProvided {
+		return fmt.Errorf("config-template summary flag specified more than once")
 	}
 	return fmt.Errorf("guided summary flag specified more than once")
 }
 
-func requiredSummaryError(agentAssistedProvided bool) error {
+func requiredSummaryError(agentAssistedProvided bool, configTemplateProvided bool) error {
 	if agentAssistedProvided {
 		return fmt.Errorf("agent-assisted summary is required")
+	}
+	if configTemplateProvided {
+		return fmt.Errorf("config-template summary is required")
 	}
 	return fmt.Errorf("guided summary is required")
 }
 
 func printGenerationReport(output io.Writer, result domain.GenerationResult) {
+	if result.ConfigTemplateAlias != "" {
+		printConfigTemplateGenerationReport(output, result)
+		return
+	}
 	if result.Mode == domain.TemplateMode && result.TemplateSource == domain.CustomTemplateSource {
 		printCustomTemplateGenerationReport(output, result)
 		return
@@ -751,6 +847,42 @@ func printGenerationReport(output io.Writer, result domain.GenerationResult) {
 			fmt.Fprintf(output, "- %s\n", file)
 		}
 	}
+}
+
+func printConfigTemplateGenerationReport(output io.Writer, result domain.GenerationResult) {
+	createdFiles := result.CreatedFiles()
+	skippedExistingFiles := result.SkippedExistingFiles()
+	directoryStatus := "existing"
+	if result.ChangeDirectoryCreated {
+		directoryStatus = "created"
+	}
+
+	fmt.Fprintln(output, "SpecHarbor config template change generated.")
+	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
+	fmt.Fprintf(output, "Config template: %s\n", result.ConfigTemplateAlias)
+	fmt.Fprintf(output, "Resolved source: %s\n", result.ConfigTemplateSource)
+	fmt.Fprintf(output, "Resolved template: %s\n", result.ConfigTemplateName)
+	if result.ConfigTemplateSource == domain.ConfigTemplateSourceCustom {
+		fmt.Fprintf(output, "Template source: %s\n", result.TemplatePath)
+	}
+	fmt.Fprintf(output, "Change path: %s\n", result.ChangePath)
+	fmt.Fprintf(output, "Change directory: %s\n", directoryStatus)
+
+	if len(createdFiles) > 0 {
+		fmt.Fprintln(output, "Created files:")
+		for _, file := range createdFiles {
+			fmt.Fprintf(output, "- %s\n", file)
+		}
+	}
+
+	if len(skippedExistingFiles) > 0 {
+		fmt.Fprintln(output, "Skipped existing files:")
+		for _, file := range skippedExistingFiles {
+			fmt.Fprintf(output, "- %s\n", file)
+		}
+	}
+
+	fmt.Fprintf(output, "Only OpenSpec change files under %s/ were written.\n", result.ChangePath)
 }
 
 func printCustomTemplateGenerationReport(output io.Writer, result domain.GenerationResult) {

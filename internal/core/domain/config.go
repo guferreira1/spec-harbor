@@ -10,6 +10,7 @@ type LocalConfig struct {
 	Archive    ConfigArchive
 	Scan       ConfigScan
 	Output     ConfigOutput
+	Templates  ConfigTemplates
 }
 
 type ConfigDefaults struct {
@@ -37,6 +38,10 @@ type ConfigOutput struct {
 	Format string
 }
 
+type ConfigTemplates struct {
+	aliases ConfigTemplateAliases
+}
+
 type ConfigResult struct {
 	Path   string
 	Config LocalConfig
@@ -44,4 +49,12 @@ type ConfigResult struct {
 
 func IsSupportedLocalConfigVersion(version int) bool {
 	return version == SupportedLocalConfigVersion
+}
+
+func NewConfigTemplates(aliases ConfigTemplateAliases) ConfigTemplates {
+	return ConfigTemplates{aliases: aliases.Copy()}
+}
+
+func (templates ConfigTemplates) Aliases() ConfigTemplateAliases {
+	return templates.aliases.Copy()
 }
