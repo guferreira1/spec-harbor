@@ -32,6 +32,7 @@ go run ./cmd/specharbor scan
 go run ./cmd/specharbor generate add-example-feature --blank
 go run ./cmd/specharbor generate add-feature --template feature
 go run ./cmd/specharbor generate add-reports --guided --type feature --title "Add reports" --summary "Create report generation support"
+go run ./cmd/specharbor generate add-reports --agent-assisted --agent codex --type feature --title "Add reports" --summary "Create report generation support"
 go run ./cmd/specharbor validate add-example-feature
 go run ./cmd/specharbor prompt add-example-feature --role implementer
 go run ./cmd/specharbor review add-example-feature
@@ -46,6 +47,8 @@ Built-in template generation supports exactly `feature`, `bugfix`, `docs`, and `
 
 Guided generation is deterministic, local, non-interactive, and supports exactly `feature`, `bugfix`, `docs`, and `refactor`. It uses explicit `--type`, `--title`, and `--summary` flags.
 
+Dry-run agent-assisted spec authoring supports exactly `feature`, `bugfix`, `docs`, and `refactor`. It prints a deterministic authoring plan and copy-pasteable prompt to stdout; it writes no files, does not execute agents, and does not call provider, network, source-control, or workflow APIs. See [Usage](docs/usage.md) and [Generation modes](docs/generation-modes.md) for details.
+
 ## Status
 
 Implemented:
@@ -55,6 +58,7 @@ Implemented:
 - Blank OpenSpec change generation.
 - Built-in OpenSpec change template generation for `feature`, `bugfix`, `docs`, and `refactor`.
 - Guided OpenSpec change generation for `feature`, `bugfix`, `docs`, and `refactor`.
+- Dry-run agent-assisted spec authoring for `feature`, `bugfix`, `docs`, and `refactor`.
 - Change validation, review, and archive.
 - Role-based prompt generation with `--role`.
 - Read-only local config display with `config show` and `config`.
@@ -65,7 +69,8 @@ In progress:
 
 Planned:
 
-- AI-assisted, agent-assisted, and hybrid spec generation.
+- AI-assisted and hybrid spec generation.
+- Future agent execution and non-dry-run agent-assisted workflows.
 - Future template capabilities such as custom, remote, and config-driven templates.
 - Interactive generation prompts.
 - Config mutation commands such as `config get`, `config set`, and `config unset`.
