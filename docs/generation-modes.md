@@ -1,8 +1,92 @@
 # Generation Modes
 
-SpecHarbor currently implements blank generation, built-in template generation, project-local custom template generation, config-driven template aliases, hybrid generation, guided generation, AI-assisted from-file generation, dry-run agent-assisted spec authoring, and explicit agent-assisted local runner execution in run-and-report mode.
+SpecHarbor currently implements interactive generation prompts, blank generation, built-in template generation, project-local custom template generation, config-driven template aliases, hybrid generation, guided generation, AI-assisted from-file generation, dry-run agent-assisted spec authoring, and explicit agent-assisted local runner execution in run-and-report mode.
 
 ## Implemented
+
+### Interactive Generation
+
+```bash
+go run ./cmd/specharbor generate <change-id> --interactive
+```
+
+Interactive generation is a CLI prompt layer over existing generation behavior. It keeps `<change-id>` explicit on the command line, requires a TTY, collects only path-specific values, validates answers, prints a deterministic pre-confirmation summary, and delegates to the selected existing generation path only after confirmation.
+
+Supported interactive paths in this version:
+
+- blank
+- built-in template
+- custom template
+- config template
+- hybrid
+
+Excluded from interactive prompts in this version:
+
+- direct guided generation
+- AI-assisted generation
+- agent-assisted generation
+- local agent runner execution
+- live runner output application
+- raw remote template URLs or checksums
+
+The first menu has deterministic ordering:
+
+```text
+Select generation path:
+1. blank
+2. built-in template
+3. custom template
+4. config template
+5. hybrid
+```
+
+Path-specific prompts:
+
+- Blank asks no additional questions.
+- Built-in template asks for one supported built-in template: `feature`, `bugfix`, `docs`, or `refactor`.
+- Custom template asks for a custom template name plus optional title and summary.
+- Config template asks for a config alias plus optional title and summary.
+- Hybrid asks for exactly one source namespace (`built-in template`, `custom template`, or `config template`), the source value, required title, required summary, and optional type.
+
+Example answer sequences:
+
+```text
+blank:           1 -> y
+built-in:        2 -> feature -> y
+custom:          3 -> api-feature -> Add payments -> Adds a payment flow. -> y
+config:          4 -> default-feature -> empty title -> empty summary -> y
+hybrid built-in: 5 -> 1 -> feature -> Add login -> Add login support -> empty type -> y
+```
+
+Before writes, every interactive flow prints a deterministic summary with change id, selected path, selected source values, expected write target, approved filenames, validation behavior, and safety notes. Blank, built-in template, custom template, and config template summaries show:
+
+```text
+Validation: automatic no
+```
+
+Hybrid summaries show:
+
+```text
+Validation: automatic yes
+```
+
+The safety section is always printed before confirmation:
+
+```text
+Safety:
+- Writes are limited to OpenSpec change files.
+- Production code will not be modified.
+- Source-control commands will not be run.
+- Workflow automation will not be triggered.
+- Provider, LLM, and agent APIs will not be called.
+- No auto-commit, auto-push, PR creation, merge, or archive will be performed.
+```
+
+Confirmation is trimmed and case-insensitive. `y` and `yes` proceed in any casing; `n` and `no` cancel in any casing. Empty confirmation and EOF cancel. Cancellation exits non-zero with `operation cancelled` and writes nothing. Invalid required answers and invalid confirmation answers retry up to three attempts, then fail clearly and write nothing.
+
+Interactive mode preserves selected-mode write and validation behavior. It does not resolve config aliases, fetch remote templates, or call generation use cases before confirmation. Remote templates remain reachable only through existing config aliases and keep the existing HTTPS, checksum, ZIP, no-credential, no-query, no-fragment, no-script, no-production-code, and OpenSpec-only write safeguards.
+
+Interactive mode does not call provider APIs, LLM APIs, local model APIs, agents, source-control tools, workflow tools, shell commands, or scripts. It performs no production-code writes, config mutation, auto-commit, auto-push, pull request creation, merge, or archive automation.
 
 ### Blank Generation
 
