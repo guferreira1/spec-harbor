@@ -67,7 +67,7 @@ date: unknown
 dirty: unknown
 ```
 
-This is expected behavior. `dev` means no release version was injected. `unknown` means the build did not provide that metadata field. Git release tags use `vX.Y.Z`, such as `v0.1.0`, while binary metadata should use plain `X.Y.Z`, such as `0.1.0`. Runtime displays the injected version string as-is, does not normalize versions, and does not inspect Git tags, read `.git`, or run Git. To get release metadata, the binary must be built with injected Go `-ldflags -X` values under `github.com/guferreira1/spec-harbor/internal/platform/version`. Release builds will inject that metadata in future release automation. GitHub Releases, install scripts, npm publishing for the desired future package name `specharbor`, Homebrew publishing, native Linux packages, and Windows package-manager support are future changes, not implemented distribution channels.
+This is expected behavior. `dev` means no release version was injected. `unknown` means the build did not provide that metadata field. Git release tags use `vX.Y.Z`, such as `v0.1.0`, while release binaries display plain `X.Y.Z`, such as `0.1.0`. Runtime displays the injected version string as-is, does not normalize versions, and does not inspect Git tags, read `.git`, or run Git. GoReleaser builds GitHub Release assets for Linux, macOS, and Windows on `amd64` and `arm64`, injects metadata under `github.com/guferreira1/spec-harbor/internal/platform/version`, and generates `checksums.txt` with SHA-256 checksums. Snapshot releases are local verification only. Install channels such as npm, Homebrew, `install.sh`, native Linux packages, Windows package managers, signing, SBOMs, and Docker images are future work.
 
 `config` is a read-only alias for `config show`. It reads `.specharbor/config.yml` and prints a local config report when the project has a supported version `1` config file.
 
@@ -159,6 +159,7 @@ Implemented:
 - Read-only local config display with `config show` and `config`.
 - Read-only advisory workflow guide with `workflow`.
 - Deterministic version metadata reporting with `version`.
+- Tag-based GoReleaser GitHub Release assets with SHA-256 checksums.
 
 In progress:
 

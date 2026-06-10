@@ -39,7 +39,7 @@ Fields:
 - `date`: build date supplied by the build.
 - `dirty`: working tree state supplied by the build.
 
-`dev` means no release version was injected. `unknown` means the build did not provide that metadata field. Git release tags use `vX.Y.Z`, for example `v0.1.0`, while binary metadata should use plain `X.Y.Z`, for example `0.1.0`.
+`dev` means no release version was injected. `unknown` means the build did not provide that metadata field. Git release tags use `vX.Y.Z`, for example `v0.1.0`, while release binary metadata uses plain `X.Y.Z`, for example `0.1.0`.
 
 Plain `go install` without `-ldflags` uses the same development fallback metadata. An installed binary built that way is expected to print:
 
@@ -65,7 +65,7 @@ go build \
   ./cmd/specharbor
 ```
 
-Runtime displays the injected version string as-is and does not normalize it. It does not inspect Git tags, read `.git`, run Git, or normalize versions. Future release automation will inject release metadata and should convert a tag such as `v0.1.0` into injected binary metadata such as `0.1.0`. This command does not implement tag conversion. GitHub Releases, install scripts, npm publishing for the desired future package name `specharbor`, Homebrew publishing, native Linux packages, and Windows package-manager support are future work.
+Runtime displays the injected version string as-is and does not normalize it. It does not inspect Git tags, read `.git`, run Git, or normalize versions. GoReleaser injects release metadata when building GitHub Release assets from tags such as `v0.1.0`, and those binaries display plain metadata such as `0.1.0`. Install channels such as npm, Homebrew, `install.sh`, native Linux packages, Windows package managers, signing, SBOMs, and Docker images are future work.
 
 ### Initialize a Project
 

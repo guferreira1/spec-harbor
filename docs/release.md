@@ -1,6 +1,6 @@
 # Release Metadata
 
-SpecHarbor currently provides a local release-versioning foundation for the CLI binary. It does not publish releases or packages.
+SpecHarbor uses GoReleaser to build GitHub Release assets from pushed version tags.
 
 ## Check Version
 
@@ -37,15 +37,22 @@ date: unknown
 dirty: unknown
 ```
 
-This is expected behavior. To get release metadata, the binary must be built with injected `-ldflags` values.
+This is expected behavior.
 
 ## Version Convention
 
 Git release tags use `vX.Y.Z`, for example `v0.1.0`.
 
-Binary version metadata uses plain `X.Y.Z`, for example `0.1.0`.
+Release binary version metadata uses plain `X.Y.Z`, for example `0.1.0`. GoReleaser injects the plain version value, so a release built from tag `v0.1.0` displays:
 
-Future release tooling should convert a tag such as `v0.1.0` into injected binary metadata such as `0.1.0`. Runtime displays the injected version string as-is and does not normalize it. If a manual build injects `v0.1.0`, `specharbor version` may display `v0.1.0`.
+```text
+SpecHarbor 0.1.0
+commit: <full commit sha>
+date: <UTC RFC3339 build date>
+dirty: false
+```
+
+Runtime displays the injected version string as-is and does not normalize it. If a manual build injects `v0.1.0`, `specharbor version` may display `v0.1.0`.
 
 ## Build-Time Injection
 
@@ -55,48 +62,70 @@ Release builds inject metadata through Go `-ldflags -X` variables in:
 github.com/guferreira1/spec-harbor/internal/platform/version
 ```
 
-Supported metadata variables:
+GoReleaser injects exactly:
 
-- `Version`
-- `Commit`
-- `Date`
-- `Dirty`
+- `Version={{ .Version }}`
+- `Commit={{ .FullCommit }}`
+- `Date={{ .Date }}`
+- `Dirty={{ .IsGitDirty }}`
 
-Example:
+The runtime command does not inspect Git tags, read `.git`, run Git commands, execute shell commands, call the network, write files, or normalize versions.
+
+## Release Workflow
+
+Maintainers publish a release by pushing a tag that matches `v*`, such as:
 
 ```bash
-go build \
-  -ldflags "
-    -X github.com/guferreira1/spec-harbor/internal/platform/version.Version=0.1.0
-    -X github.com/guferreira1/spec-harbor/internal/platform/version.Commit=abc1234
-    -X github.com/guferreira1/spec-harbor/internal/platform/version.Date=2026-06-10T19:00:00Z
-    -X github.com/guferreira1/spec-harbor/internal/platform/version.Dirty=false
-  " \
-  ./cmd/specharbor
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
-Expected injected output:
+The GitHub Actions release workflow runs only for pushed tags matching `v*`. It does not run on normal branch pushes or pull requests. The workflow uses GoReleaser with the repository `GITHUB_TOKEN` and top-level `contents: write` permission to create or update the GitHub Release and upload assets.
 
-```text
-SpecHarbor 0.1.0
-commit: abc1234
-date: 2026-06-10T19:00:00Z
-dirty: false
+## Release Assets
+
+GoReleaser builds one `specharbor` binary from `./cmd/specharbor` for these archives:
+
+- `specharbor_Linux_x86_64.tar.gz`
+- `specharbor_Linux_arm64.tar.gz`
+- `specharbor_Darwin_x86_64.tar.gz`
+- `specharbor_Darwin_arm64.tar.gz`
+- `specharbor_Windows_x86_64.zip`
+- `specharbor_Windows_arm64.zip`
+
+Linux and macOS assets use `.tar.gz`. Windows assets use `.zip`. GoReleaser also generates `checksums.txt` with SHA-256 checksums.
+
+## Local Snapshot Verification
+
+Local snapshot releases are for verification only. They write generated artifacts under `dist/`, which is ignored by Git.
+
+Use `goreleaser check` and `goreleaser release --snapshot --clean` before publishing release changes.
+
+Run:
+
+```bash
+goreleaser check
+goreleaser release --snapshot --clean
 ```
 
-Future release automation will inject release metadata with these linker variables. The runtime command does not inspect Git tags, read `.git`, run Git commands, execute shell commands, call the network, write files, or normalize versions.
+Then run one generated snapshot binary:
 
-## Not Implemented Here
+```bash
+./dist/specharbor_linux_amd64_v1/specharbor version
+```
 
-This metadata foundation does not implement release publishing or package distribution.
+Snapshot versions may include GoReleaser snapshot metadata instead of a normal release version. They should still show injected `commit`, `date`, and `dirty` values instead of the default `unknown` fallback values.
 
-Future OpenSpec changes may add:
+## Future Work
 
-- GitHub Releases.
-- install scripts.
-- npm publishing for the desired future package name `specharbor`, subject to verification during publishing.
-- Homebrew publishing to `guferreira1/homebrew-tap`.
-- Native Linux packages.
-- Windows package-manager support.
+The current release foundation does not implement these future work items:
 
-No GoReleaser configuration, GitHub Release workflow, install script, npm package, Homebrew tap, Linux package, Windows package, publishing script, release archive, or checksum artifact is implemented by this change.
+- npm publishing.
+- Homebrew publishing.
+- `install.sh` and other install scripts.
+- Native Linux packages such as deb, rpm, or apk.
+- Windows package-manager manifests such as Winget, Scoop, or Chocolatey.
+- Signing, cosign, attestations, or SBOM generation.
+- Docker images or Docker manifests.
+
+Those install channels and supply-chain features require separate OpenSpec changes.

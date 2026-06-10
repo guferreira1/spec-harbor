@@ -1,0 +1,41 @@
+version: 2
+project_name: specharbor
+dist: dist
+
+builds:
+  - id: specharbor
+    main: ./cmd/specharbor
+    binary: specharbor
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - >-
+        -s -w
+        -X github.com/guferreira1/spec-harbor/internal/platform/version.Version={{ .Version }}
+        -X github.com/guferreira1/spec-harbor/internal/platform/version.Commit={{ .FullCommit }}
+        -X github.com/guferreira1/spec-harbor/internal/platform/version.Date={{ .Date }}
+        -X github.com/guferreira1/spec-harbor/internal/platform/version.Dirty={{ .IsGitDirty }}
+
+archives:
+  - id: specharbor
+    ids:
+      - specharbor
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}_{{ title .Os }}_{{ if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
