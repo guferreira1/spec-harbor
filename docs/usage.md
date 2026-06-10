@@ -95,6 +95,49 @@ Supported built-in templates are exactly:
 - `docs`
 - `refactor`
 
+Custom template generation uses project-local templates with `--custom-template <template-name>`:
+
+```bash
+go run ./cmd/specharbor generate <change-id> --custom-template <template-name>
+```
+
+For example:
+
+```bash
+go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature
+```
+
+A custom template is a plain directory under the fixed project-local root `.specharbor/templates/<template-name>/` containing all five required OpenSpec change files:
+
+```text
+.specharbor/templates/<template-name>/
+  proposal.md
+  design.md
+  tasks.md
+  acceptance-criteria.md
+  risks.md
+```
+
+Custom template behavior:
+
+- All five files are required and must be non-empty; a missing template directory, missing required files, or an empty file fails with a clear error before anything is written.
+- Unknown extra files and subdirectories in the template directory are ignored and never copied.
+- Template content supports minimal deterministic variable substitution: `{{change_id}}` is always replaced; `{{title}}` and `{{summary}}` are replaced only when the optional `--title` and `--summary` flags are provided. Unresolved and unknown `{{...}}` tokens remain in the output verbatim.
+- There are no conditionals, loops, includes, or any other templating language features, and templates are never executed.
+- `--custom-template` is mutually exclusive with `--blank`, `--template`, `--guided`, and `--agent-assisted`.
+- Custom template names must be safe single path segments (characters `[A-Za-z0-9._-]`, no `/` or `\`, no `..` sequences, no leading `.` or `-`, at most 128 characters); invalid names are rejected before any filesystem access.
+- Built-in and custom templates are disjoint: `--template` resolves only the built-in set, `--custom-template` resolves only `.specharbor/templates/`, and a custom template sharing a built-in name never shadows the built-in template.
+- Files are written only under `openspec/changes/<change-id>/`; existing files are skipped, never overwritten, and any template validation failure produces zero writes.
+- No remote templates, no config-driven template registry, no marketplace, no network calls, and no production code writes.
+
+After generation, run `go run ./cmd/specharbor validate <change-id>` to check the generated change; validation findings depend on the template's content quality, exactly as for hand-authored changes.
+
+Custom template title/summary example:
+
+```bash
+go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature --title "Add payments" --summary "Adds a payment flow."
+```
+
 Guided generation uses explicit CLI flags:
 
 ```bash
@@ -109,6 +152,65 @@ Supported guided types are exactly:
 - `bugfix`
 - `docs`
 - `refactor`
+
+AI-assisted generation imports a local file containing AI-authored OpenSpec Markdown in a strict delimiter format:
+
+```bash
+go run ./cmd/specharbor generate <change-id> --ai-assisted --from-file <agent-output-file>
+go run ./cmd/specharbor generate <change-id> --ai-assisted --from-file <agent-output-file> --overwrite
+```
+
+The source file is local text only. It may be output that a user saved from an AI or agent tool, but SpecHarbor only reads the file from disk. It does not call provider APIs, remote AI services, local model APIs, OAuth, credentials, agents, shell commands, source-control tools, workflow tools, or network services.
+
+The file must contain exactly these five file blocks, using exact delimiter lines:
+
+```text
+---FILE: proposal.md---
+# Proposal
+
+...
+---END FILE---
+---FILE: design.md---
+# Design
+
+...
+---END FILE---
+---FILE: tasks.md---
+# Tasks
+
+## Phase 1
+
+- [ ] Implement the approved work.
+---END FILE---
+---FILE: acceptance-criteria.md---
+# Acceptance Criteria
+
+- The approved behavior is observable.
+---END FILE---
+---FILE: risks.md---
+# Risks
+
+## Risks
+
+- A concrete risk is identified.
+
+## Mitigations
+
+- A mitigation is defined.
+---END FILE---
+```
+
+Allowed filenames are exactly `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md`. Unknown filenames, duplicate blocks, missing blocks, empty content, absolute paths, `..` traversal, nested paths, malformed block syntax, fenced wrapper formats, patch/diff formats, orphan end markers, unclosed blocks, and non-whitespace text outside file blocks are rejected before any writes.
+
+AI-assisted generation writes only these files under:
+
+```text
+openspec/changes/<change-id>/
+```
+
+Existing files are skipped by default and reported as skipped. `--overwrite` is explicit and replaces existing required files only; symlink output targets are rejected instead of followed. All parsing and target preflight checks happen before file writes; malformed AI output writes nothing. After successful writes or skips, SpecHarbor runs the existing `validate <change-id>` logic and prints the validation status, error count, warning count, and findings. Validation warnings keep exit code `0`; validation errors are printed and then the command exits non-zero. Validation never auto-fixes files and AI-assisted generation never modifies production code.
+
+Safety boundaries printed by the command are part of the contract: provider APIs called `no`, remote AI services called `no`, agent commands executed `no`, production code modified `no`, source-control commands run `no`, and auto-commit, auto-push, PR, merge, or archive `no`. Direct live runner application such as `--agent-assisted --execute --apply` is not implemented.
 
 Agent-assisted spec authoring uses explicit CLI flags:
 
@@ -198,7 +300,7 @@ Execute mode is run-and-report only:
 
 Provider APIs, IDE automation, OAuth, credentials, marketplace integrations, remote execution, source-control automation, and workflow automation remain out of scope. Local agent command behavior is controlled by the installed local tool.
 
-Blank, built-in template, and guided generation create the same required OpenSpec change files:
+Blank, built-in template, custom template, guided, and AI-assisted generation create the same required OpenSpec change files:
 
 ```text
 openspec/changes/<change-id>/
@@ -209,11 +311,11 @@ openspec/changes/<change-id>/
   risks.md
 ```
 
-Built-in template content is deterministic, local, and generic starter content. Guided content is deterministic, local starter content that includes the supplied title and summary.
+Built-in template content is deterministic, local, and generic starter content. Guided content is deterministic, local starter content that includes the supplied title and summary. AI-assisted content comes only from the explicit local `--from-file` source after strict parsing.
 
 Generated content is safe to edit after generation. Guided output does not mean SpecHarbor inferred project-specific requirements beyond the provided type, title, and summary.
 
-Existing files are skipped and are not overwritten. If a change directory partially exists, running generation again recovers it by creating only the missing required files.
+Blank, built-in template, custom template, and guided generation skip existing files and do not overwrite them. AI-assisted generation also skips existing files by default, and overwrites only with explicit `--overwrite`. If a change directory partially exists, running generation again recovers it by creating only the missing required files.
 
 Copy-pasteable examples from the repository root:
 
@@ -223,10 +325,14 @@ go run ./cmd/specharbor generate add-example-feature --template feature
 go run ./cmd/specharbor generate fix-example-bug --template bugfix
 go run ./cmd/specharbor generate update-example-docs --template docs
 go run ./cmd/specharbor generate refactor-example-flow --template refactor
+go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature
+go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature --title "Add payments" --summary "Adds a payment flow."
 go run ./cmd/specharbor generate add-guided-feature --guided --type feature --title "Add guided feature" --summary "Create a guided OpenSpec change from explicit CLI inputs."
 go run ./cmd/specharbor generate fix-guided-bug --guided --type bugfix --title "Fix guided bug" --summary "Describe the bugfix using deterministic guided starter content."
 go run ./cmd/specharbor generate update-guided-docs --guided --type docs --title "Update guided docs" --summary "Document guided generation as implemented behavior."
 go run ./cmd/specharbor generate refactor-guided-flow --guided --type refactor --title "Refactor guided flow" --summary "Describe a behavior-preserving refactor with explicit context."
+go run ./cmd/specharbor generate add-ai-assisted-change --ai-assisted --from-file agent-output.txt
+go run ./cmd/specharbor generate add-ai-assisted-change --ai-assisted --from-file agent-output.txt --overwrite
 go run ./cmd/specharbor generate add-reports --agent-assisted --agent codex --type feature --title "Add reports" --summary "Create report generation support"
 go run ./cmd/specharbor generate add-reports --agent-assisted --agent codex --type feature --title "Add reports" --summary "Create report generation support" --execute
 ```
@@ -406,9 +512,8 @@ Do not archive a change until the implementation is complete and reviewed.
 
 The following items are product direction, not implemented command behavior:
 
-- AI-assisted generation;
 - hybrid generation;
-- custom, remote, and config-driven templates;
+- remote and config-driven templates;
 - config-driven generic runner commands;
 - interactive generation prompts;
 - AI provider setup;
