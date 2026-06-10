@@ -1823,7 +1823,7 @@ func currentLocalArchiveDate() string {
 }
 
 func formatLocalArchiveDate(now time.Time) string {
-	return now.Local().Format("2006-01-02")
+	return now.Format("2006-01-02")
 }
 
 func printArchiveReport(output io.Writer, result domain.ArchiveResult) {
