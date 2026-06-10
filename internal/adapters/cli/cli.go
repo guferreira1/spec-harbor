@@ -91,7 +91,21 @@ func commandRegistry() map[string]CommandHandler {
 }
 
 func versionCommand(ctx CommandContext) error {
-	fmt.Fprintln(ctx.Output, version.Version)
+	if err := parseVersionArguments(ctx.Args); err != nil {
+		return err
+	}
+
+	fmt.Fprintln(ctx.Output, version.Current().Format())
+	return nil
+}
+
+func parseVersionArguments(args []string) error {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			return fmt.Errorf("unsupported flag: %s", arg)
+		}
+		return fmt.Errorf("unexpected argument: %s", arg)
+	}
 	return nil
 }
 
