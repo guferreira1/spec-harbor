@@ -76,6 +76,82 @@ go run ./cmd/specharbor generate add-example-feature --blank
 
 `generate <change-id> --blank` creates the expected OpenSpec change structure with blank/manual starter content.
 
+Interactive generation is a prompt layer over existing deterministic generation paths:
+
+```bash
+go run ./cmd/specharbor generate <change-id> --interactive
+```
+
+`<change-id>` remains required on the command line; interactive mode does not prompt for it. `--interactive` cannot be combined with direct generation or input flags such as `--blank`, `--template`, `--custom-template`, `--config-template`, `--guided`, `--hybrid`, `--ai-assisted`, `--agent-assisted`, `--from-file`, `--overwrite`, `--agent`, `--execute`, `--type`, `--title`, or `--summary`.
+
+Interactive mode requires an interactive terminal. In CI, piped input, or other non-TTY contexts it fails immediately with:
+
+```text
+interactive mode requires a TTY
+```
+
+It does not prompt, hang, or write files in that case.
+
+Supported interactive paths in this version are exactly:
+
+- `blank`
+- built-in template
+- custom template
+- config template
+- hybrid
+
+The first menu accepts the numbered choices `1` through `5` and stable keywords such as `blank`, `template`, `custom`, `config`, and `hybrid`. Direct guided generation remains available only through non-interactive flags. AI-assisted generation, agent-assisted generation, local agent runner execution, live runner output application, and raw remote URL entry are not offered by interactive prompts.
+
+Prompt sequence:
+
+- Blank asks only for the generation path.
+- Built-in template asks for the built-in template name (`feature`, `bugfix`, `docs`, or `refactor`).
+- Custom template asks for a custom template name, optional title, and optional summary.
+- Config template asks for a config alias, optional title, and optional summary.
+- Hybrid asks for exactly one source namespace (built-in template, custom template, or config template), the source value, required title, required summary, and optional type.
+
+Invalid required answers retry up to three attempts. Empty required answers are invalid. Invalid non-empty hybrid type answers retry up to three attempts. Empty optional title, summary, and hybrid type answers are treated as omitted. Retry exhaustion exits non-zero and writes nothing.
+
+Before any generation use case runs, interactive mode prints a deterministic summary:
+
+```text
+Interactive generation summary:
+Change: add-login
+Generation path: hybrid
+Hybrid source: built-in template
+Template: feature
+Title: Add login
+Summary: Add login support
+Expected write target: openspec/changes/add-login/
+Files: proposal.md, design.md, tasks.md, acceptance-criteria.md, risks.md
+Validation: automatic yes
+Safety:
+- Writes are limited to OpenSpec change files.
+- Production code will not be modified.
+- Source-control commands will not be run.
+- Workflow automation will not be triggered.
+- Provider, LLM, and agent APIs will not be called.
+- No auto-commit, auto-push, PR creation, merge, or archive will be performed.
+
+Proceed? [y/N]:
+```
+
+Blank, built-in template, custom template, and config template summaries show `Validation: automatic no`. Hybrid summaries show `Validation: automatic yes`, preserving hybrid's existing automatic validation after generation. Interactive mode does not add a validation prompt and never auto-fixes validation findings.
+
+Confirmation is trimmed and case-insensitive. `y` and `yes` proceed in any casing, including `Y`, `YES`, and `Yes`. `n` and `no` cancel in any casing, including `N`, `NO`, and `No`. Empty confirmation and EOF also cancel. Cancellation exits non-zero with `operation cancelled` and writes nothing. Unsupported confirmation answers retry up to three attempts; confirmation retry exhaustion writes nothing.
+
+On confirmation, interactive mode delegates to the same behavior as the equivalent direct command:
+
+```bash
+go run ./cmd/specharbor generate add-blank --interactive
+go run ./cmd/specharbor generate add-feature --interactive
+go run ./cmd/specharbor generate add-payment-flow --interactive
+go run ./cmd/specharbor generate add-configured-feature --interactive
+go run ./cmd/specharbor generate add-login --interactive
+```
+
+Write behavior, existing-file preservation, template rendering, config alias lookup, remote-template safeguards, and validation behavior remain owned by the selected generation mode. Remote templates are reachable only through existing config aliases after confirmation; interactive mode does not ask for URLs or checksums and does not print credentials, query strings, fragments, auth headers, cookies, OAuth material, or environment-derived secrets.
+
 Built-in template generation uses the same command with `--template <template-name>` and deterministic built-in starter content:
 
 ```bash
@@ -464,6 +540,7 @@ Blank, built-in template, custom template, config-template, hybrid, and guided g
 Copy-pasteable examples from the repository root:
 
 ```bash
+go run ./cmd/specharbor generate add-interactive-change --interactive
 go run ./cmd/specharbor generate add-example-feature --blank
 go run ./cmd/specharbor generate add-example-feature --template feature
 go run ./cmd/specharbor generate fix-example-bug --template bugfix
@@ -662,7 +739,6 @@ Do not archive a change until the implementation is complete and reviewed.
 The following items are product direction, not implemented command behavior:
 
 - config-driven generic runner commands;
-- interactive generation prompts;
 - AI provider setup;
 - provider API key management;
 - config mutation commands;

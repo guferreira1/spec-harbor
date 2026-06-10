@@ -20,8 +20,9 @@ import (
 )
 
 type CommandContext struct {
-	Args   []string
-	Output io.Writer
+	Args     []string
+	Output   io.Writer
+	terminal interactiveTerminal
 }
 
 type CommandHandler func(ctx CommandContext) error
@@ -47,6 +48,10 @@ func Execute(args []string) error {
 }
 
 func execute(args []string, output io.Writer) error {
+	return executeWithTerminal(args, output, nil)
+}
+
+func executeWithTerminal(args []string, output io.Writer, terminal interactiveTerminal) error {
 	if len(args) == 0 {
 		printHelp(output)
 		return nil
@@ -60,8 +65,9 @@ func execute(args []string, output io.Writer) error {
 	}
 
 	return handler(CommandContext{
-		Args:   args[1:],
-		Output: output,
+		Args:     args[1:],
+		Output:   output,
+		terminal: terminal,
 	})
 }
 
@@ -197,6 +203,23 @@ func generateCommand(ctx CommandContext) error {
 	arguments, err := parseGenerateArguments(ctx.Args)
 	if err != nil {
 		return err
+	}
+
+	if arguments.interactive {
+		parsedChangeID, err := domain.NewChangeID(arguments.changeID)
+		if err != nil {
+			return err
+		}
+
+		terminal := ctx.terminal
+		if terminal == nil {
+			terminal = newOSInteractiveTerminal(ctx.Output)
+		}
+
+		arguments, err = promptInteractiveGeneration(terminal, parsedChangeID.String())
+		if err != nil {
+			return err
+		}
 	}
 
 	root, err := os.Getwd()
@@ -339,6 +362,7 @@ func generateCommand(ctx CommandContext) error {
 type generateArguments struct {
 	changeID            string
 	mode                domain.GenerationMode
+	interactive         bool
 	templateName        string
 	customTemplate      bool
 	customTemplateName  string
@@ -355,6 +379,7 @@ type generateArguments struct {
 
 func parseGenerateArguments(args []string) (generateArguments, error) {
 	var positionals []string
+	interactiveProvided := false
 	hybridProvided := false
 	blankProvided := false
 	templateProvided := false
@@ -381,6 +406,14 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
+		if arg == "--interactive" {
+			if interactiveProvided {
+				return generateArguments{}, fmt.Errorf("interactive generation flag specified more than once")
+			}
+			interactiveProvided = true
+			continue
+		}
+
 		if arg == "--hybrid" {
 			if hybridProvided {
 				return generateArguments{}, fmt.Errorf("hybrid generation flag specified more than once")
@@ -578,6 +611,64 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 		}
 
 		positionals = append(positionals, arg)
+	}
+
+	if interactiveProvided {
+		if blankProvided {
+			return generateArguments{}, fmt.Errorf("interactive and blank generation flags cannot be used together")
+		}
+		if templateProvided {
+			return generateArguments{}, fmt.Errorf("interactive and template generation flags cannot be used together")
+		}
+		if customTemplateProvided {
+			return generateArguments{}, fmt.Errorf("interactive and custom-template generation flags cannot be used together")
+		}
+		if configTemplateProvided {
+			return generateArguments{}, fmt.Errorf("interactive and config-template generation flags cannot be used together")
+		}
+		if guidedProvided {
+			return generateArguments{}, fmt.Errorf("interactive and guided generation flags cannot be used together")
+		}
+		if hybridProvided {
+			return generateArguments{}, fmt.Errorf("interactive and hybrid generation flags cannot be used together")
+		}
+		if aiAssistedProvided {
+			return generateArguments{}, fmt.Errorf("interactive and ai-assisted generation flags cannot be used together")
+		}
+		if agentAssistedProvided {
+			return generateArguments{}, fmt.Errorf("interactive and agent-assisted generation flags cannot be used together")
+		}
+		if guidedTypeProvided {
+			return generateArguments{}, fmt.Errorf("interactive and type flags cannot be used together")
+		}
+		if titleProvided {
+			return generateArguments{}, fmt.Errorf("interactive and title flags cannot be used together")
+		}
+		if summaryProvided {
+			return generateArguments{}, fmt.Errorf("interactive and summary flags cannot be used together")
+		}
+		if fromFileProvided {
+			return generateArguments{}, fmt.Errorf("interactive and from-file flags cannot be used together")
+		}
+		if agentProvided {
+			return generateArguments{}, fmt.Errorf("interactive and agent flags cannot be used together")
+		}
+		if executeProvided {
+			return generateArguments{}, fmt.Errorf("interactive and execute flags cannot be used together")
+		}
+		if overwriteProvided {
+			return generateArguments{}, fmt.Errorf("interactive and overwrite flags cannot be used together")
+		}
+		if len(positionals) == 0 {
+			return generateArguments{}, fmt.Errorf("change id is required")
+		}
+		if len(positionals) > 1 {
+			return generateArguments{}, fmt.Errorf("unexpected argument: %s", positionals[1])
+		}
+		return generateArguments{
+			changeID:    positionals[0],
+			interactive: true,
+		}, nil
 	}
 
 	if hybridProvided {

@@ -29,6 +29,7 @@ Implemented commands on the current branch:
 ```bash
 go run ./cmd/specharbor init
 go run ./cmd/specharbor scan
+go run ./cmd/specharbor generate add-example-feature --interactive
 go run ./cmd/specharbor generate add-example-feature --blank
 go run ./cmd/specharbor generate add-feature --template feature
 go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature
@@ -52,6 +53,16 @@ go run ./cmd/specharbor workflow
 `validate <change-id>` runs deterministic, local, read-only validation over the required OpenSpec change files, including content-quality rules with `error` and `warning` severities. Errors (missing or empty files, malformed task checkboxes, missing acceptance criteria) exit non-zero; warnings (placeholders, boilerplate-only starter content, missing recommended sections) never change the exit code, so a freshly generated blank change validates as valid with warnings. See [Usage](docs/usage.md) for the full rule list, exit codes, and example output.
 
 The recommended workflow guide is available as `specharbor workflow`. It prints the nine-step advisory path: Spec Author Agent, Architecture Reviewer Agent, Implementer Agent, Test Engineer Agent, Change Reviewer Agent, Commit, Pull Request, Merge, and Archive. The command is read-only, does not execute command suggestions, does not commit, does not create PRs, does not merge, and does not call GitHub, GitLab, CI, provider APIs, agent CLIs, source-control automation, workflow execution, or remote automation.
+
+Interactive generation is available as:
+
+```bash
+specharbor generate <change-id> --interactive
+```
+
+`<change-id>` remains required on the command line. Interactive mode requires a TTY, guides the user through one supported path (`blank`, built-in template, custom template, config template, or hybrid), validates answers with the same value objects and generation rules used by direct flags, prints a deterministic pre-write summary, and asks for confirmation before delegating to existing generation behavior. The summary includes `Validation: automatic no` for blank, built-in template, custom template, and config template paths, and `Validation: automatic yes` for hybrid paths. It also prints deterministic safety notes: writes stay limited to OpenSpec change files, production code is not modified, source-control and workflow commands are not run, provider/LLM/agent APIs are not called, and no auto-commit, auto-push, PR creation, merge, or archive is performed.
+
+Interactive prompts do not offer direct guided generation, AI-assisted generation, agent-assisted generation, local agent execution, or raw remote URL entry in this version. Remote templates remain reachable only through existing config aliases and only after confirmation.
 
 Built-in template generation supports exactly `feature`, `bugfix`, `docs`, and `refactor`. See [Usage](docs/usage.md) and [Generation modes](docs/generation-modes.md) for details.
 
@@ -111,6 +122,7 @@ Implemented:
 
 - OpenSpec project initialization.
 - Stack-agnostic local project scanning.
+- Interactive generation prompts for blank, built-in template, custom template, config template, and hybrid paths.
 - Blank OpenSpec change generation.
 - Built-in OpenSpec change template generation for `feature`, `bugfix`, `docs`, and `refactor`.
 - Project-local custom template generation from `.specharbor/templates/<template-name>/` with deterministic variable substitution and OpenSpec-only writes.
@@ -133,7 +145,6 @@ In progress:
 Planned:
 
 - Future config-driven generic runner mappings and richer templates.
-- Interactive generation prompts.
 - Config mutation commands such as `config get`, `config set`, and `config unset`.
 - AI-provider and workflow connector support.
 
