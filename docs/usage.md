@@ -126,9 +126,9 @@ Custom template behavior:
 - There are no conditionals, loops, includes, or any other templating language features, and templates are never executed.
 - `--custom-template` is mutually exclusive with `--blank`, `--template`, `--guided`, and `--agent-assisted`.
 - Custom template names must be safe single path segments (characters `[A-Za-z0-9._-]`, no `/` or `\`, no `..` sequences, no leading `.` or `-`, at most 128 characters); invalid names are rejected before any filesystem access.
-- Built-in and custom templates are disjoint: `--template` resolves only the built-in set, `--custom-template` resolves only `.specharbor/templates/`, and a custom template sharing a built-in name never shadows the built-in template.
+- Built-in, custom, and config-driven templates are disjoint: `--template` resolves only the built-in set, `--custom-template` resolves only `.specharbor/templates/`, and `--config-template` resolves only `.specharbor/config.yml` aliases.
 - Files are written only under `openspec/changes/<change-id>/`; existing files are skipped, never overwritten, and any template validation failure produces zero writes.
-- No remote templates, no config-driven template registry, no marketplace, no network calls, and no production code writes.
+- No remote templates, no marketplace, no arbitrary local paths, no template script execution, no shell execution, no network/provider behavior, and no production code writes.
 
 After generation, run `go run ./cmd/specharbor validate <change-id>` to check the generated change; validation findings depend on the template's content quality, exactly as for hand-authored changes.
 
@@ -137,6 +137,42 @@ Custom template title/summary example:
 ```bash
 go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature --title "Add payments" --summary "Adds a payment flow."
 ```
+
+Config-driven template generation uses aliases declared in `.specharbor/config.yml`:
+
+```bash
+go run ./cmd/specharbor generate <change-id> --config-template <alias>
+go run ./cmd/specharbor generate <change-id> --config-template <alias> --title "<title>" --summary "<summary>"
+```
+
+Schema:
+
+```yaml
+version: 1
+
+templates:
+  aliases:
+    api-feature:
+      source: custom
+      template: api-feature
+
+    default-feature:
+      source: builtin
+      template: feature
+```
+
+Rules:
+
+- `version: 1` is required when `--config-template` is used; missing config, missing version, unsupported versions, invalid YAML, invalid alias entries, and missing aliases fail clearly.
+- Supported source kinds are exactly `builtin` and `custom`.
+- `builtin` resolves only supported built-in templates: `feature`, `bugfix`, `docs`, and `refactor`.
+- `custom` resolves only `.specharbor/templates/<template-name>/` and uses the same required-file validation and `{{change_id}}`, `{{title}}`, and `{{summary}}` substitution as direct `--custom-template`.
+- Alias names must be safe single path segments: non-empty, at most 128 characters, characters `[A-Za-z0-9._-]`, no `/` or `\`, no absolute paths, no traversal or `..` sequence, no leading `.` or `-`.
+- `--title` and `--summary` are optional with `--config-template`; they are passed through to the resolved custom template path and do not change built-in template output.
+- `--config-template` is mutually exclusive with `--blank`, `--template`, `--custom-template`, `--guided`, `--agent-assisted`, `--ai-assisted`, and `--execute`.
+- `--template`, `--custom-template`, and `--config-template` use separate namespaces. A built-in template, custom template, and config alias may share the same name without shadowing, fallback, or guessing.
+- Config aliases do not support `local`, `remote`, `url`, arbitrary `path`, marketplace lookup, script execution, shell execution, network/provider behavior, production code writes, source-control automation, or archive automation.
+- Generated files are still limited to `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md` under `openspec/changes/<change-id>/`; existing files are skipped.
 
 Guided generation uses explicit CLI flags:
 
@@ -327,6 +363,8 @@ go run ./cmd/specharbor generate update-example-docs --template docs
 go run ./cmd/specharbor generate refactor-example-flow --template refactor
 go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature
 go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature --title "Add payments" --summary "Adds a payment flow."
+go run ./cmd/specharbor generate add-payment-flow --config-template api-feature
+go run ./cmd/specharbor generate add-payment-flow --config-template api-feature --title "Add payments" --summary "Adds a payment flow."
 go run ./cmd/specharbor generate add-guided-feature --guided --type feature --title "Add guided feature" --summary "Create a guided OpenSpec change from explicit CLI inputs."
 go run ./cmd/specharbor generate fix-guided-bug --guided --type bugfix --title "Fix guided bug" --summary "Describe the bugfix using deterministic guided starter content."
 go run ./cmd/specharbor generate update-guided-docs --guided --type docs --title "Update guided docs" --summary "Document guided generation as implemented behavior."
@@ -513,7 +551,7 @@ Do not archive a change until the implementation is complete and reviewed.
 The following items are product direction, not implemented command behavior:
 
 - hybrid generation;
-- remote and config-driven templates;
+- remote templates;
 - config-driven generic runner commands;
 - interactive generation prompts;
 - AI provider setup;

@@ -44,6 +44,16 @@ func TestExecuteInitFirstAndSecondRun(t *testing.T) {
 	assertPathExists(t, root, ".specharbor/rules/test-engineer.md")
 	assertPathExists(t, root, ".specharbor/rules/change-reviewer.md")
 
+	configContents, err := os.ReadFile(filepath.Join(root, ".specharbor", "config.yml"))
+	if err != nil {
+		t.Fatalf("ReadFile(config.yml) error = %v", err)
+	}
+	for _, want := range []string{"version: 1", "templates:", "  aliases: {}"} {
+		if !strings.Contains(string(configContents), want) {
+			t.Fatalf("config.yml = %q, want %q", string(configContents), want)
+		}
+	}
+
 	projectPath := filepath.Join(root, "openspec", "project.md")
 	if err := os.WriteFile(projectPath, []byte("custom project"), 0o644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)

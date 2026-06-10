@@ -48,6 +48,25 @@ func TestDefaultInitializationConfigDoesNotContainCredentials(t *testing.T) {
 	}
 }
 
+func TestDefaultInitializationConfigIncludesTemplateAliasSchema(t *testing.T) {
+	defaults := NewDefaultInitializationTemplates()
+
+	contents, err := defaults.ContentFor(".specharbor/config.yml")
+	if err != nil {
+		t.Fatalf("ContentFor() error = %v", err)
+	}
+
+	for _, want := range []string{
+		"version: 1",
+		"templates:",
+		"  aliases: {}",
+	} {
+		if !strings.Contains(contents, want) {
+			t.Fatalf("default config = %q, want %q", contents, want)
+		}
+	}
+}
+
 func TestDefaultInitializationTemplatesRejectUnknownPath(t *testing.T) {
 	defaults := NewDefaultInitializationTemplates()
 

@@ -32,6 +32,7 @@ go run ./cmd/specharbor scan
 go run ./cmd/specharbor generate add-example-feature --blank
 go run ./cmd/specharbor generate add-feature --template feature
 go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature
+go run ./cmd/specharbor generate add-payment-flow --config-template api-feature
 go run ./cmd/specharbor generate add-reports --guided --type feature --title "Add reports" --summary "Create report generation support"
 go run ./cmd/specharbor generate add-reports --ai-assisted --from-file agent-output.txt
 go run ./cmd/specharbor generate add-reports --agent-assisted --agent codex --type feature --title "Add reports" --summary "Create report generation support"
@@ -53,7 +54,15 @@ The recommended workflow guide is available as `specharbor workflow`. It prints 
 
 Built-in template generation supports exactly `feature`, `bugfix`, `docs`, and `refactor`. See [Usage](docs/usage.md) and [Generation modes](docs/generation-modes.md) for details.
 
-Custom template generation renders reusable, project-local templates from `.specharbor/templates/<template-name>/` with `--custom-template`. A custom template is a plain directory containing the five required OpenSpec change files; generation performs minimal deterministic variable substitution (`{{change_id}}`, plus `{{title}}`/`{{summary}}` when provided, with unresolved tokens left verbatim) and writes only under `openspec/changes/<change-id>/`, skipping existing files. Built-in and custom templates resolve from disjoint sources, so a custom template never shadows a built-in one. Templates are local and static: no remote templates, no config-driven registry, no template or script execution, and no network or provider calls. See [Usage](docs/usage.md) and [Generation modes](docs/generation-modes.md) for details.
+Custom template generation renders reusable, project-local templates from `.specharbor/templates/<template-name>/` with `--custom-template`. A custom template is a plain directory containing the five required OpenSpec change files; generation performs minimal deterministic variable substitution (`{{change_id}}`, plus `{{title}}`/`{{summary}}` when provided, with unresolved tokens left verbatim) and writes only under `openspec/changes/<change-id>/`, skipping existing files. Built-in and custom templates resolve from disjoint sources, so a custom template never shadows a built-in one. See [Usage](docs/usage.md) and [Generation modes](docs/generation-modes.md) for details.
+
+Config-driven template generation uses project-owned aliases from `.specharbor/config.yml`:
+
+```bash
+specharbor generate <change-id> --config-template <alias> [--title "<title>"] [--summary "<summary>"]
+```
+
+Aliases live under `version: 1` config as `templates.aliases.<alias>` and resolve only to `source: builtin` or `source: custom` with a `template` name. `--template`, `--custom-template`, and `--config-template` are disjoint namespaces; the same name can exist in all three without shadowing or fallback. Config aliases are local and static: no remote templates, no marketplace, no arbitrary local paths, no template or script execution, no network/provider calls, no production code writes, and no source-control automation.
 
 Guided generation is deterministic, local, non-interactive, and supports exactly `feature`, `bugfix`, `docs`, and `refactor`. It uses explicit `--type`, `--title`, and `--summary` flags.
 
@@ -78,6 +87,7 @@ Implemented:
 - Blank OpenSpec change generation.
 - Built-in OpenSpec change template generation for `feature`, `bugfix`, `docs`, and `refactor`.
 - Project-local custom template generation from `.specharbor/templates/<template-name>/` with deterministic variable substitution and OpenSpec-only writes.
+- Config-driven template aliases for built-in and project-local custom templates.
 - Guided OpenSpec change generation for `feature`, `bugfix`, `docs`, and `refactor`.
 - AI-assisted from-file OpenSpec generation with strict local delimiter blocks, default skip behavior, explicit overwrite, validation integration, and no provider/API/runner/source-control automation.
 - Dry-run agent-assisted spec authoring for `feature`, `bugfix`, `docs`, and `refactor`.
@@ -96,7 +106,7 @@ Planned:
 
 - Hybrid spec generation.
 - Future config-driven generic runner mappings and richer templates.
-- Future template capabilities such as remote and config-driven templates.
+- Future template capabilities such as remote templates.
 - Interactive generation prompts.
 - Config mutation commands such as `config get`, `config set`, and `config unset`.
 - AI-provider and workflow connector support.

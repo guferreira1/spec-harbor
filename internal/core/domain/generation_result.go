@@ -7,6 +7,9 @@ type GenerationResult struct {
 	TemplateSource         TemplateSource
 	CustomTemplateName     string
 	TemplatePath           string
+	ConfigTemplateAlias    string
+	ConfigTemplateSource   ConfigTemplateSourceKind
+	ConfigTemplateName     string
 	GuidedType             GuidedType
 	GuidedTitle            string
 	ChangePath             string
@@ -68,6 +71,56 @@ func NewCustomTemplateGenerationResult(
 		TemplateSource:         CustomTemplateSource,
 		CustomTemplateName:     customTemplateName.String(),
 		TemplatePath:           templatePath,
+		ChangePath:             changePath,
+		ChangeDirectoryCreated: changeDirectoryCreated,
+		createdFiles:           append([]string(nil), createdFiles...),
+		skippedExistingFiles:   append([]string(nil), skippedExistingFiles...),
+	}
+}
+
+func NewConfigTemplateBuiltInGenerationResult(
+	changeID string,
+	configTemplateAlias ConfigTemplateAlias,
+	templateName TemplateName,
+	changePath string,
+	changeDirectoryCreated bool,
+	createdFiles []string,
+	skippedExistingFiles []string,
+) GenerationResult {
+	return GenerationResult{
+		ChangeID:               changeID,
+		Mode:                   TemplateMode,
+		TemplateName:           templateName,
+		TemplateSource:         BuiltInTemplateSource,
+		ConfigTemplateAlias:    configTemplateAlias.String(),
+		ConfigTemplateSource:   ConfigTemplateSourceBuiltin,
+		ConfigTemplateName:     string(templateName),
+		ChangePath:             changePath,
+		ChangeDirectoryCreated: changeDirectoryCreated,
+		createdFiles:           append([]string(nil), createdFiles...),
+		skippedExistingFiles:   append([]string(nil), skippedExistingFiles...),
+	}
+}
+
+func NewConfigTemplateCustomGenerationResult(
+	changeID string,
+	configTemplateAlias ConfigTemplateAlias,
+	customTemplateName CustomTemplateName,
+	templatePath string,
+	changePath string,
+	changeDirectoryCreated bool,
+	createdFiles []string,
+	skippedExistingFiles []string,
+) GenerationResult {
+	return GenerationResult{
+		ChangeID:               changeID,
+		Mode:                   TemplateMode,
+		TemplateSource:         CustomTemplateSource,
+		CustomTemplateName:     customTemplateName.String(),
+		TemplatePath:           templatePath,
+		ConfigTemplateAlias:    configTemplateAlias.String(),
+		ConfigTemplateSource:   ConfigTemplateSourceCustom,
+		ConfigTemplateName:     customTemplateName.String(),
 		ChangePath:             changePath,
 		ChangeDirectoryCreated: changeDirectoryCreated,
 		createdFiles:           append([]string(nil), createdFiles...),

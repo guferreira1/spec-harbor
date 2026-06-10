@@ -1,6 +1,6 @@
 # Generation Modes
 
-SpecHarbor currently implements blank generation, built-in template generation, project-local custom template generation, guided generation, AI-assisted from-file generation, dry-run agent-assisted spec authoring, and explicit agent-assisted local runner execution in run-and-report mode.
+SpecHarbor currently implements blank generation, built-in template generation, project-local custom template generation, config-driven template aliases, guided generation, AI-assisted from-file generation, dry-run agent-assisted spec authoring, and explicit agent-assisted local runner execution in run-and-report mode.
 
 ## Implemented
 
@@ -65,13 +65,58 @@ Built-in and custom templates resolve from disjoint sources:
 
 - `--template <name>` resolves only the four built-in templates; its behavior, content, output, and unknown-name errors are unchanged.
 - `--custom-template <name>` resolves only `.specharbor/templates/<name>/`.
+- `--config-template <alias>` resolves only aliases declared in `.specharbor/config.yml`.
 - A custom template sharing a built-in name (for example `feature`) never shadows or overrides the built-in template.
 
 `--custom-template` is mutually exclusive with `--blank`, `--template`, `--guided`, and `--agent-assisted`. The success report identifies the template as custom, shows the relative template source path, lists created and skipped files, and notes that only OpenSpec change files were written.
 
 Generated changes work with `specharbor validate <change-id>` like any other change; generation does not run validation automatically, and validation findings depend on the template's content quality.
 
-Safety boundaries: templates are local and project-scoped; there are no remote templates, no config-driven template registry, no marketplace, no network or provider calls, no credentials, and no writes outside `openspec/changes/<change-id>/`. Existing files are skipped, never overwritten.
+Safety boundaries: templates are local and project-scoped; there are no remote templates, no marketplace, no network or provider calls, no credentials, and no writes outside `openspec/changes/<change-id>/`. Existing files are skipped, never overwritten.
+
+### Config-Driven Template Aliases
+
+```bash
+go run ./cmd/specharbor generate <change-id> --config-template <alias>
+go run ./cmd/specharbor generate <change-id> --config-template <alias> --title "<title>" --summary "<summary>"
+```
+
+Config-driven templates let a project define stable aliases for existing built-in or custom templates. The alias map lives in `.specharbor/config.yml`:
+
+```yaml
+version: 1
+
+templates:
+  aliases:
+    api-feature:
+      source: custom
+      template: api-feature
+
+    default-feature:
+      source: builtin
+      template: feature
+```
+
+`version: 1` is required for config-driven generation. Omitted `templates` or omitted `templates.aliases` means there are no aliases. A missing config file, missing version, unsupported version, invalid YAML, invalid alias entry, or missing requested alias returns a clear error.
+
+Supported source kinds are exactly:
+
+- `builtin`, resolving the named built-in template only.
+- `custom`, resolving `.specharbor/templates/<template-name>/` only.
+
+Aliases are safe single path segments: non-empty, at most 128 characters, allowed characters `[A-Za-z0-9._-]`, no `/` or `\`, no absolute paths, no traversal or `..` sequence, no leading `.` or `-`. Invalid CLI aliases fail before template resolution, and invalid alias names in config fail during config validation.
+
+Config-driven generation delegates to the resolved source behavior:
+
+- A built-in alias produces the same files as direct `--template <name>`.
+- A custom alias uses the same custom-template directory, required-file validation, and deterministic `{{change_id}}`, `{{title}}`, and `{{summary}}` substitution as direct `--custom-template <name>`.
+- Optional `--title` and `--summary` pass through to the resolved generation behavior; built-in templates do not use those values.
+
+Namespaces are disjoint by flag. `--template feature`, `--custom-template feature`, and `--config-template feature` are three different lookups. There is no shadowing, fallback, or source inference.
+
+`--config-template` is mutually exclusive with `--blank`, `--template`, `--custom-template`, `--guided`, `--agent-assisted`, `--ai-assisted`, and `--execute`. It also does not accept `--type`, `--agent`, `--from-file`, or `--overwrite`.
+
+Safety boundaries: config aliases support no `local`, `remote`, `url`, arbitrary `path`, marketplace templates, template scripts, shell execution, network/provider behavior, production code writes, source-control automation, or archive automation. Generated files stay under `openspec/changes/<change-id>/`, use the five required OpenSpec filenames, and skip existing files without overwriting.
 
 ### Guided Generation
 
@@ -223,7 +268,6 @@ The following items are product direction, not implemented command behavior:
 
 - hybrid generation;
 - remote templates;
-- config-driven templates;
 - config-driven generic runner commands;
 - interactive prompts.
 

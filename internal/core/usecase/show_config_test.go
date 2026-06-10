@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -21,7 +22,7 @@ func TestShowConfigReturnsVersionOneConfig(t *testing.T) {
 	if result.Path != localConfigPath {
 		t.Fatalf("Path = %q, want %q", result.Path, localConfigPath)
 	}
-	if result.Config != completeDomainConfig() {
+	if !reflect.DeepEqual(result.Config, completeDomainConfig()) {
 		t.Fatalf("Config = %#v, want complete config", result.Config)
 	}
 	if fileSystem.readCount != 1 {
@@ -383,5 +384,6 @@ func completeDomainConfig() domain.LocalConfig {
 		Output: domain.ConfigOutput{
 			Format: "text",
 		},
+		Templates: domain.NewConfigTemplates(domain.EmptyConfigTemplateAliases()),
 	}
 }

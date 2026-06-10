@@ -12,15 +12,17 @@ import (
 const customTemplatesDirectory = ".specharbor/templates"
 
 type GenerateChangeInput struct {
-	ProjectRoot        string
-	ChangeID           string
-	Mode               domain.GenerationMode
-	TemplateName       string
-	TemplateSource     domain.TemplateSource
-	CustomTemplateName string
-	GuidedType         string
-	Title              string
-	Summary            string
+	ProjectRoot         string
+	ChangeID            string
+	Mode                domain.GenerationMode
+	TemplateName        string
+	TemplateSource      domain.TemplateSource
+	CustomTemplateName  string
+	ConfigTemplate      bool
+	ConfigTemplateAlias string
+	GuidedType          string
+	Title               string
+	Summary             string
 }
 
 type GenerateChange struct {
@@ -29,6 +31,8 @@ type GenerateChange struct {
 	templateContent     ports.TemplateChangeContent
 	guidedContent       ports.GuidedChangeContent
 	customTemplateFiles ports.CustomTemplateFileSystem
+	configFileSystem    ports.ConfigFileSystem
+	configParser        ports.ConfigParser
 }
 
 func NewGenerateChange(fileSystem ports.GenerationFileSystem, content ports.BlankChangeContent) *GenerateChange {
@@ -80,6 +84,26 @@ func NewGenerateChangeWithCustomTemplates(
 	}
 }
 
+func NewGenerateChangeWithConfigTemplates(
+	fileSystem ports.GenerationFileSystem,
+	blankContent ports.BlankChangeContent,
+	templateContent ports.TemplateChangeContent,
+	guidedContent ports.GuidedChangeContent,
+	customTemplateFiles ports.CustomTemplateFileSystem,
+	configFileSystem ports.ConfigFileSystem,
+	configParser ports.ConfigParser,
+) *GenerateChange {
+	return &GenerateChange{
+		fileSystem:          fileSystem,
+		blankContent:        blankContent,
+		templateContent:     templateContent,
+		guidedContent:       guidedContent,
+		customTemplateFiles: customTemplateFiles,
+		configFileSystem:    configFileSystem,
+		configParser:        configParser,
+	}
+}
+
 func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.GenerationResult, error) {
 	if useCase == nil {
 		return domain.GenerationResult{}, errors.New("generate change use case is required")
@@ -90,15 +114,25 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 	if input.Mode == domain.BlankMode && useCase.blankContent == nil {
 		return domain.GenerationResult{}, errors.New("blank change content is required")
 	}
+	configTemplateRequested := input.ConfigTemplate || strings.TrimSpace(input.ConfigTemplateAlias) != ""
 	customTemplateRequested, err := isCustomTemplateRequest(input)
 	if err != nil {
 		return domain.GenerationResult{}, err
 	}
-	if input.Mode == domain.TemplateMode && !customTemplateRequested && useCase.templateContent == nil {
+	if configTemplateRequested && input.Mode != domain.TemplateMode {
+		return domain.GenerationResult{}, fmt.Errorf("config templates require template generation mode, got: %s", input.Mode)
+	}
+	if input.Mode == domain.TemplateMode && !customTemplateRequested && !configTemplateRequested && useCase.templateContent == nil {
 		return domain.GenerationResult{}, errors.New("template change content is required")
 	}
 	if customTemplateRequested && useCase.customTemplateFiles == nil {
 		return domain.GenerationResult{}, errors.New("custom template filesystem is required")
+	}
+	if configTemplateRequested && useCase.configFileSystem == nil {
+		return domain.GenerationResult{}, errors.New("config filesystem is required")
+	}
+	if configTemplateRequested && useCase.configParser == nil {
+		return domain.GenerationResult{}, errors.New("config parser is required")
 	}
 	if input.Mode == domain.GuidedMode && useCase.guidedContent == nil {
 		return domain.GenerationResult{}, errors.New("guided change content is required")
@@ -119,6 +153,8 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 
 	var templateName domain.TemplateName
 	var customTemplateName domain.CustomTemplateName
+	var configTemplateAlias domain.ConfigTemplateAlias
+	var configTemplateReference domain.ConfigTemplateReference
 	var guidedType domain.GuidedType
 	var guidedTitle string
 	var guidedSummary string
@@ -126,7 +162,37 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 	case domain.BlankMode:
 	case domain.TemplateMode:
 		var err error
-		if customTemplateRequested {
+		if configTemplateRequested {
+			configTemplateAlias, err = domain.NewConfigTemplateAlias(input.ConfigTemplateAlias)
+			if err != nil {
+				return domain.GenerationResult{}, err
+			}
+			config, err := useCase.loadConfigForTemplateGeneration(projectRoot)
+			if err != nil {
+				return domain.GenerationResult{}, err
+			}
+			configTemplateReference, err = config.Templates.Aliases().Lookup(configTemplateAlias)
+			if err != nil {
+				return domain.GenerationResult{}, err
+			}
+			switch configTemplateReference.SourceKind() {
+			case domain.ConfigTemplateSourceBuiltin:
+				var ok bool
+				templateName, ok = configTemplateReference.BuiltInTemplateName()
+				if !ok {
+					return domain.GenerationResult{}, fmt.Errorf("invalid config template builtin reference: %s", configTemplateReference.Template())
+				}
+			case domain.ConfigTemplateSourceCustom:
+				var ok bool
+				customTemplateName, ok = configTemplateReference.CustomTemplateName()
+				if !ok {
+					return domain.GenerationResult{}, fmt.Errorf("invalid config template custom reference: %s", configTemplateReference.Template())
+				}
+				customTemplateRequested = true
+			default:
+				return domain.GenerationResult{}, fmt.Errorf("unsupported config template source: %s", configTemplateReference.SourceKind())
+			}
+		} else if customTemplateRequested {
 			customTemplateName, err = domain.NewCustomTemplateName(input.CustomTemplateName)
 		} else {
 			templateName, err = domain.ParseTemplateName(input.TemplateName)
@@ -150,6 +216,12 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 		}
 	default:
 		return domain.GenerationResult{}, fmt.Errorf("unsupported generation mode: %s", input.Mode)
+	}
+	if input.Mode == domain.TemplateMode && !customTemplateRequested && useCase.templateContent == nil {
+		return domain.GenerationResult{}, errors.New("template change content is required")
+	}
+	if customTemplateRequested && useCase.customTemplateFiles == nil {
+		return domain.GenerationResult{}, errors.New("custom template filesystem is required")
 	}
 
 	changePath := openspecChangesDirectory + "/" + changeID
@@ -187,6 +259,29 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 	}
 
 	if input.Mode == domain.TemplateMode {
+		if configTemplateRequested {
+			if customTemplateRequested {
+				return domain.NewConfigTemplateCustomGenerationResult(
+					changeID,
+					configTemplateAlias,
+					customTemplateName,
+					templatePath,
+					changePath,
+					directoryCreated,
+					createdFiles,
+					skippedExistingFiles,
+				), nil
+			}
+			return domain.NewConfigTemplateBuiltInGenerationResult(
+				changeID,
+				configTemplateAlias,
+				templateName,
+				changePath,
+				directoryCreated,
+				createdFiles,
+				skippedExistingFiles,
+			), nil
+		}
 		if customTemplateRequested {
 			return domain.NewCustomTemplateGenerationResult(
 				changeID,
@@ -228,6 +323,43 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 		createdFiles,
 		skippedExistingFiles,
 	), nil
+}
+
+func (useCase *GenerateChange) loadConfigForTemplateGeneration(projectRoot string) (domain.LocalConfig, error) {
+	configExists, err := useCase.configFileSystem.FileExists(projectRoot, localConfigPath)
+	if err != nil {
+		return domain.LocalConfig{}, fmt.Errorf("check config file %s: %w", localConfigPath, err)
+	}
+	if !configExists {
+		return domain.LocalConfig{}, fmt.Errorf("missing config file: %s", localConfigPath)
+	}
+
+	contents, err := useCase.configFileSystem.ReadFile(projectRoot, localConfigPath)
+	if err != nil {
+		return domain.LocalConfig{}, fmt.Errorf("unreadable config %s: %w", localConfigPath, err)
+	}
+
+	config, err := useCase.configParser.ParseLocalConfig(contents)
+	if err != nil {
+		return domain.LocalConfig{}, fmt.Errorf("invalid config YAML in %s: %w", localConfigPath, err)
+	}
+	if config.Version == 0 {
+		return domain.LocalConfig{}, fmt.Errorf(
+			"missing config version in %s: supported version is %d",
+			localConfigPath,
+			domain.SupportedLocalConfigVersion,
+		)
+	}
+	if !domain.IsSupportedLocalConfigVersion(config.Version) {
+		return domain.LocalConfig{}, fmt.Errorf(
+			"unsupported config version %d in %s: supported version is %d",
+			config.Version,
+			localConfigPath,
+			domain.SupportedLocalConfigVersion,
+		)
+	}
+
+	return config, nil
 }
 
 func validateGenerationChangeID(changeID string) error {
