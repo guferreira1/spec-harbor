@@ -11,6 +11,27 @@ type GenerationFileSystem interface {
 	WriteFileIfAbsent(root string, relativePath string, contents string) (bool, error)
 }
 
+// AIAssistedGenerationFileSystem provides only the local read and bounded
+// OpenSpec write operations required by AI-assisted from-file generation.
+type AIAssistedGenerationFileSystem interface {
+	ReadSourceFile(path string) (string, error)
+	DirectoryExists(root string, relativePath string) (bool, error)
+	FileExists(root string, relativePath string) (bool, error)
+	PathExists(root string, relativePath string) (bool, error)
+	CreateDirectory(root string, relativePath string) error
+	EnsureSafeWriteTarget(root string, relativePath string) error
+	WriteFileIfAbsent(root string, relativePath string, contents string) (bool, error)
+	WriteFile(root string, relativePath string, contents string) error
+}
+
+// CustomTemplateFileSystem provides only the filesystem reads required to
+// load a project-local custom template.
+type CustomTemplateFileSystem interface {
+	DirectoryExists(root string, relativePath string) (bool, error)
+	FileExists(root string, relativePath string) (bool, error)
+	ReadFile(root string, relativePath string) (string, error)
+}
+
 // BlankChangeContent provides deterministic starter content for blank
 // OpenSpec change files.
 type BlankChangeContent interface {

@@ -944,6 +944,294 @@ Skipped existing:
 	}
 }
 
+func TestExecuteGenerateAIAssistedPrintsSuccessReportAndWritesFiles(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	writeAIOutputFile(t, root, "agent-output.txt", validAIAssistedCLIOutput(nil))
+
+	var output bytes.Buffer
+	if err := execute([]string{"generate", "ai-change", "--ai-assisted", "--from-file", "agent-output.txt"}, &output); err != nil {
+		t.Fatalf("execute(generate --ai-assisted) error = %v", err)
+	}
+
+	want := `SpecHarbor AI-assisted change generated.
+Change: ai-change
+Source file: agent-output.txt
+Path: openspec/changes/ai-change
+Directory: created
+Overwrite: no
+Generated files: 5
+Skipped existing files: 0
+Overwritten files: 0
+
+Generated:
+- proposal.md
+- design.md
+- tasks.md
+- acceptance-criteria.md
+- risks.md
+
+Validation:
+Status: valid
+Required files: 5
+Errors: 0
+Warnings: 0
+
+Safety:
+- Provider APIs called: no
+- Remote AI services called: no
+- Agent commands executed: no
+- Production code modified: no
+- Source-control commands run: no
+- Auto-commit, auto-push, PR, merge, or archive: no
+`
+	if output.String() != want {
+		t.Fatalf("generate output = %q, want %q", output.String(), want)
+	}
+
+	for _, requiredFile := range domain.RequiredOpenSpecChangeFiles() {
+		path := filepath.Join(root, "openspec", "changes", "ai-change", requiredFile)
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile(%q) error = %v", path, err)
+		}
+		if strings.TrimSpace(string(contents)) == "" {
+			t.Fatalf("%s is empty", requiredFile)
+		}
+	}
+	assertPathDoesNotExist(t, root, "internal")
+}
+
+func TestExecuteGenerateAIAssistedPrintsParseErrorsAndWritesNothing(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	writeAIOutputFile(t, root, "bad-output.txt", "---FILE: notes.md---\n# Notes\n\nNope.\n---END FILE---\n")
+
+	var output bytes.Buffer
+	err := execute([]string{"generate", "bad-ai-change", "--ai-assisted", "--from-file", "bad-output.txt"}, &output)
+	assertExitCode(t, err, 1)
+
+	generateOutput := output.String()
+	for _, want := range []string{
+		"SpecHarbor AI-assisted import failed.",
+		"Change: bad-ai-change",
+		"Source file: bad-output.txt",
+		"Parse status: invalid",
+		"Files written: 0",
+		"No files written: yes",
+		"Parse errors:",
+		"unknown_file_block",
+		"missing_file_block",
+		"file: notes.md",
+		"line: 1",
+		"Safety:",
+		"- Provider APIs called: no",
+		"- Production code modified: no",
+	} {
+		if !strings.Contains(generateOutput, want) {
+			t.Fatalf("generate output = %q, want to contain %q", generateOutput, want)
+		}
+	}
+	assertPathDoesNotExist(t, root, "openspec/changes/bad-ai-change")
+}
+
+func TestExecuteGenerateAIAssistedSkipsAndOverwritesExistingFiles(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	writeAIOutputFile(t, root, "agent-output.txt", validAIAssistedCLIOutput(nil))
+	createAuthoredOpenSpecChange(t, root, "ai-existing", nil)
+
+	var output bytes.Buffer
+	if err := execute([]string{"generate", "ai-existing", "--ai-assisted", "--from-file", "agent-output.txt"}, &output); err != nil {
+		t.Fatalf("execute(generate --ai-assisted skip) error = %v", err)
+	}
+	skipOutput := output.String()
+	for _, want := range []string{
+		"Directory: existing",
+		"Overwrite: no",
+		"Generated files: 0",
+		"Skipped existing files: 5",
+		"Skipped existing:",
+		"- proposal.md",
+	} {
+		if !strings.Contains(skipOutput, want) {
+			t.Fatalf("skip output = %q, want %q", skipOutput, want)
+		}
+	}
+	proposalPath := filepath.Join(root, "openspec", "changes", "ai-existing", "proposal.md")
+	proposal, err := os.ReadFile(proposalPath)
+	if err != nil {
+		t.Fatalf("ReadFile(proposal.md) error = %v", err)
+	}
+	if !strings.Contains(string(proposal), "Users cannot tell whether a change package is ready") {
+		t.Fatalf("proposal after skip = %q, want original authored content", string(proposal))
+	}
+
+	output.Reset()
+	if err := execute([]string{"generate", "ai-existing", "--ai-assisted", "--from-file", "agent-output.txt", "--overwrite"}, &output); err != nil {
+		t.Fatalf("execute(generate --ai-assisted overwrite) error = %v", err)
+	}
+	overwriteOutput := output.String()
+	for _, want := range []string{
+		"Overwrite: yes",
+		"Generated files: 0",
+		"Skipped existing files: 0",
+		"Overwritten files: 5",
+		"Overwritten:",
+		"- proposal.md",
+	} {
+		if !strings.Contains(overwriteOutput, want) {
+			t.Fatalf("overwrite output = %q, want %q", overwriteOutput, want)
+		}
+	}
+	proposal, err = os.ReadFile(proposalPath)
+	if err != nil {
+		t.Fatalf("ReadFile(proposal.md) error = %v", err)
+	}
+	if !strings.Contains(string(proposal), "AI-assisted imports need a safe bridge.") {
+		t.Fatalf("proposal after overwrite = %q, want AI-assisted content", string(proposal))
+	}
+}
+
+func TestExecuteGenerateAIAssistedOverwriteRejectsSymlinkOutputFile(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	writeAIOutputFile(t, root, "agent-output.txt", validAIAssistedCLIOutput(nil))
+
+	changeDirectory := filepath.Join(root, "openspec", "changes", "symlink-ai")
+	if err := os.MkdirAll(changeDirectory, 0o755); err != nil {
+		t.Fatalf("MkdirAll(change) error = %v", err)
+	}
+	outsidePath := filepath.Join(t.TempDir(), "outside-proposal.md")
+	if err := os.WriteFile(outsidePath, []byte("outside original"), 0o644); err != nil {
+		t.Fatalf("WriteFile(outside) error = %v", err)
+	}
+	if err := os.Symlink(outsidePath, filepath.Join(changeDirectory, "proposal.md")); err != nil {
+		t.Skipf("Symlink() unavailable: %v", err)
+	}
+
+	var output bytes.Buffer
+	err := execute([]string{"generate", "symlink-ai", "--ai-assisted", "--from-file", "agent-output.txt", "--overwrite"}, &output)
+	if err == nil || !strings.Contains(err.Error(), "symlink target paths are not allowed for generated OpenSpec files") {
+		t.Fatalf("execute(generate --ai-assisted --overwrite) error = %v, want symlink safety failure", err)
+	}
+	if strings.Contains(output.String(), "SpecHarbor AI-assisted change generated.") {
+		t.Fatalf("output = %q, want no success report", output.String())
+	}
+	contents, readErr := os.ReadFile(outsidePath)
+	if readErr != nil {
+		t.Fatalf("ReadFile(outside) error = %v", readErr)
+	}
+	if string(contents) != "outside original" {
+		t.Fatalf("outside target = %q, want unchanged", string(contents))
+	}
+}
+
+func TestExecuteGenerateAIAssistedValidationWarningsExitZero(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	writeAIOutputFile(t, root, "warning-output.txt", validAIAssistedCLIOutput(map[string]string{
+		"risks.md": "# Risks\n\n## Risks\n\n- Strict import can reject useful drafts.\n",
+	}))
+
+	var output bytes.Buffer
+	if err := execute([]string{"generate", "ai-warning", "--ai-assisted", "--from-file", "warning-output.txt"}, &output); err != nil {
+		t.Fatalf("execute(generate warnings) error = %v, want exit 0", err)
+	}
+
+	generateOutput := output.String()
+	for _, want := range []string{
+		"Validation:",
+		"Status: valid",
+		"Errors: 0",
+		"Warnings: 1",
+		"Warnings:",
+		"risks_mitigation_missing",
+	} {
+		if !strings.Contains(generateOutput, want) {
+			t.Fatalf("generate output = %q, want %q", generateOutput, want)
+		}
+	}
+}
+
+func TestExecuteGenerateAIAssistedValidationErrorsExitNonZeroAfterReport(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	createOpenSpecProject(t, root)
+	writeAIOutputFile(t, root, "invalid-output.txt", validAIAssistedCLIOutput(map[string]string{
+		"tasks.md": "# Tasks\n\n## Phase 1\n\nNo checkbox tasks here.\n",
+	}))
+
+	var output bytes.Buffer
+	err := execute([]string{"generate", "ai-invalid", "--ai-assisted", "--from-file", "invalid-output.txt"}, &output)
+	assertExitCode(t, err, 1)
+
+	generateOutput := output.String()
+	for _, want := range []string{
+		"SpecHarbor AI-assisted change generated.",
+		"Generated files: 5",
+		"Validation:",
+		"Status: invalid",
+		"Errors: 1",
+		"Errors:",
+		"tasks_checkbox_missing",
+		"Safety:",
+	} {
+		if !strings.Contains(generateOutput, want) {
+			t.Fatalf("generate output = %q, want %q", generateOutput, want)
+		}
+	}
+	assertPathExists(t, root, "openspec/changes/ai-invalid/tasks.md")
+}
+
+func TestExecuteGenerateAIAssistedRejectsInvalidArguments(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "missing from-file", args: []string{"generate", "change", "--ai-assisted"}, want: "source file is required"},
+		{name: "from-file without ai", args: []string{"generate", "change", "--from-file", "agent-output.txt"}, want: "from-file requires --ai-assisted"},
+		{name: "overwrite without ai", args: []string{"generate", "change", "--blank", "--overwrite"}, want: "overwrite requires --ai-assisted"},
+		{name: "duplicate ai-assisted", args: []string{"generate", "change", "--ai-assisted", "--ai-assisted", "--from-file", "agent-output.txt"}, want: "ai-assisted generation flag specified more than once"},
+		{name: "duplicate from-file", args: []string{"generate", "change", "--ai-assisted", "--from-file", "one.txt", "--from-file", "two.txt"}, want: "from-file flag specified more than once"},
+		{name: "duplicate overwrite", args: []string{"generate", "change", "--ai-assisted", "--from-file", "agent-output.txt", "--overwrite", "--overwrite"}, want: "overwrite flag specified more than once"},
+		{name: "blank conflict", args: []string{"generate", "change", "--ai-assisted", "--from-file", "agent-output.txt", "--blank"}, want: "ai-assisted and blank generation flags cannot be used together"},
+		{name: "template conflict", args: []string{"generate", "change", "--ai-assisted", "--from-file", "agent-output.txt", "--template", "feature"}, want: "ai-assisted and template generation flags cannot be used together"},
+		{name: "guided conflict", args: []string{"generate", "change", "--ai-assisted", "--from-file", "agent-output.txt", "--guided"}, want: "ai-assisted and guided generation flags cannot be used together"},
+		{name: "agent-assisted conflict", args: []string{"generate", "change", "--ai-assisted", "--from-file", "agent-output.txt", "--agent-assisted"}, want: "ai-assisted and agent-assisted generation flags cannot be used together"},
+		{name: "execute conflict", args: []string{"generate", "change", "--ai-assisted", "--from-file", "agent-output.txt", "--execute"}, want: "ai-assisted and execute flags cannot be used together"},
+		{name: "agent flag conflict", args: []string{"generate", "change", "--ai-assisted", "--from-file", "agent-output.txt", "--agent", "codex"}, want: "agent-assisted input flags cannot be used with --ai-assisted"},
+		{name: "guided input conflict", args: []string{"generate", "change", "--ai-assisted", "--from-file", "agent-output.txt", "--type", "feature"}, want: "guided input flags cannot be used with --ai-assisted"},
+		{name: "extra argument", args: []string{"generate", "change", "--ai-assisted", "--from-file", "agent-output.txt", "extra"}, want: "unexpected argument: extra"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+
+			var output bytes.Buffer
+			err := execute(test.args, &output)
+			if err == nil {
+				t.Fatalf("execute(%v) error = nil, want %q", test.args, test.want)
+			}
+			if !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("execute(%v) error = %q, want %q", test.args, err.Error(), test.want)
+			}
+			if output.String() != "" {
+				t.Fatalf("execute(%v) output = %q, want empty output", test.args, output.String())
+			}
+			assertPathDoesNotExist(t, root, "openspec")
+		})
+	}
+}
+
 func TestExecuteGenerateRejectsInvalidArguments(t *testing.T) {
 	tests := []struct {
 		name string
@@ -2513,6 +2801,71 @@ func TestExecuteWorkflowOutputContainsRequiredFacts(t *testing.T) {
 			t.Fatalf("workflow output = %q, want to contain %q", workflowOutput, want)
 		}
 	}
+}
+
+func writeAIOutputFile(t *testing.T, root string, relativePath string, contents string) {
+	t.Helper()
+
+	if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(relativePath)), []byte(contents), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v", relativePath, err)
+	}
+}
+
+func validAIAssistedCLIOutput(overrides map[string]string) string {
+	contents := map[string]string{
+		"proposal.md": `# Proposal: AI-Assisted Import
+
+## Problem
+
+AI-assisted imports need a safe bridge.
+
+## Goal
+
+Import strict local file blocks into OpenSpec change files.
+`,
+		"design.md": `# Design: AI-Assisted Import
+
+## Overview
+
+The command parses all local source content before writing.
+
+## Architecture
+
+Domain parser rules stay pure and the use case writes approved paths only.
+`,
+		"tasks.md": `# Tasks
+
+## Phase 1
+
+- [ ] Implement the strict parser.
+- [ ] Update documentation.
+`,
+		"acceptance-criteria.md": `# Acceptance Criteria
+
+- Valid strict output writes only the required OpenSpec files.
+- Validation runs after successful writes.
+`,
+		"risks.md": `# Risks
+
+## Risks
+
+- Untrusted AI output could include unsafe paths.
+
+## Mitigations
+
+- Reject unsafe filenames before writes.
+`,
+	}
+
+	for fileName, content := range overrides {
+		contents[fileName] = content
+	}
+
+	var blocks []string
+	for _, fileName := range domain.RequiredOpenSpecChangeFiles() {
+		blocks = append(blocks, "---FILE: "+fileName+"---\n"+contents[fileName]+"---END FILE---")
+	}
+	return strings.Join(blocks, "\n\n")
 }
 
 func writeScanFile(t *testing.T, root string, relativePath string, contents string) {

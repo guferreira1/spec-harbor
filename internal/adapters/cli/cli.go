@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -193,6 +194,33 @@ func generateCommand(ctx CommandContext) error {
 		return err
 	}
 
+	if arguments.mode == domain.AIAssistedMode {
+		fileSystem := filesystem.NewLocalFileSystem()
+		validateChange := usecase.NewValidateChange(fileSystem)
+		generateAIAssisted := usecase.NewGenerateAIAssistedChange(fileSystem, validateChange)
+
+		result, err := generateAIAssisted.Execute(usecase.GenerateAIAssistedChangeInput{
+			ProjectRoot: root,
+			ChangeID:    arguments.changeID,
+			SourcePath:  arguments.fromFile,
+			Overwrite:   arguments.overwrite,
+		})
+		if err != nil {
+			var parseFailure *usecase.AIAssistedParseFailure
+			if errors.As(err, &parseFailure) {
+				printAIAssistedParseFailureReport(ctx.Output, parseFailure)
+				return ExitError{Code: 1}
+			}
+			return err
+		}
+
+		printAIAssistedGenerationReport(ctx.Output, result)
+		if validationResult, ok := result.ValidationResult(); ok && validationResult.Status == domain.ValidationStatusInvalid {
+			return ExitError{Code: 1}
+		}
+		return nil
+	}
+
 	if arguments.mode == domain.AgentAssistedMode {
 		promptTemplate := templates.NewAgentAssistedAuthoringPromptTemplate()
 		localRunner := agentrunner.NewLocalCommandRunner()
@@ -222,9 +250,9 @@ func generateCommand(ctx CommandContext) error {
 	blankContent := templates.NewDefaultBlankChangeContent()
 	templateContent := templates.NewBuiltInChangeTemplates()
 	guidedContent := templates.NewGuidedChangeTemplates()
-	generateChange := usecase.NewGenerateChangeWithContent(fileSystem, blankContent, templateContent, guidedContent)
+	generateChange := usecase.NewGenerateChangeWithCustomTemplates(fileSystem, blankContent, templateContent, guidedContent, fileSystem)
 
-	result, err := generateChange.Execute(usecase.GenerateChangeInput{
+	generateInput := usecase.GenerateChangeInput{
 		ProjectRoot:  root,
 		ChangeID:     arguments.changeID,
 		Mode:         arguments.mode,
@@ -232,7 +260,13 @@ func generateCommand(ctx CommandContext) error {
 		GuidedType:   arguments.guidedType,
 		Title:        arguments.title,
 		Summary:      arguments.summary,
-	})
+	}
+	if arguments.customTemplate {
+		generateInput.TemplateSource = domain.CustomTemplateSource
+		generateInput.CustomTemplateName = arguments.customTemplateName
+	}
+
+	result, err := generateChange.Execute(generateInput)
 	if err != nil {
 		return err
 	}
@@ -242,30 +276,40 @@ func generateCommand(ctx CommandContext) error {
 }
 
 type generateArguments struct {
-	changeID     string
-	mode         domain.GenerationMode
-	templateName string
-	guidedType   string
-	agentName    string
-	title        string
-	summary      string
-	execute      bool
+	changeID           string
+	mode               domain.GenerationMode
+	templateName       string
+	customTemplate     bool
+	customTemplateName string
+	guidedType         string
+	agentName          string
+	fromFile           string
+	title              string
+	summary            string
+	execute            bool
+	overwrite          bool
 }
 
 func parseGenerateArguments(args []string) (generateArguments, error) {
 	var positionals []string
 	blankProvided := false
 	templateProvided := false
+	customTemplateProvided := false
 	guidedProvided := false
+	aiAssistedProvided := false
 	agentAssistedProvided := false
 	guidedTypeProvided := false
 	agentProvided := false
+	fromFileProvided := false
 	titleProvided := false
 	summaryProvided := false
 	executeProvided := false
+	overwriteProvided := false
 	var templateName string
+	var customTemplateName string
 	var guidedType string
 	var agentName string
+	var fromFile string
 	var title string
 	var summary string
 
@@ -295,6 +339,14 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 			continue
 		}
 
+		if arg == "--ai-assisted" {
+			if aiAssistedProvided {
+				return generateArguments{}, fmt.Errorf("ai-assisted generation flag specified more than once")
+			}
+			aiAssistedProvided = true
+			continue
+		}
+
 		if arg == "--template" {
 			if templateProvided {
 				return generateArguments{}, fmt.Errorf("template generation flag specified more than once")
@@ -312,6 +364,23 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 			continue
 		}
 
+		if arg == "--custom-template" {
+			if customTemplateProvided {
+				return generateArguments{}, fmt.Errorf("custom-template generation flag specified more than once")
+			}
+			if index+1 >= len(args) {
+				return generateArguments{}, fmt.Errorf("custom template name is required")
+			}
+			if strings.HasPrefix(args[index+1], "-") {
+				return generateArguments{}, fmt.Errorf("custom template name is required")
+			}
+
+			customTemplateName = args[index+1]
+			customTemplateProvided = true
+			index++
+			continue
+		}
+
 		if arg == "--agent" {
 			if agentProvided {
 				return generateArguments{}, fmt.Errorf("agent flag specified more than once")
@@ -325,6 +394,23 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 
 			agentName = args[index+1]
 			agentProvided = true
+			index++
+			continue
+		}
+
+		if arg == "--from-file" {
+			if fromFileProvided {
+				return generateArguments{}, fmt.Errorf("from-file flag specified more than once")
+			}
+			if index+1 >= len(args) {
+				return generateArguments{}, fmt.Errorf("source file is required")
+			}
+			if strings.HasPrefix(args[index+1], "-") {
+				return generateArguments{}, fmt.Errorf("source file is required")
+			}
+
+			fromFile = args[index+1]
+			fromFileProvided = true
 			index++
 			continue
 		}
@@ -388,6 +474,14 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 			continue
 		}
 
+		if arg == "--overwrite" {
+			if overwriteProvided {
+				return generateArguments{}, fmt.Errorf("overwrite flag specified more than once")
+			}
+			overwriteProvided = true
+			continue
+		}
+
 		if strings.HasPrefix(arg, "-") {
 			return generateArguments{}, fmt.Errorf("unsupported flag: %s", arg)
 		}
@@ -404,6 +498,21 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 	if guidedProvided && templateProvided {
 		return generateArguments{}, fmt.Errorf("guided and template generation flags cannot be used together")
 	}
+	if aiAssistedProvided && blankProvided {
+		return generateArguments{}, fmt.Errorf("ai-assisted and blank generation flags cannot be used together")
+	}
+	if aiAssistedProvided && templateProvided {
+		return generateArguments{}, fmt.Errorf("ai-assisted and template generation flags cannot be used together")
+	}
+	if aiAssistedProvided && customTemplateProvided {
+		return generateArguments{}, fmt.Errorf("ai-assisted and custom-template generation flags cannot be used together")
+	}
+	if aiAssistedProvided && guidedProvided {
+		return generateArguments{}, fmt.Errorf("ai-assisted and guided generation flags cannot be used together")
+	}
+	if aiAssistedProvided && agentAssistedProvided {
+		return generateArguments{}, fmt.Errorf("ai-assisted and agent-assisted generation flags cannot be used together")
+	}
 	if agentAssistedProvided && blankProvided {
 		return generateArguments{}, fmt.Errorf("agent-assisted and blank generation flags cannot be used together")
 	}
@@ -413,13 +522,43 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 	if agentAssistedProvided && guidedProvided {
 		return generateArguments{}, fmt.Errorf("agent-assisted and guided generation flags cannot be used together")
 	}
+	if customTemplateProvided && blankProvided {
+		return generateArguments{}, fmt.Errorf("custom-template and blank generation flags cannot be used together")
+	}
+	if customTemplateProvided && templateProvided {
+		return generateArguments{}, fmt.Errorf("custom-template and template generation flags cannot be used together")
+	}
+	if customTemplateProvided && guidedProvided {
+		return generateArguments{}, fmt.Errorf("custom-template and guided generation flags cannot be used together")
+	}
+	if customTemplateProvided && agentAssistedProvided {
+		return generateArguments{}, fmt.Errorf("custom-template and agent-assisted generation flags cannot be used together")
+	}
+	if aiAssistedProvided && executeProvided {
+		return generateArguments{}, fmt.Errorf("ai-assisted and execute flags cannot be used together")
+	}
 	if !agentAssistedProvided && executeProvided {
 		return generateArguments{}, fmt.Errorf("unsupported flag: --execute")
+	}
+	if !aiAssistedProvided && fromFileProvided {
+		return generateArguments{}, fmt.Errorf("from-file requires --ai-assisted")
+	}
+	if !aiAssistedProvided && overwriteProvided {
+		return generateArguments{}, fmt.Errorf("overwrite requires --ai-assisted")
+	}
+	if aiAssistedProvided && agentProvided {
+		return generateArguments{}, fmt.Errorf("agent-assisted input flags cannot be used with --ai-assisted")
+	}
+	if aiAssistedProvided && (guidedTypeProvided || titleProvided || summaryProvided) {
+		return generateArguments{}, fmt.Errorf("guided input flags cannot be used with --ai-assisted")
 	}
 	if !agentAssistedProvided && agentProvided {
 		return generateArguments{}, fmt.Errorf("agent-assisted input flags require --agent-assisted")
 	}
-	if !guidedProvided && !agentAssistedProvided && (guidedTypeProvided || titleProvided || summaryProvided) {
+	if !guidedProvided && !agentAssistedProvided && !aiAssistedProvided && guidedTypeProvided {
+		return generateArguments{}, fmt.Errorf("guided input flags require --guided")
+	}
+	if !guidedProvided && !agentAssistedProvided && !aiAssistedProvided && !customTemplateProvided && (titleProvided || summaryProvided) {
 		return generateArguments{}, fmt.Errorf("guided input flags require --guided")
 	}
 	if len(positionals) == 0 {
@@ -428,8 +567,19 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 	if len(positionals) > 1 {
 		return generateArguments{}, fmt.Errorf("unexpected argument: %s", positionals[1])
 	}
-	if !blankProvided && !templateProvided && !guidedProvided && !agentAssistedProvided {
+	if !blankProvided && !templateProvided && !customTemplateProvided && !guidedProvided && !aiAssistedProvided && !agentAssistedProvided {
 		return generateArguments{}, fmt.Errorf("generation mode flag is required")
+	}
+	if aiAssistedProvided {
+		if !fromFileProvided || strings.TrimSpace(fromFile) == "" {
+			return generateArguments{}, fmt.Errorf("source file is required")
+		}
+		return generateArguments{
+			changeID:  positionals[0],
+			mode:      domain.AIAssistedMode,
+			fromFile:  fromFile,
+			overwrite: overwriteProvided,
+		}, nil
 	}
 	if agentAssistedProvided {
 		if !agentProvided || strings.TrimSpace(agentName) == "" {
@@ -468,6 +618,19 @@ func parseGenerateArguments(args []string) (generateArguments, error) {
 			changeID:     positionals[0],
 			mode:         domain.TemplateMode,
 			templateName: templateName,
+		}, nil
+	}
+	if customTemplateProvided {
+		if strings.TrimSpace(customTemplateName) == "" {
+			return generateArguments{}, fmt.Errorf("custom template name is required")
+		}
+		return generateArguments{
+			changeID:           positionals[0],
+			mode:               domain.TemplateMode,
+			customTemplate:     true,
+			customTemplateName: customTemplateName,
+			title:              title,
+			summary:            summary,
 		}, nil
 	}
 	if guidedProvided {
@@ -541,6 +704,11 @@ func requiredSummaryError(agentAssistedProvided bool) error {
 }
 
 func printGenerationReport(output io.Writer, result domain.GenerationResult) {
+	if result.Mode == domain.TemplateMode && result.TemplateSource == domain.CustomTemplateSource {
+		printCustomTemplateGenerationReport(output, result)
+		return
+	}
+
 	createdFiles := result.CreatedFiles()
 	skippedExistingFiles := result.SkippedExistingFiles()
 	directoryStatus := "existing"
@@ -583,6 +751,129 @@ func printGenerationReport(output io.Writer, result domain.GenerationResult) {
 			fmt.Fprintf(output, "- %s\n", file)
 		}
 	}
+}
+
+func printCustomTemplateGenerationReport(output io.Writer, result domain.GenerationResult) {
+	createdFiles := result.CreatedFiles()
+	skippedExistingFiles := result.SkippedExistingFiles()
+	directoryStatus := "existing"
+	if result.ChangeDirectoryCreated {
+		directoryStatus = "created"
+	}
+
+	fmt.Fprintln(output, "SpecHarbor custom template change generated.")
+	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
+	fmt.Fprintf(output, "Template: %s (custom)\n", result.CustomTemplateName)
+	fmt.Fprintf(output, "Template source: %s\n", result.TemplatePath)
+	fmt.Fprintf(output, "Change path: %s\n", result.ChangePath)
+	fmt.Fprintf(output, "Change directory: %s\n", directoryStatus)
+
+	if len(createdFiles) > 0 {
+		fmt.Fprintln(output, "Created files:")
+		for _, file := range createdFiles {
+			fmt.Fprintf(output, "- %s\n", file)
+		}
+	}
+
+	if len(skippedExistingFiles) > 0 {
+		fmt.Fprintln(output, "Skipped existing files:")
+		for _, file := range skippedExistingFiles {
+			fmt.Fprintf(output, "- %s\n", file)
+		}
+	}
+
+	fmt.Fprintf(output, "Only OpenSpec change files under %s/ were written.\n", result.ChangePath)
+}
+
+func printAIAssistedGenerationReport(output io.Writer, result domain.AIAssistedGenerationResult) {
+	generatedFiles := result.GeneratedFiles()
+	skippedFiles := result.SkippedFiles()
+	overwrittenFiles := result.OverwrittenFiles()
+	directoryStatus := "existing"
+	if result.ChangeDirectoryCreated {
+		directoryStatus = "created"
+	}
+
+	fmt.Fprintln(output, "SpecHarbor AI-assisted change generated.")
+	fmt.Fprintf(output, "Change: %s\n", result.ChangeID)
+	fmt.Fprintf(output, "Source file: %s\n", result.SourcePath)
+	fmt.Fprintf(output, "Path: %s\n", result.TargetPath)
+	fmt.Fprintf(output, "Directory: %s\n", directoryStatus)
+	fmt.Fprintf(output, "Overwrite: %s\n", yesNo(result.Overwrite))
+	fmt.Fprintf(output, "Generated files: %d\n", len(generatedFiles))
+	fmt.Fprintf(output, "Skipped existing files: %d\n", len(skippedFiles))
+	fmt.Fprintf(output, "Overwritten files: %d\n", len(overwrittenFiles))
+
+	printNamedFileList(output, "Generated:", generatedFiles)
+	printNamedFileList(output, "Skipped existing:", skippedFiles)
+	printNamedFileList(output, "Overwritten:", overwrittenFiles)
+
+	if validationResult, ok := result.ValidationResult(); ok {
+		fmt.Fprintln(output)
+		fmt.Fprintln(output, "Validation:")
+		fmt.Fprintf(output, "Status: %s\n", validationResult.Status)
+		fmt.Fprintf(output, "Required files: %d\n", len(validationResult.RequiredFiles))
+		fmt.Fprintf(output, "Errors: %d\n", validationResult.ErrorCount())
+		fmt.Fprintf(output, "Warnings: %d\n", validationResult.WarningCount())
+		printValidationFindingGroup(output, "Errors:", findingsBySeverity(validationResult, domain.ValidationFindingSeverityError))
+		printValidationFindingGroup(output, "Warnings:", findingsBySeverity(validationResult, domain.ValidationFindingSeverityWarning))
+	}
+
+	printAIAssistedSafetyNotes(output)
+}
+
+func printAIAssistedParseFailureReport(output io.Writer, failure *usecase.AIAssistedParseFailure) {
+	fmt.Fprintln(output, "SpecHarbor AI-assisted import failed.")
+	fmt.Fprintf(output, "Change: %s\n", failure.ChangeID)
+	fmt.Fprintf(output, "Source file: %s\n", failure.SourcePath)
+	fmt.Fprintln(output, "Parse status: invalid")
+	fmt.Fprintln(output, "Files written: 0")
+	fmt.Fprintln(output, "No files written: yes")
+
+	findings := failure.ParseResult.Findings()
+	if len(findings) > 0 {
+		fmt.Fprintln(output)
+		fmt.Fprintln(output, "Parse errors:")
+		for _, finding := range findings {
+			line := fmt.Sprintf("- [%s] %s: %s", finding.Severity, finding.Code, finding.Message)
+			var details []string
+			if finding.FileName != "" {
+				details = append(details, "file: "+finding.FileName)
+			}
+			if finding.Line > 0 {
+				details = append(details, fmt.Sprintf("line: %d", finding.Line))
+			}
+			if len(details) > 0 {
+				line += " (" + strings.Join(details, ", ") + ")"
+			}
+			fmt.Fprintln(output, line)
+		}
+	}
+
+	printAIAssistedSafetyNotes(output)
+}
+
+func printNamedFileList(output io.Writer, title string, files []string) {
+	if len(files) == 0 {
+		return
+	}
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, title)
+	for _, file := range files {
+		fmt.Fprintf(output, "- %s\n", file)
+	}
+}
+
+func printAIAssistedSafetyNotes(output io.Writer) {
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Safety:")
+	fmt.Fprintln(output, "- Provider APIs called: no")
+	fmt.Fprintln(output, "- Remote AI services called: no")
+	fmt.Fprintln(output, "- Agent commands executed: no")
+	fmt.Fprintln(output, "- Production code modified: no")
+	fmt.Fprintln(output, "- Source-control commands run: no")
+	fmt.Fprintln(output, "- Auto-commit, auto-push, PR, merge, or archive: no")
 }
 
 func printAgentAssistedAuthoringReport(output io.Writer, result domain.AgentAssistedAuthoringResult) {

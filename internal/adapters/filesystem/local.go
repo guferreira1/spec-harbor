@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 )
 
 type LocalFileSystem struct{}
@@ -15,40 +17,69 @@ func NewLocalFileSystem() *LocalFileSystem {
 }
 
 func (fileSystem *LocalFileSystem) DirectoryExists(root string, relativePath string) (bool, error) {
-	info, err := os.Stat(fileSystem.fullPath(root, relativePath))
+	fullPath, err := fileSystem.safeFullPath(root, relativePath)
+	if err != nil {
+		return false, err
+	}
+
+	info, err := os.Lstat(fullPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return false, nil
 		}
 		return false, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return false, unsafeSymlinkPathError(relativePath)
 	}
 	return info.IsDir(), nil
 }
 
 func (fileSystem *LocalFileSystem) FileExists(root string, relativePath string) (bool, error) {
-	info, err := os.Stat(fileSystem.fullPath(root, relativePath))
+	fullPath, err := fileSystem.safeFullPath(root, relativePath)
+	if err != nil {
+		return false, err
+	}
+
+	info, err := os.Lstat(fullPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return false, nil
 		}
 		return false, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return false, unsafeSymlinkPathError(relativePath)
 	}
 	return !info.IsDir(), nil
 }
 
 func (fileSystem *LocalFileSystem) PathExists(root string, relativePath string) (bool, error) {
-	_, err := os.Stat(fileSystem.fullPath(root, relativePath))
+	fullPath, err := fileSystem.safeFullPath(root, relativePath)
+	if err != nil {
+		return false, err
+	}
+
+	info, err := os.Lstat(fullPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return false, nil
 		}
 		return false, err
 	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return false, unsafeSymlinkPathError(relativePath)
+	}
 	return true, nil
 }
 
 func (fileSystem *LocalFileSystem) ListDirectoryNames(root string, relativePath string) ([]string, error) {
-	entries, err := os.ReadDir(fileSystem.fullPath(root, relativePath))
+	fullPath, err := fileSystem.safeFullPath(root, relativePath)
+	if err != nil {
+		return nil, err
+	}
+
+	entries, err := os.ReadDir(fullPath)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +92,35 @@ func (fileSystem *LocalFileSystem) ListDirectoryNames(root string, relativePath 
 }
 
 func (fileSystem *LocalFileSystem) ReadFile(root string, relativePath string) (string, error) {
-	contents, err := os.ReadFile(fileSystem.fullPath(root, relativePath))
+	fullPath, err := fileSystem.safeFullPath(root, relativePath)
+	if err != nil {
+		return "", err
+	}
+
+	contents, err := os.ReadFile(fullPath)
+	if err != nil {
+		return "", err
+	}
+	return string(contents), nil
+}
+
+func (fileSystem *LocalFileSystem) ReadSourceFile(sourcePath string) (string, error) {
+	if strings.TrimSpace(sourcePath) == "" {
+		return "", errors.New("source file path is required")
+	}
+
+	info, err := os.Stat(sourcePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("source file not found: %s", sourcePath)
+		}
+		return "", err
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("source file is a directory: %s", sourcePath)
+	}
+
+	contents, err := os.ReadFile(sourcePath)
 	if err != nil {
 		return "", err
 	}
@@ -69,12 +128,25 @@ func (fileSystem *LocalFileSystem) ReadFile(root string, relativePath string) (s
 }
 
 func (fileSystem *LocalFileSystem) CreateDirectory(root string, relativePath string) error {
-	return os.MkdirAll(fileSystem.fullPath(root, relativePath), 0o755)
+	fullPath, err := fileSystem.safeFullPath(root, relativePath)
+	if err != nil {
+		return err
+	}
+	if err := fileSystem.ensureSafeDirectoryTarget(root, relativePath); err != nil {
+		return err
+	}
+	return os.MkdirAll(fullPath, 0o755)
 }
 
 func (fileSystem *LocalFileSystem) MoveDirectory(root string, sourceRelativePath string, destinationRelativePath string) error {
-	sourcePath := fileSystem.fullPath(root, sourceRelativePath)
-	destinationPath := fileSystem.fullPath(root, destinationRelativePath)
+	sourcePath, err := fileSystem.safeFullPath(root, sourceRelativePath)
+	if err != nil {
+		return err
+	}
+	destinationPath, err := fileSystem.safeFullPath(root, destinationRelativePath)
+	if err != nil {
+		return err
+	}
 
 	sourceInfo, err := os.Stat(sourcePath)
 	if err != nil {
@@ -94,7 +166,15 @@ func (fileSystem *LocalFileSystem) MoveDirectory(root string, sourceRelativePath
 }
 
 func (fileSystem *LocalFileSystem) WriteFileIfAbsent(root string, relativePath string, contents string) (bool, error) {
-	file, err := os.OpenFile(fileSystem.fullPath(root, relativePath), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	fullPath, err := fileSystem.safeFullPath(root, relativePath)
+	if err != nil {
+		return false, err
+	}
+	if err := fileSystem.EnsureSafeWriteTarget(root, relativePath); err != nil {
+		return false, err
+	}
+
+	file, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
 		if errors.Is(err, os.ErrExist) {
 			return false, nil
@@ -102,20 +182,220 @@ func (fileSystem *LocalFileSystem) WriteFileIfAbsent(root string, relativePath s
 		return false, err
 	}
 
-	if _, err := io.WriteString(file, contents); err != nil {
-		closeErr := file.Close()
-		if closeErr != nil {
-			return false, errors.Join(err, closeErr)
-		}
-		return false, err
-	}
-
-	if err := file.Close(); err != nil {
+	if err := writeStringAndClose(file, contents); err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
+func (fileSystem *LocalFileSystem) WriteFile(root string, relativePath string, contents string) error {
+	fullPath, err := fileSystem.safeFullPath(root, relativePath)
+	if err != nil {
+		return err
+	}
+	if err := fileSystem.EnsureSafeWriteTarget(root, relativePath); err != nil {
+		return err
+	}
+	return replaceFileWithoutFollowingSymlink(fullPath, relativePath, contents)
+}
+
+func (fileSystem *LocalFileSystem) EnsureSafeWriteTarget(root string, relativePath string) error {
+	safeRelativePath, fullPath, err := fileSystem.safeFullPathParts(root, relativePath)
+	if err != nil {
+		return err
+	}
+	if err := fileSystem.ensureSafeExistingParents(root, safeRelativePath); err != nil {
+		return err
+	}
+
+	info, err := os.Lstat(fullPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return unsafeGeneratedSymlinkTargetError(relativePath)
+	}
+	return nil
+}
+
+func (fileSystem *LocalFileSystem) ensureSafeDirectoryTarget(root string, relativePath string) error {
+	safeRelativePath, fullPath, err := fileSystem.safeFullPathParts(root, relativePath)
+	if err != nil {
+		return err
+	}
+	if err := fileSystem.ensureSafeExistingParents(root, safeRelativePath); err != nil {
+		return err
+	}
+
+	info, err := os.Lstat(fullPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return unsafeSymlinkPathError(relativePath)
+	}
+	return nil
+}
+
+func (fileSystem *LocalFileSystem) ensureSafeExistingParents(root string, safeRelativePath string) error {
+	parentPath := path.Dir(safeRelativePath)
+	if parentPath == "." {
+		return nil
+	}
+
+	currentPath := ""
+	for _, segment := range strings.Split(parentPath, "/") {
+		if currentPath == "" {
+			currentPath = segment
+		} else {
+			currentPath += "/" + segment
+		}
+
+		fullPath := filepath.Join(root, filepath.FromSlash(currentPath))
+		info, err := os.Lstat(fullPath)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return unsafeGeneratedSymlinkParentError(currentPath)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("parent path is not a directory: %s", currentPath)
+		}
+	}
+
+	return nil
+}
+
+func (fileSystem *LocalFileSystem) safeFullPath(root string, relativePath string) (string, error) {
+	_, fullPath, err := fileSystem.safeFullPathParts(root, relativePath)
+	return fullPath, err
+}
+
+func (fileSystem *LocalFileSystem) safeFullPathParts(root string, relativePath string) (string, string, error) {
+	safeRelativePath, err := safeRelativePath(relativePath)
+	if err != nil {
+		return "", "", err
+	}
+	if safeRelativePath == "." {
+		return safeRelativePath, root, nil
+	}
+	return safeRelativePath, filepath.Join(root, filepath.FromSlash(safeRelativePath)), nil
+}
+
 func (fileSystem *LocalFileSystem) fullPath(root string, relativePath string) string {
 	return filepath.Join(root, filepath.FromSlash(relativePath))
+}
+
+func safeRelativePath(relativePath string) (string, error) {
+	if strings.TrimSpace(relativePath) == "" {
+		return "", errors.New("relative path is required")
+	}
+	if strings.ContainsRune(relativePath, 0) {
+		return "", errors.New("relative path contains a null byte")
+	}
+
+	normalized := strings.ReplaceAll(relativePath, "\\", "/")
+	if filepath.IsAbs(relativePath) || strings.HasPrefix(normalized, "/") || isWindowsDrivePath(normalized) {
+		return "", fmt.Errorf("relative path must not be absolute: %s", relativePath)
+	}
+	for _, segment := range strings.Split(normalized, "/") {
+		if segment == ".." {
+			return "", fmt.Errorf("relative path must not contain path traversal: %s", relativePath)
+		}
+	}
+
+	cleaned := path.Clean(normalized)
+	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return "", fmt.Errorf("relative path must not contain path traversal: %s", relativePath)
+	}
+	return cleaned, nil
+}
+
+func isWindowsDrivePath(value string) bool {
+	return len(value) >= 2 && isASCIIAlpha(value[0]) && value[1] == ':'
+}
+
+func isASCIIAlpha(value byte) bool {
+	return (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z')
+}
+
+func unsafeGeneratedSymlinkTargetError(relativePath string) error {
+	return fmt.Errorf("symlink target paths are not allowed for generated OpenSpec files: %s", relativePath)
+}
+
+func unsafeGeneratedSymlinkParentError(relativePath string) error {
+	return fmt.Errorf("symlink parent directories are not allowed for generated OpenSpec files: %s", relativePath)
+}
+
+func unsafeSymlinkPathError(relativePath string) error {
+	return fmt.Errorf("symlink paths are not allowed: %s", relativePath)
+}
+
+func replaceFileWithoutFollowingSymlink(fullPath string, relativePath string, contents string) error {
+	initialInfo, err := os.Lstat(fullPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			file, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+			if err != nil {
+				return err
+			}
+			return writeStringAndClose(file, contents)
+		}
+		return err
+	}
+	if initialInfo.Mode()&os.ModeSymlink != 0 {
+		return unsafeGeneratedSymlinkTargetError(relativePath)
+	}
+
+	file, err := os.OpenFile(fullPath, os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+
+	openedInfo, err := file.Stat()
+	if err != nil {
+		return closeWithError(file, err)
+	}
+	latestInfo, err := os.Lstat(fullPath)
+	if err != nil {
+		return closeWithError(file, err)
+	}
+	if latestInfo.Mode()&os.ModeSymlink != 0 {
+		return closeWithError(file, unsafeGeneratedSymlinkTargetError(relativePath))
+	}
+	if !os.SameFile(latestInfo, openedInfo) {
+		return closeWithError(file, fmt.Errorf("target file changed during safety check: %s", relativePath))
+	}
+	if err := file.Truncate(0); err != nil {
+		return closeWithError(file, err)
+	}
+	if _, err := file.Seek(0, 0); err != nil {
+		return closeWithError(file, err)
+	}
+
+	return writeStringAndClose(file, contents)
+}
+
+func writeStringAndClose(file *os.File, contents string) error {
+	if _, err := io.WriteString(file, contents); err != nil {
+		return closeWithError(file, err)
+	}
+	return file.Close()
+}
+
+func closeWithError(file *os.File, err error) error {
+	if closeErr := file.Close(); closeErr != nil {
+		return errors.Join(err, closeErr)
+	}
+	return err
 }

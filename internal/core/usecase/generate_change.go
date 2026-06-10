@@ -9,21 +9,26 @@ import (
 	"github.com/guferreira1/spec-harbor/internal/core/ports"
 )
 
+const customTemplatesDirectory = ".specharbor/templates"
+
 type GenerateChangeInput struct {
-	ProjectRoot  string
-	ChangeID     string
-	Mode         domain.GenerationMode
-	TemplateName string
-	GuidedType   string
-	Title        string
-	Summary      string
+	ProjectRoot        string
+	ChangeID           string
+	Mode               domain.GenerationMode
+	TemplateName       string
+	TemplateSource     domain.TemplateSource
+	CustomTemplateName string
+	GuidedType         string
+	Title              string
+	Summary            string
 }
 
 type GenerateChange struct {
-	fileSystem      ports.GenerationFileSystem
-	blankContent    ports.BlankChangeContent
-	templateContent ports.TemplateChangeContent
-	guidedContent   ports.GuidedChangeContent
+	fileSystem          ports.GenerationFileSystem
+	blankContent        ports.BlankChangeContent
+	templateContent     ports.TemplateChangeContent
+	guidedContent       ports.GuidedChangeContent
+	customTemplateFiles ports.CustomTemplateFileSystem
 }
 
 func NewGenerateChange(fileSystem ports.GenerationFileSystem, content ports.BlankChangeContent) *GenerateChange {
@@ -59,6 +64,22 @@ func NewGenerateChangeWithContent(
 	}
 }
 
+func NewGenerateChangeWithCustomTemplates(
+	fileSystem ports.GenerationFileSystem,
+	blankContent ports.BlankChangeContent,
+	templateContent ports.TemplateChangeContent,
+	guidedContent ports.GuidedChangeContent,
+	customTemplateFiles ports.CustomTemplateFileSystem,
+) *GenerateChange {
+	return &GenerateChange{
+		fileSystem:          fileSystem,
+		blankContent:        blankContent,
+		templateContent:     templateContent,
+		guidedContent:       guidedContent,
+		customTemplateFiles: customTemplateFiles,
+	}
+}
+
 func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.GenerationResult, error) {
 	if useCase == nil {
 		return domain.GenerationResult{}, errors.New("generate change use case is required")
@@ -69,8 +90,15 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 	if input.Mode == domain.BlankMode && useCase.blankContent == nil {
 		return domain.GenerationResult{}, errors.New("blank change content is required")
 	}
-	if input.Mode == domain.TemplateMode && useCase.templateContent == nil {
+	customTemplateRequested, err := isCustomTemplateRequest(input)
+	if err != nil {
+		return domain.GenerationResult{}, err
+	}
+	if input.Mode == domain.TemplateMode && !customTemplateRequested && useCase.templateContent == nil {
 		return domain.GenerationResult{}, errors.New("template change content is required")
+	}
+	if customTemplateRequested && useCase.customTemplateFiles == nil {
+		return domain.GenerationResult{}, errors.New("custom template filesystem is required")
 	}
 	if input.Mode == domain.GuidedMode && useCase.guidedContent == nil {
 		return domain.GenerationResult{}, errors.New("guided change content is required")
@@ -90,6 +118,7 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 	}
 
 	var templateName domain.TemplateName
+	var customTemplateName domain.CustomTemplateName
 	var guidedType domain.GuidedType
 	var guidedTitle string
 	var guidedSummary string
@@ -97,7 +126,11 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 	case domain.BlankMode:
 	case domain.TemplateMode:
 		var err error
-		templateName, err = domain.ParseTemplateName(input.TemplateName)
+		if customTemplateRequested {
+			customTemplateName, err = domain.NewCustomTemplateName(input.CustomTemplateName)
+		} else {
+			templateName, err = domain.ParseTemplateName(input.TemplateName)
+		}
 		if err != nil {
 			return domain.GenerationResult{}, err
 		}
@@ -124,17 +157,29 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 		return domain.GenerationResult{}, err
 	}
 
+	var templatePath string
+	var renderedContents map[string]string
+	if customTemplateRequested {
+		templatePath = customTemplatesDirectory + "/" + customTemplateName.String()
+		customTemplate, err := useCase.loadCustomTemplate(projectRoot, customTemplateName, templatePath)
+		if err != nil {
+			return domain.GenerationResult{}, err
+		}
+		renderedContents = customTemplate.Render(changeID, input.Title, input.Summary)
+	}
+
 	directoryCreated, err := useCase.ensureChangeDirectory(projectRoot, changePath)
 	if err != nil {
 		return domain.GenerationResult{}, err
 	}
 
 	contentRequest := generationContentRequest{
-		mode:          input.Mode,
-		templateName:  templateName,
-		guidedType:    guidedType,
-		guidedTitle:   guidedTitle,
-		guidedSummary: guidedSummary,
+		mode:             input.Mode,
+		templateName:     templateName,
+		guidedType:       guidedType,
+		guidedTitle:      guidedTitle,
+		guidedSummary:    guidedSummary,
+		renderedContents: renderedContents,
 	}
 	createdFiles, skippedExistingFiles, err := useCase.writeChangeFiles(projectRoot, changePath, contentRequest)
 	if err != nil {
@@ -142,6 +187,17 @@ func (useCase *GenerateChange) Execute(input GenerateChangeInput) (domain.Genera
 	}
 
 	if input.Mode == domain.TemplateMode {
+		if customTemplateRequested {
+			return domain.NewCustomTemplateGenerationResult(
+				changeID,
+				customTemplateName,
+				templatePath,
+				changePath,
+				directoryCreated,
+				createdFiles,
+				skippedExistingFiles,
+			), nil
+		}
 		return domain.NewTemplateGenerationResult(
 			changeID,
 			templateName,
@@ -187,12 +243,74 @@ func validateGenerationChangeID(changeID string) error {
 	return nil
 }
 
+func isCustomTemplateRequest(input GenerateChangeInput) (bool, error) {
+	switch input.TemplateSource {
+	case "", domain.BuiltInTemplateSource:
+		return false, nil
+	case domain.CustomTemplateSource:
+		if input.Mode != domain.TemplateMode {
+			return false, fmt.Errorf("custom templates require template generation mode, got: %s", input.Mode)
+		}
+		return true, nil
+	default:
+		return false, fmt.Errorf("unsupported template source: %s", input.TemplateSource)
+	}
+}
+
 type generationContentRequest struct {
-	mode          domain.GenerationMode
-	templateName  domain.TemplateName
-	guidedType    domain.GuidedType
-	guidedTitle   string
-	guidedSummary string
+	mode             domain.GenerationMode
+	templateName     domain.TemplateName
+	guidedType       domain.GuidedType
+	guidedTitle      string
+	guidedSummary    string
+	renderedContents map[string]string
+}
+
+func (useCase *GenerateChange) loadCustomTemplate(
+	projectRoot string,
+	customTemplateName domain.CustomTemplateName,
+	templatePath string,
+) (domain.CustomTemplate, error) {
+	templateDirectoryExists, err := useCase.customTemplateFiles.DirectoryExists(projectRoot, templatePath)
+	if err != nil {
+		return domain.CustomTemplate{}, fmt.Errorf("check directory %s: %w", templatePath, err)
+	}
+	if !templateDirectoryExists {
+		return domain.CustomTemplate{}, fmt.Errorf(
+			"unknown custom template: %s. Expected directory: %s",
+			customTemplateName,
+			templatePath,
+		)
+	}
+
+	var missingFiles []string
+	templateFiles := make(map[string]string)
+	for _, requiredFile := range domain.AllowedCustomTemplateFiles() {
+		filePath := templatePath + "/" + requiredFile
+		fileExists, err := useCase.customTemplateFiles.FileExists(projectRoot, filePath)
+		if err != nil {
+			return domain.CustomTemplate{}, fmt.Errorf("check file %s: %w", filePath, err)
+		}
+		if !fileExists {
+			missingFiles = append(missingFiles, requiredFile)
+			continue
+		}
+
+		contents, err := useCase.customTemplateFiles.ReadFile(projectRoot, filePath)
+		if err != nil {
+			return domain.CustomTemplate{}, fmt.Errorf("read file %s: %w", filePath, err)
+		}
+		templateFiles[requiredFile] = contents
+	}
+	if len(missingFiles) > 0 {
+		return domain.CustomTemplate{}, fmt.Errorf(
+			"custom template %s is missing required files: %s",
+			customTemplateName,
+			strings.Join(missingFiles, ", "),
+		)
+	}
+
+	return domain.NewCustomTemplate(customTemplateName, templateFiles)
 }
 
 func (useCase *GenerateChange) requireOpenSpecProject(projectRoot string) error {
@@ -261,6 +379,14 @@ func (useCase *GenerateChange) contentFor(
 	contentRequest generationContentRequest,
 	requiredFile string,
 ) (string, error) {
+	if contentRequest.renderedContents != nil {
+		contents, exists := contentRequest.renderedContents[requiredFile]
+		if !exists {
+			return "", fmt.Errorf("missing rendered custom template content for %s", requiredFile)
+		}
+		return contents, nil
+	}
+
 	if contentRequest.mode == domain.TemplateMode {
 		contents, err := useCase.templateContent.ContentFor(contentRequest.templateName, requiredFile)
 		if err != nil {

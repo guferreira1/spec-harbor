@@ -11,6 +11,7 @@ import (
 
 var _ ports.ValidationFileSystem = (*LocalFileSystem)(nil)
 var _ ports.GenerationFileSystem = (*LocalFileSystem)(nil)
+var _ ports.AIAssistedGenerationFileSystem = (*LocalFileSystem)(nil)
 var _ ports.ArchiveFileSystem = (*LocalFileSystem)(nil)
 var _ ports.ReviewFileSystem = (*LocalFileSystem)(nil)
 var _ ports.ScanFileSystem = (*LocalFileSystem)(nil)
@@ -253,6 +254,212 @@ func TestLocalFileSystemReportsMissingFilesDistinctlyFromReadErrors(t *testing.T
 	}
 	if !os.IsNotExist(err) {
 		t.Fatalf("ReadFile() error = %v, want not-exist error", err)
+	}
+}
+
+func TestLocalFileSystemReadsAIAssistedSourceFileLocally(t *testing.T) {
+	root := t.TempDir()
+	sourcePath := filepath.Join(root, "agent-output.txt")
+	if err := os.WriteFile(sourcePath, []byte("strict blocks"), 0o644); err != nil {
+		t.Fatalf("WriteFile(source) error = %v", err)
+	}
+
+	contents, err := NewLocalFileSystem().ReadSourceFile(sourcePath)
+	if err != nil {
+		t.Fatalf("ReadSourceFile() error = %v", err)
+	}
+	if contents != "strict blocks" {
+		t.Fatalf("ReadSourceFile() = %q, want strict blocks", contents)
+	}
+}
+
+func TestLocalFileSystemReportsMissingAIAssistedSourceFileClearly(t *testing.T) {
+	sourcePath := filepath.Join(t.TempDir(), "missing-output.txt")
+
+	_, err := NewLocalFileSystem().ReadSourceFile(sourcePath)
+	if err == nil {
+		t.Fatalf("ReadSourceFile() error = nil, want missing source error")
+	}
+	if !strings.Contains(err.Error(), "source file not found") || !strings.Contains(err.Error(), sourcePath) {
+		t.Fatalf("ReadSourceFile() error = %q, want clear missing source path", err.Error())
+	}
+}
+
+func TestLocalFileSystemWritesAIAssistedTargetFilesAndOverwritesExplicitly(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+
+	if err := fileSystem.CreateDirectory(root, "openspec/changes/ai-change"); err != nil {
+		t.Fatalf("CreateDirectory() error = %v", err)
+	}
+
+	created, err := fileSystem.WriteFileIfAbsent(root, "openspec/changes/ai-change/proposal.md", "first")
+	if err != nil {
+		t.Fatalf("WriteFileIfAbsent() error = %v", err)
+	}
+	if !created {
+		t.Fatalf("WriteFileIfAbsent() created = false, want true")
+	}
+
+	created, err = fileSystem.WriteFileIfAbsent(root, "openspec/changes/ai-change/proposal.md", "second")
+	if err != nil {
+		t.Fatalf("WriteFileIfAbsent(existing) error = %v", err)
+	}
+	if created {
+		t.Fatalf("WriteFileIfAbsent(existing) created = true, want false")
+	}
+
+	if err := fileSystem.WriteFile(root, "openspec/changes/ai-change/proposal.md", "overwritten"); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	contents, err := os.ReadFile(filepath.Join(root, "openspec", "changes", "ai-change", "proposal.md"))
+	if err != nil {
+		t.Fatalf("ReadFile(proposal.md) error = %v", err)
+	}
+	if string(contents) != "overwritten" {
+		t.Fatalf("proposal.md = %q, want overwritten", string(contents))
+	}
+
+	if err := fileSystem.WriteFile(root, "openspec/changes/ai-change/design.md", "new overwrite target"); err != nil {
+		t.Fatalf("WriteFile(missing) error = %v", err)
+	}
+	contents, err = os.ReadFile(filepath.Join(root, "openspec", "changes", "ai-change", "design.md"))
+	if err != nil {
+		t.Fatalf("ReadFile(design.md) error = %v", err)
+	}
+	if string(contents) != "new overwrite target" {
+		t.Fatalf("design.md = %q, want newly written content", string(contents))
+	}
+}
+
+func TestLocalFileSystemRejectsAIAssistedSymlinkTargetPaths(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+
+	if err := fileSystem.CreateDirectory(root, "openspec/changes/ai-change"); err != nil {
+		t.Fatalf("CreateDirectory() error = %v", err)
+	}
+	outsidePath := filepath.Join(t.TempDir(), "outside-proposal.md")
+	if err := os.WriteFile(outsidePath, []byte("outside original"), 0o644); err != nil {
+		t.Fatalf("WriteFile(outside) error = %v", err)
+	}
+	targetPath := filepath.Join(root, "openspec", "changes", "ai-change", "proposal.md")
+	if err := os.Symlink(outsidePath, targetPath); err != nil {
+		t.Skipf("Symlink() unavailable: %v", err)
+	}
+
+	relativePath := "openspec/changes/ai-change/proposal.md"
+	if exists, err := fileSystem.FileExists(root, relativePath); err == nil || !strings.Contains(err.Error(), "symlink paths are not allowed") {
+		t.Fatalf("FileExists() = %v, %v; want symlink rejection", exists, err)
+	}
+	if err := fileSystem.EnsureSafeWriteTarget(root, relativePath); err == nil || !strings.Contains(err.Error(), "symlink target paths are not allowed for generated OpenSpec files") {
+		t.Fatalf("EnsureSafeWriteTarget() error = %v, want generated symlink target rejection", err)
+	}
+	if created, err := fileSystem.WriteFileIfAbsent(root, relativePath, "replacement"); err == nil || created {
+		t.Fatalf("WriteFileIfAbsent() = %v, %v; want symlink rejection without creation", created, err)
+	}
+	if err := fileSystem.WriteFile(root, relativePath, "replacement"); err == nil || !strings.Contains(err.Error(), "symlink target paths are not allowed") {
+		t.Fatalf("WriteFile() error = %v, want symlink rejection", err)
+	}
+
+	contents, err := os.ReadFile(outsidePath)
+	if err != nil {
+		t.Fatalf("ReadFile(outside) error = %v", err)
+	}
+	if string(contents) != "outside original" {
+		t.Fatalf("outside target = %q, want unchanged", string(contents))
+	}
+}
+
+func TestLocalFileSystemRejectsAIAssistedSymlinkParentDirectories(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+
+	if err := os.MkdirAll(filepath.Join(root, "openspec", "changes"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(changes) error = %v", err)
+	}
+	outsideDirectory := t.TempDir()
+	changeLink := filepath.Join(root, "openspec", "changes", "ai-change")
+	if err := os.Symlink(outsideDirectory, changeLink); err != nil {
+		t.Skipf("Symlink() unavailable: %v", err)
+	}
+
+	relativePath := "openspec/changes/ai-change/proposal.md"
+	if err := fileSystem.EnsureSafeWriteTarget(root, relativePath); err == nil || !strings.Contains(err.Error(), "symlink parent directories are not allowed for generated OpenSpec files") {
+		t.Fatalf("EnsureSafeWriteTarget() error = %v, want symlink parent rejection", err)
+	}
+	if err := fileSystem.WriteFile(root, relativePath, "replacement"); err == nil || !strings.Contains(err.Error(), "symlink parent directories are not allowed") {
+		t.Fatalf("WriteFile() error = %v, want symlink parent rejection", err)
+	}
+	if _, err := os.Stat(filepath.Join(outsideDirectory, "proposal.md")); !os.IsNotExist(err) {
+		t.Fatalf("outside proposal stat error = %v, want no file created through symlink parent", err)
+	}
+}
+
+func TestLocalFileSystemDistinguishesMissingAIAssistedTargetsFromUnsafeSymlinks(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+
+	if err := fileSystem.CreateDirectory(root, "openspec/changes/ai-change"); err != nil {
+		t.Fatalf("CreateDirectory() error = %v", err)
+	}
+	missingPath := "openspec/changes/ai-change/proposal.md"
+	if err := fileSystem.EnsureSafeWriteTarget(root, missingPath); err != nil {
+		t.Fatalf("EnsureSafeWriteTarget(missing) error = %v, want nil", err)
+	}
+	exists, err := fileSystem.FileExists(root, missingPath)
+	if err != nil {
+		t.Fatalf("FileExists(missing) error = %v", err)
+	}
+	if exists {
+		t.Fatalf("FileExists(missing) = true, want false")
+	}
+}
+
+func TestLocalFileSystemRejectsUnsafeAIAssistedTargetPaths(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+
+	tests := []struct {
+		name         string
+		relativePath string
+	}{
+		{name: "path traversal", relativePath: "../outside.md"},
+		{name: "nested traversal", relativePath: "openspec/../outside.md"},
+		{name: "absolute unix", relativePath: "/tmp/outside.md"},
+		{name: "absolute windows", relativePath: `C:\tmp\outside.md`},
+		{name: "backslash traversal", relativePath: `openspec\..\outside.md`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := fileSystem.PathExists(root, test.relativePath); err == nil {
+				t.Fatalf("PathExists(%q) error = nil, want unsafe path rejection", test.relativePath)
+			}
+			if err := fileSystem.EnsureSafeWriteTarget(root, test.relativePath); err == nil {
+				t.Fatalf("EnsureSafeWriteTarget(%q) error = nil, want unsafe path rejection", test.relativePath)
+			}
+			if _, err := fileSystem.WriteFileIfAbsent(root, test.relativePath, "content"); err == nil {
+				t.Fatalf("WriteFileIfAbsent(%q) error = nil, want unsafe path rejection", test.relativePath)
+			}
+			if err := fileSystem.WriteFile(root, test.relativePath, "content"); err == nil {
+				t.Fatalf("WriteFile(%q) error = nil, want unsafe path rejection", test.relativePath)
+			}
+		})
+	}
+}
+
+func TestLocalFileSystemReportsAIAssistedWriteErrors(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+
+	_, err := fileSystem.WriteFileIfAbsent(root, "openspec/changes/missing/proposal.md", "content")
+	if err == nil {
+		t.Fatalf("WriteFileIfAbsent() error = nil, want missing directory write error")
+	}
+	if !os.IsNotExist(err) {
+		t.Fatalf("WriteFileIfAbsent() error = %v, want not-exist write error", err)
 	}
 }
 

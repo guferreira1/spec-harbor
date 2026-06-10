@@ -31,7 +31,9 @@ go run ./cmd/specharbor init
 go run ./cmd/specharbor scan
 go run ./cmd/specharbor generate add-example-feature --blank
 go run ./cmd/specharbor generate add-feature --template feature
+go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature
 go run ./cmd/specharbor generate add-reports --guided --type feature --title "Add reports" --summary "Create report generation support"
+go run ./cmd/specharbor generate add-reports --ai-assisted --from-file agent-output.txt
 go run ./cmd/specharbor generate add-reports --agent-assisted --agent codex --type feature --title "Add reports" --summary "Create report generation support"
 go run ./cmd/specharbor generate add-reports --agent-assisted --agent codex --type feature --title "Add reports" --summary "Create report generation support" --execute
 go run ./cmd/specharbor validate add-example-feature
@@ -51,7 +53,17 @@ The recommended workflow guide is available as `specharbor workflow`. It prints 
 
 Built-in template generation supports exactly `feature`, `bugfix`, `docs`, and `refactor`. See [Usage](docs/usage.md) and [Generation modes](docs/generation-modes.md) for details.
 
+Custom template generation renders reusable, project-local templates from `.specharbor/templates/<template-name>/` with `--custom-template`. A custom template is a plain directory containing the five required OpenSpec change files; generation performs minimal deterministic variable substitution (`{{change_id}}`, plus `{{title}}`/`{{summary}}` when provided, with unresolved tokens left verbatim) and writes only under `openspec/changes/<change-id>/`, skipping existing files. Built-in and custom templates resolve from disjoint sources, so a custom template never shadows a built-in one. Templates are local and static: no remote templates, no config-driven registry, no template or script execution, and no network or provider calls. See [Usage](docs/usage.md) and [Generation modes](docs/generation-modes.md) for details.
+
 Guided generation is deterministic, local, non-interactive, and supports exactly `feature`, `bugfix`, `docs`, and `refactor`. It uses explicit `--type`, `--title`, and `--summary` flags.
+
+AI-assisted generation imports AI-authored OpenSpec Markdown from a local file only:
+
+```bash
+specharbor generate <change-id> --ai-assisted --from-file <agent-output-file> [--overwrite]
+```
+
+The source file must contain strict `---FILE: <name>---` and `---END FILE---` blocks for exactly `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md`. SpecHarbor parses the whole file before writing, rejects malformed or unsafe output, rejects symlink output targets, writes only under `openspec/changes/<change-id>/`, skips existing files by default, overwrites only with `--overwrite`, then runs validation. It does not call provider APIs or remote AI services, does not execute agents, does not modify production code, and does not run source-control automation.
 
 Agent-assisted spec authoring supports exactly `feature`, `bugfix`, `docs`, and `refactor`. Dry-run remains the default and prints a deterministic authoring plan plus copy-pasteable prompt to stdout; it writes no files, does not execute agents, and does not resolve executable mappings. With explicit `--execute`, supported local agent commands run in run-and-report mode only. SpecHarbor captures stdout, stderr, exit code, and status, but does not parse or apply output, does not write files from output, does not modify production code from output, and does not auto-commit, auto-push, or auto-merge. See [Usage](docs/usage.md) and [Generation modes](docs/generation-modes.md) for details.
 
@@ -65,7 +77,9 @@ Implemented:
 - Stack-agnostic local project scanning.
 - Blank OpenSpec change generation.
 - Built-in OpenSpec change template generation for `feature`, `bugfix`, `docs`, and `refactor`.
+- Project-local custom template generation from `.specharbor/templates/<template-name>/` with deterministic variable substitution and OpenSpec-only writes.
 - Guided OpenSpec change generation for `feature`, `bugfix`, `docs`, and `refactor`.
+- AI-assisted from-file OpenSpec generation with strict local delimiter blocks, default skip behavior, explicit overwrite, validation integration, and no provider/API/runner/source-control automation.
 - Dry-run agent-assisted spec authoring for `feature`, `bugfix`, `docs`, and `refactor`.
 - Explicit agent-assisted local runner execution in run-and-report mode for supported concrete agent targets.
 - Deterministic, local, read-only change validation with content-quality rules, error/warning severities, and grouped reports: errors (missing/empty/unusable files, malformed task checkboxes, missing acceptance criteria) exit non-zero, while quality warnings (placeholders, boilerplate-only starter content, missing recommended sections or mitigations) keep exit code `0`, so freshly generated blank changes stay valid.
@@ -80,9 +94,9 @@ In progress:
 
 Planned:
 
-- AI-assisted and hybrid spec generation.
+- Hybrid spec generation.
 - Future config-driven generic runner mappings and richer templates.
-- Future template capabilities such as custom, remote, and config-driven templates.
+- Future template capabilities such as remote and config-driven templates.
 - Interactive generation prompts.
 - Config mutation commands such as `config get`, `config set`, and `config unset`.
 - AI-provider and workflow connector support.
