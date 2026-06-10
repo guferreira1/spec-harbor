@@ -2920,8 +2920,9 @@ func TestExecutePreservesHelpVersionAndUnknownCommandBehavior(t *testing.T) {
 	if err := execute([]string{"version"}, &output); err != nil {
 		t.Fatalf("execute(version) error = %v", err)
 	}
-	if output.String() != version.Version+"\n" {
-		t.Fatalf("version output = %q, want %q", output.String(), version.Version+"\n")
+	wantVersion := version.Current().Format() + "\n"
+	if output.String() != wantVersion {
+		t.Fatalf("version output = %q, want %q", output.String(), wantVersion)
 	}
 
 	output.Reset()
@@ -2931,6 +2932,86 @@ func TestExecutePreservesHelpVersionAndUnknownCommandBehavior(t *testing.T) {
 	}
 	if err.Error() != "unknown command: missing" {
 		t.Fatalf("unknown command error = %q, want %q", err.Error(), "unknown command: missing")
+	}
+}
+
+func TestExecuteVersionPrintsMultilineReport(t *testing.T) {
+	var output bytes.Buffer
+	if err := execute([]string{"version"}, &output); err != nil {
+		t.Fatalf("execute(version) error = %v", err)
+	}
+
+	want := `SpecHarbor dev
+commit: unknown
+date: unknown
+dirty: unknown
+`
+	if output.String() != want {
+		t.Fatalf("version output = %q, want %q", output.String(), want)
+	}
+}
+
+func TestExecuteVersionRejectsUnsupportedArguments(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "json flag", args: []string{"version", "--json"}, want: "unsupported flag: --json"},
+		{name: "short flag", args: []string{"version", "--short"}, want: "unsupported flag: --short"},
+		{name: "format flag", args: []string{"version", "--format", "json"}, want: "unsupported flag: --format"},
+		{name: "extra argument", args: []string{"version", "extra"}, want: "unexpected argument: extra"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var output bytes.Buffer
+			err := execute(test.args, &output)
+			if err == nil {
+				t.Fatalf("execute(%v) error = nil, want %q", test.args, test.want)
+			}
+			if err.Error() != test.want {
+				t.Fatalf("execute(%v) error = %q, want %q", test.args, err.Error(), test.want)
+			}
+			if output.String() != "" {
+				t.Fatalf("execute(%v) output = %q, want empty output", test.args, output.String())
+			}
+		})
+	}
+}
+
+func TestExecuteVersionIsReadOnlyAndWorksOutsideProject(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	var output bytes.Buffer
+	if err := execute([]string{"version"}, &output); err != nil {
+		t.Fatalf("execute(version) error = %v", err)
+	}
+
+	if output.String() != version.Current().Format()+"\n" {
+		t.Fatalf("version output = %q, want current metadata report", output.String())
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatalf("ReadDir(%q) error = %v", root, err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("version command created files in %q: %v", root, entries)
+	}
+}
+
+func TestExecuteTopLevelVersionFlagRemainsUnsupported(t *testing.T) {
+	var output bytes.Buffer
+	err := execute([]string{"--version"}, &output)
+	if err == nil {
+		t.Fatalf("execute(--version) error = nil, want unknown command")
+	}
+	if err.Error() != "unknown command: --version" {
+		t.Fatalf("execute(--version) error = %q, want unknown command", err.Error())
+	}
+	if output.String() != "" {
+		t.Fatalf("execute(--version) output = %q, want empty output", output.String())
 	}
 }
 

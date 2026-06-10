@@ -16,6 +16,57 @@ That creates a local `specharbor` binary in the repository root.
 
 ## Implemented Commands
 
+### Check Version Metadata
+
+```bash
+go run ./cmd/specharbor version
+specharbor version
+```
+
+`specharbor version` prints deterministic multiline build metadata:
+
+```text
+SpecHarbor dev
+commit: unknown
+date: unknown
+dirty: unknown
+```
+
+Fields:
+
+- `version`: product version metadata.
+- `commit`: source commit supplied by the build.
+- `date`: build date supplied by the build.
+- `dirty`: working tree state supplied by the build.
+
+`dev` means no release version was injected. `unknown` means the build did not provide that metadata field. Git release tags use `vX.Y.Z`, for example `v0.1.0`, while binary metadata should use plain `X.Y.Z`, for example `0.1.0`.
+
+Plain `go install` without `-ldflags` uses the same development fallback metadata. An installed binary built that way is expected to print:
+
+```text
+SpecHarbor dev
+commit: unknown
+date: unknown
+dirty: unknown
+```
+
+This is expected behavior. To get release metadata, the binary must be built with injected `-ldflags` values.
+
+Release builds inject metadata through Go `-ldflags -X` variables in `github.com/guferreira1/spec-harbor/internal/platform/version`:
+
+```bash
+go build \
+  -ldflags "
+    -X github.com/guferreira1/spec-harbor/internal/platform/version.Version=0.1.0
+    -X github.com/guferreira1/spec-harbor/internal/platform/version.Commit=abc1234
+    -X github.com/guferreira1/spec-harbor/internal/platform/version.Date=2026-06-10T19:00:00Z
+    -X github.com/guferreira1/spec-harbor/internal/platform/version.Dirty=false
+  " \
+  ./cmd/specharbor
+```
+
+Runtime displays the injected version string as-is and does not normalize it. It does not inspect Git tags, read `.git`, run Git, or normalize versions. Future release automation will inject release metadata and should convert a tag such as `v0.1.0` into injected binary metadata such as `0.1.0`. This command does not implement tag conversion. GitHub Releases, install scripts, npm publishing for the desired future package name `specharbor`, Homebrew publishing, native Linux packages, and Windows package-manager support are future work.
+
 ### Initialize a Project
 
 ```bash

@@ -1,0 +1,91 @@
+# Acceptance Criteria: Implement Release Versioning
+
+- `specharbor version` prints a multiline human-readable report.
+- The first output line is `SpecHarbor <version>`.
+- The report includes `commit: <commit>`.
+- The report includes `date: <date>`.
+- The report includes `dirty: <dirty>`.
+- The report ends with a trailing newline when printed by the CLI.
+- Default local development output uses `SpecHarbor dev`.
+- Default local development output uses `commit: unknown`.
+- Default local development output uses `date: unknown`.
+- Default local development output uses `dirty: unknown`.
+- Release output examples use plain SemVer such as `SpecHarbor 0.1.0`, not `SpecHarbor v0.1.0`.
+- Empty metadata values handled through internal helpers or constructors fall back to the same deterministic defaults.
+- Git release tags use the documented `vX.Y.Z` convention, for example `v0.1.0`.
+- Binary version metadata uses the documented plain SemVer `X.Y.Z` convention, for example `0.1.0`.
+- `specharbor version` displays the injected version string as-is.
+- Runtime code does not add a leading `v` to the version string.
+- Runtime code does not remove a leading `v` from the version string.
+- Runtime code does not inspect Git tags.
+- Release builds can inject `Version` with Go `-ldflags -X`.
+- Release builds can inject `Commit` with Go `-ldflags -X`.
+- Release builds can inject `Date` with Go `-ldflags -X`.
+- Release builds can inject `Dirty` with Go `-ldflags -X`.
+- The linker package path is `github.com/guferreira1/spec-harbor/internal/platform/version`.
+- The first-scope metadata fields are limited to version, commit, date, and dirty.
+- Optional fields such as `builtBy`, `goVersion`, and `platform` are not added in this change.
+- `specharbor version` accepts no positional arguments.
+- `specharbor version` rejects unsupported flags.
+- `specharbor version --json` is not implemented.
+- `specharbor version --short` is not implemented.
+- Top-level `specharbor --version` is not added.
+- The version command remains read-only.
+- The version command performs no file writes.
+- The version command performs no network calls.
+- The version command performs no Git commands.
+- The version command does not read `.git`.
+- The version command works outside a Git repository.
+- The version command works from an installed binary.
+- `internal/platform/version` does not import Git libraries.
+- `internal/platform/version` does not import `os/exec`.
+- `internal/platform/version` does not perform network calls.
+- Core packages do not import CLI or adapters for version reporting.
+- Use case packages are not expanded for this platform-only metadata behavior.
+- Existing commands other than `version` keep their behavior.
+- Regression coverage exists for `init`.
+- Regression coverage exists for `generate`.
+- Regression coverage exists for `validate`.
+- Regression coverage exists for `prompt`.
+- Regression coverage exists for `review`.
+- Regression coverage exists for `archive`.
+- Regression coverage exists for `workflow`.
+- Regression coverage exists for `config`.
+- Regression coverage exists for unknown commands.
+- Platform tests cover default metadata values.
+- Platform tests cover version output with default metadata.
+- Platform tests cover overridden metadata values where practical.
+- Platform tests cover version output with an injected plain SemVer-like value.
+- Platform tests cover preserving an injected version value as-is.
+- Platform tests or static checks cover absence of runtime version string normalization.
+- Platform tests cover formatted version output.
+- Platform tests or static checks cover absence of runtime Git tag inspection, Git, shell, network, and filesystem dependencies in the version package.
+- CLI tests cover `specharbor version` output.
+- CLI tests cover unsupported version flags.
+- CLI tests cover unexpected version arguments.
+- `README.md` documents how to check the installed version.
+- `docs/usage.md` documents the version command output.
+- `docs/release.md` documents metadata fields, defaults, and linker injection.
+- Documentation explains that `dev` means no release version was injected.
+- Documentation explains that `unknown` means the build did not provide that metadata field.
+- Documentation explains that Git tags use `vX.Y.Z` and injected binary versions use plain `X.Y.Z`.
+- Documentation explains that future release tooling, not runtime code, converts tags such as `v0.1.0` into injected values such as `0.1.0`.
+- Documentation states that publishing is not implemented in this change.
+- Documentation states that GitHub Releases are future work.
+- Documentation states that install scripts are future work.
+- Documentation states that npm publishing for desired package name `specharbor` is future work.
+- Documentation states that Homebrew publishing to `guferreira1/homebrew-tap` is future work.
+- Documentation states that native Linux packages and Windows package manager support are future work.
+- No release automation files are introduced.
+- No `.goreleaser.yaml` or `.goreleaser.yml` is introduced.
+- No release-specific GitHub Actions workflow is introduced.
+- No install script is introduced.
+- No npm package file or package directory is introduced.
+- No Homebrew formula or tap file is introduced.
+- No Linux package file or package directory is introduced.
+- No Windows package-manager file or package directory is introduced.
+- No release publishing script is introduced.
+- No package-manager artifact is introduced.
+- No generated release archive or checksum is introduced.
+- `go test ./...` passes after implementation.
+- `go run ./cmd/specharbor validate implement-release-versioning` passes after implementation.
