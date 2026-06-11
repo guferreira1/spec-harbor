@@ -2,12 +2,22 @@
 
 npm wrapper package for the [SpecHarbor](https://github.com/guferreira1/spec-harbor) CLI.
 
-> **Status:** this package is maintained in the SpecHarbor repository and has
-> not been published to the npm registry yet. `npm install -g specharbor`
-> works only after a maintainer publishes the package manually. Publishing is
-> an explicit manual step and is never automated. See
-> [docs/install.md](https://github.com/guferreira1/spec-harbor/blob/main/docs/install.md)
-> for currently available installation options.
+> **Status:** `specharbor@0.1.0` is published to the npm registry and maps to
+> GitHub Release `v0.1.0`. Publishing version bumps remains an explicit
+> manual maintainer step and is not automated.
+
+Install globally:
+
+```bash
+npm install -g specharbor
+specharbor version
+```
+
+Run without a global install:
+
+```bash
+npx specharbor version
+```
 
 ## What it does
 
@@ -24,9 +34,9 @@ npm wrapper package for the [SpecHarbor](https://github.com/guferreira1/spec-har
 ## Version mapping
 
 The npm package version `X.Y.Z` maps to exactly one GitHub Release tag
-`vX.Y.Z`. The pinned release is the single source of the downloaded binary.
-At publish time the package version must match a published SpecHarbor
-release tag.
+`vX.Y.Z`. Package version `0.1.0` resolves to GitHub Release `v0.1.0`, which
+is the single source of the downloaded binary. At publish time the package
+version must match a published SpecHarbor release tag.
 
 ## Supported platforms
 
@@ -42,6 +52,22 @@ release tag.
 Unsupported platforms fail with a deterministic error naming the detected
 platform and pointing to the manual installation documentation, both at
 postinstall and at run time.
+
+## Troubleshooting
+
+- `npm install --ignore-scripts -g specharbor` skips postinstall by design.
+  Run `specharbor version` or `npx specharbor version` later to trigger the
+  same checksum-verified binary download.
+- First-run download failures usually indicate offline use, proxy
+  restrictions, GitHub Release access restrictions, or an unsupported
+  platform/architecture pair. Retry with network access to GitHub Releases or
+  use the manual install guide.
+- If version output shows `SpecHarbor 0.1.0`, the wrapper resolved the
+  `v0.1.0` release binary successfully.
+
+See
+[docs/install.md](https://github.com/guferreira1/spec-harbor/blob/main/docs/install.md)
+for the full install guide.
 
 ## Security model
 
