@@ -23,3 +23,7 @@ Thumbs.db
 
 # SpecHarbor local config
 .specharbor/config.local.yml
+
+# npm wrapper package: downloaded native binaries and local installs
+packages/npm/specharbor/native/
+packages/npm/specharbor/node_modules/

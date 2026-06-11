@@ -65,7 +65,7 @@ go build \
   ./cmd/specharbor
 ```
 
-Runtime displays the injected version string as-is and does not normalize it. It does not inspect Git tags, read `.git`, run Git, or normalize versions. GoReleaser injects release metadata when building GitHub Release assets from tags such as `v0.1.0`, and those binaries display plain metadata such as `0.1.0`. Install channels such as npm, Homebrew, `install.sh`, native Linux packages, Windows package managers, signing, SBOMs, and Docker images are future work.
+Runtime displays the injected version string as-is and does not normalize it. It does not inspect Git tags, read `.git`, run Git, or normalize versions. GoReleaser injects release metadata when building GitHub Release assets from tags such as `v0.1.0`, and those binaries display plain metadata such as `0.1.0`. Installation options are documented in [Install](install.md): `install.sh` and the npm wrapper package are implemented in-repo, while npm registry publishing, the Homebrew tap, native Linux packages, Windows package managers, signing, SBOMs, and Docker images remain future steps.
 
 ### Initialize a Project
 

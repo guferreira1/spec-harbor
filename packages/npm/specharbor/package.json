@@ -1,0 +1,46 @@
+{
+  "name": "specharbor",
+  "version": "0.1.0",
+  "description": "SpecHarbor CLI. Installs the official specharbor binary from GitHub Releases with mandatory SHA-256 checksum verification.",
+  "license": "MIT",
+  "homepage": "https://github.com/guferreira1/spec-harbor#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guferreira1/spec-harbor.git",
+    "directory": "packages/npm/specharbor"
+  },
+  "bugs": {
+    "url": "https://github.com/guferreira1/spec-harbor/issues"
+  },
+  "keywords": [
+    "specharbor",
+    "openspec",
+    "cli",
+    "spec-driven-development"
+  ],
+  "bin": {
+    "specharbor": "bin/specharbor.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "scripts",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "linux",
+    "darwin",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
+}
