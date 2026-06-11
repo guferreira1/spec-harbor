@@ -8,16 +8,16 @@ those assets over HTTPS and verifies SHA-256 checksums before installing.
 
 | Channel | Status |
 | --- | --- |
-| Manual GitHub Release download | Available once a release is published |
-| `install.sh` (Linux, macOS) | Implemented; installs published releases |
-| npm global package (`specharbor`) | Implemented in-repo; **not yet published to the npm registry** |
-| Homebrew tap (`guferreira1/tap/specharbor`) | Planned / future; external tap not created yet |
+| Manual GitHub Release download | Available |
+| `install.sh` (Linux, macOS) | Available; installs published releases |
+| npm global package (`specharbor`) | Available as `specharbor@0.1.0` |
+| Homebrew tap (`guferreira1/tap/specharbor`) | Available through `guferreira1/homebrew-tap` |
 | Linux `.deb` / `.rpm` packages | Future only |
 | Windows Scoop / Winget | Future only |
 | `go install` from source | Available (development fallback metadata) |
 
-No channel works before the first GitHub Release with assets is published.
-Until then, build from source (see the `go install` fallback below).
+Binary install channels require a published GitHub Release with matching
+assets and checksums. The first published release is `v0.1.0`.
 
 ## Release assets
 
@@ -139,13 +139,11 @@ sh scripts/test-install-sh.sh
 ## npm global package
 
 The npm wrapper package lives in this repository at
-`packages/npm/specharbor/`. It is **not yet published to the npm registry**,
-so `npm install -g specharbor` does not work yet. Publishing is a manual,
-explicit maintainer step that happens outside this repository's automation;
-the unscoped name `specharbor` is re-verified at publish time (a scoped
-package is the fallback only if the name becomes unavailable).
+`packages/npm/specharbor/` and is published to the npm registry as
+`specharbor@0.1.0`. Publishing version bumps remains a manual, explicit
+maintainer step that happens outside this repository's automation.
 
-Once published, the experience will be:
+Install it with:
 
 ```bash
 npm install -g specharbor
@@ -170,19 +168,16 @@ How the wrapper works:
 See [packages/npm/specharbor/README.md](../packages/npm/specharbor/README.md)
 for details and `npm test` for its offline test suite.
 
-## Homebrew tap (planned)
+## Homebrew tap
 
-Homebrew support is planned and not available yet. The formula will live in a
-personal external tap repository, `guferreira1/homebrew-tap`, with formula
-name `specharbor`. No organization is required. Once the tap exists, the
-install command will be:
+Homebrew support is available through the personal external tap repository
+`guferreira1/homebrew-tap`, with formula name `specharbor`. Install it with:
 
 ```bash
 brew install guferreira1/tap/specharbor
 ```
 
-The formula must satisfy these expectations (testable criteria for the tap
-repository):
+The formula satisfies these expectations in the tap repository:
 
 - `url` points at an official pinned GitHub Release asset.
 - A `sha256` value, copied from the release `checksums.txt`, is mandatory for
@@ -191,11 +186,11 @@ repository):
 - The formula `test do` block runs `specharbor version` and asserts the
   output contains the expected version.
 
-Formula delivery may happen through a separate repository/PR in the tap
-repository. `brew audit`, `brew install`, and `brew test` validation can run
-later in a GitHub Actions macOS runner inside the tap repository. Formula
-version bumps are manual until later automation is specified. No Homebrew
-formula files are committed to this repository.
+The tap validates `brew audit --strict --online specharbor`, formula install,
+`specharbor version`, `brew test specharbor`, and the user install command on
+GitHub Actions macOS runners. Formula version bumps are manual until later
+automation is specified. No Homebrew formula files are committed to this
+repository.
 
 ## Future-only channels
 
@@ -207,9 +202,8 @@ The following are planned but intentionally not implemented yet:
 - Binary signing (for example cosign), SBOM generation, Docker images, and
   auto-update mechanisms.
 
-Interim paths: Linux users have `install.sh`, the npm package (once
-published), and manual install; Windows users have the npm package (once
-published) and manual `.zip` install.
+Interim paths: Linux users have `install.sh`, npm, and manual install;
+Windows users have npm and manual `.zip` install.
 
 ## Verifying an installation
 
@@ -283,5 +277,5 @@ All install channels follow the same rules:
   user input, requires tokens or authentication, sends telemetry, mutates Git
   state, or writes outside its install target and cache/temporary
   directories.
-- Nothing is published automatically: npm and Homebrew publishing are
-  explicit, manual, later steps.
+- Package publishing and formula version bumps are explicit maintainer steps
+  unless a later OpenSpec change defines automation.
