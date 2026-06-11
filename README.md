@@ -24,20 +24,33 @@ SpecHarbor dogfoods this workflow for its own development. Meaningful changes to
 
 ## Install
 
-See [Install](docs/install.md) for all options, checksum verification, and troubleshooting. Summary:
+SpecHarbor `v0.1.0` is available through GitHub Releases, `install.sh`,
+npm, and Homebrew. See [Install](docs/install.md) for manual downloads,
+checksum verification, platform support, and troubleshooting.
 
-- **Manual download**: grab the archive for your OS/arch from [GitHub Releases](https://github.com/guferreira1/spec-harbor/releases), verify its SHA-256 checksum against `checksums.txt`, and place the binary on `PATH`.
-- **install.sh** (Linux/macOS): downloads the latest (or pinned) release, verifies the checksum, and installs to `$HOME/.local/bin` without sudo:
+Quick install options:
 
-  ```bash
-  curl -sSL https://raw.githubusercontent.com/guferreira1/spec-harbor/main/install.sh | sh
-  ```
+```bash
+curl -fsSL https://raw.githubusercontent.com/guferreira1/spec-harbor/main/install.sh | sh
+npm install -g specharbor
+brew install guferreira1/tap/specharbor
+```
 
-- **npm**: install the published wrapper package with `npm install -g specharbor`.
-- **Homebrew**: install from the external tap with `brew install guferreira1/tap/specharbor`.
-- **From source**: `go install github.com/guferreira1/spec-harbor/cmd/specharbor@latest` (prints development fallback metadata).
+Verify any installed release binary with:
 
-Install channels require a published GitHub Release; Linux `.deb`/`.rpm`, Scoop, and Winget are future work.
+```bash
+specharbor version
+```
+
+The current public release prints `SpecHarbor 0.1.0` on the first line.
+
+Manual GitHub Release downloads are available from the
+[releases page](https://github.com/guferreira1/spec-harbor/releases); verify
+the archive against `checksums.txt` before installing. `go install` remains a
+source-build fallback and prints development fallback metadata unless release
+metadata is injected manually. Native Linux packages, Windows package managers,
+signing, SBOMs, Docker images, and package publishing automation remain
+future work.
 
 ## Current Commands
 
@@ -84,7 +97,13 @@ date: unknown
 dirty: unknown
 ```
 
-This is expected behavior. `dev` means no release version was injected. `unknown` means the build did not provide that metadata field. Git release tags use `vX.Y.Z`, such as `v0.1.0`, while release binaries display plain `X.Y.Z`, such as `0.1.0`. Runtime displays the injected version string as-is, does not normalize versions, and does not inspect Git tags, read `.git`, or run Git. GoReleaser builds GitHub Release assets for Linux, macOS, and Windows on `amd64` and `arm64`, injects metadata under `github.com/guferreira1/spec-harbor/internal/platform/version`, and generates `checksums.txt` with SHA-256 checksums. Snapshot releases are local verification only. Install channels are documented in [Install](docs/install.md): `install.sh`, the npm wrapper package, and the Homebrew tap are available, while native Linux packages, Windows package managers, signing, SBOMs, and Docker images remain future work.
+This is expected behavior. `dev` means no release version was injected.
+`unknown` means the build did not provide that metadata field. Git release
+tags use `vX.Y.Z`, such as `v0.1.0`, while release binaries display plain
+`X.Y.Z`, such as `0.1.0`. Runtime displays the injected version string as-is
+and does not inspect Git tags. See [Install](docs/install.md) for install
+channels and [Release metadata](docs/release.md) for release assets,
+checksums, and build metadata.
 
 `config` is a read-only alias for `config show`. It reads `.specharbor/config.yml` and prints a local config report when the project has a supported version `1` config file.
 

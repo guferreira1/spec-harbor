@@ -8,13 +8,17 @@ those assets over HTTPS and verifies SHA-256 checksums before installing.
 
 | Channel | Status |
 | --- | --- |
-| Manual GitHub Release download | Available |
-| `install.sh` (Linux, macOS) | Available; installs published releases |
-| npm global package (`specharbor`) | Available as `specharbor@0.1.0` |
-| Homebrew tap (`guferreira1/tap/specharbor`) | Available through `guferreira1/homebrew-tap` |
+| GitHub Releases | Available for `v0.1.0` |
+| `install.sh` | Available for Linux and macOS using real release assets |
+| npm | Available as unscoped package `specharbor@0.1.0` |
+| Homebrew | Available as `brew install guferreira1/tap/specharbor` |
+| `go install` from source | Fallback/developer option; prints development fallback metadata |
 | Linux `.deb` / `.rpm` packages | Future only |
 | Windows Scoop / Winget | Future only |
-| `go install` from source | Available (development fallback metadata) |
+| signing | Future only |
+| SBOM | Future only |
+| Docker | Future only |
+| package publishing automation | Future only |
 
 Binary install channels require a published GitHub Release with matching
 assets and checksums. The first published release is `v0.1.0`.
@@ -40,6 +44,11 @@ follow this pattern:
 ```text
 https://github.com/guferreira1/spec-harbor/releases/download/vX.Y.Z/<asset>
 ```
+
+Release assets cover Linux `amd64`, Linux `arm64`, macOS `amd64`, macOS
+`arm64`, Windows `amd64`, and Windows `arm64`. `install.sh` supports Linux
+and macOS. The npm wrapper supports Linux, macOS, and Windows on `x64` and
+`arm64`. The current Homebrew formula is macOS-only.
 
 ## Manual install from GitHub Releases
 
@@ -86,7 +95,7 @@ HTTPS, verifies the SHA-256 checksum, and installs the binary to a user-local
 directory.
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/guferreira1/spec-harbor/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/guferreira1/spec-harbor/main/install.sh | sh
 ```
 
 If you prefer to review the script before running it (recommended):
@@ -150,6 +159,12 @@ npm install -g specharbor
 specharbor version
 ```
 
+You can also run the published package without a global install:
+
+```bash
+npx specharbor version
+```
+
 How the wrapper works:
 
 - The package version `X.Y.Z` pins exactly one release tag `vX.Y.Z`.
@@ -201,6 +216,8 @@ The following are planned but intentionally not implemented yet:
 - Windows package managers: Scoop and Winget.
 - Binary signing (for example cosign), SBOM generation, Docker images, and
   auto-update mechanisms.
+- Package publishing automation for npm, Homebrew, Linux packages, Windows
+  package managers, signing, SBOMs, and Docker.
 
 Interim paths: Linux users have `install.sh`, npm, and manual install;
 Windows users have npm and manual `.zip` install.
@@ -231,11 +248,12 @@ dirty: unknown
 
 See [Release metadata](release.md) for the full version convention.
 
-## PATH troubleshooting
+## Troubleshooting
+
+### `specharbor: command not found`
 
 User-local install directories such as `$HOME/.local/bin` may not be on your
-`PATH`. If `specharbor: command not found` appears after a successful
-install, add the directory to your shell profile:
+`PATH`. Add the directory to your shell profile:
 
 ```bash
 # bash: ~/.bashrc — zsh: ~/.zshrc
@@ -247,6 +265,82 @@ Then restart the shell or `source` the profile. Verify with:
 ```bash
 command -v specharbor
 ```
+
+If a shell still resolves an old binary after replacing it, clear the command
+cache and retry:
+
+```bash
+hash -r
+specharbor version
+```
+
+### Permission denied
+
+`install.sh` never invokes `sudo`. If the install directory is not writable,
+choose a user-writable directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/guferreira1/spec-harbor/main/install.sh | sh -s -- --install-dir "$HOME/bin"
+```
+
+For manual installs, create the target directory yourself and use a directory
+already on `PATH`.
+
+### Checksum mismatch
+
+Do not install an archive whose checksum does not verify. Delete the partial
+download, fetch the archive and `checksums.txt` again from the official
+GitHub Release, and retry. If the mismatch persists, treat the artifact as
+untrusted and open an issue with the release URL and checksum output.
+
+### Unsupported platform or architecture
+
+Release assets exist for Linux, macOS, and Windows on `amd64`/`x64` and
+`arm64`. `install.sh` supports only Linux and macOS. For unsupported systems,
+use a supported machine, try the npm package if Node supports your
+OS/architecture pair, or build from source with Go.
+
+### npm postinstall skipped or first-run download failed
+
+`npm install --ignore-scripts -g specharbor` skips the postinstall download.
+That is supported: `npx specharbor version` or `specharbor version` performs
+the same checksum-verified download on first run. First-run download failures
+usually indicate offline use, proxy restrictions, GitHub access restrictions,
+or an unsupported platform. Re-run with network access to GitHub Releases, or
+use a manual GitHub Release install.
+
+### Homebrew tap/install issues
+
+Use the tap shorthand exactly:
+
+```bash
+brew install guferreira1/tap/specharbor
+```
+
+If Homebrew cannot find or update the formula, refresh taps and retry:
+
+```bash
+brew update
+brew untap guferreira1/tap
+brew tap guferreira1/tap
+brew install guferreira1/tap/specharbor
+```
+
+The external tap repository is `guferreira1/homebrew-tap`; no formula files
+live in this repository.
+
+### Version metadata looks unexpected
+
+Verify the installed binary with:
+
+```bash
+specharbor version
+```
+
+Release binaries for `v0.1.0` print `SpecHarbor 0.1.0` and include commit,
+date, and dirty metadata. `dev`/`unknown` output usually means the binary was
+built from source without injected release metadata, such as with plain
+`go install`.
 
 ## go install fallback
 

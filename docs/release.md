@@ -2,6 +2,23 @@
 
 SpecHarbor uses GoReleaser to build GitHub Release assets from pushed version tags.
 
+## Current Public Release
+
+The current public release is GitHub Release `v0.1.0`, built from commit
+`e6faff91feef07e5c1e47181243286268daf17b5`. Release binaries display plain
+version `0.1.0`.
+
+The validated public distribution channels for this release are:
+
+- GitHub Releases.
+- `install.sh`.
+- npm package `specharbor@0.1.0`.
+- Homebrew tap install command `brew install guferreira1/tap/specharbor`.
+
+The Homebrew formula lives in the external tap repository
+`guferreira1/homebrew-tap`; the validated tap commit is
+`a61783bcfa44f7eafdce72c70043b76e6f80df9c`.
+
 ## Check Version
 
 Use:
@@ -82,6 +99,11 @@ git push origin v0.1.0
 
 The GitHub Actions release workflow runs only for pushed tags matching `v*`. It does not run on normal branch pushes or pull requests. The workflow uses GoReleaser with the repository `GITHUB_TOKEN` and top-level `contents: write` permission to create or update the GitHub Release and upload assets.
 
+The tag-based workflow creates GitHub Release assets and `checksums.txt`. It
+does not publish npm packages, update the Homebrew tap, publish Linux native
+packages, publish Windows package-manager manifests, sign binaries, generate
+SBOMs, or publish Docker images.
+
 ## Release Assets
 
 GoReleaser builds one `specharbor` binary from `./cmd/specharbor` for these archives:
@@ -96,6 +118,32 @@ GoReleaser builds one `specharbor` binary from `./cmd/specharbor` for these arch
 Linux and macOS assets use `.tar.gz`. Windows assets use `.zip`. GoReleaser also generates `checksums.txt` with SHA-256 checksums.
 
 Installation options that consume these assets — manual download, `install.sh`, the npm wrapper package, and the Homebrew tap — are documented in [Install](install.md).
+
+For `v0.1.0`, those assets cover:
+
+- Linux amd64.
+- Linux arm64.
+- macOS amd64.
+- macOS arm64.
+- Windows amd64.
+- Windows arm64.
+- `checksums.txt`.
+
+## Package Channels
+
+npm package `specharbor@0.1.0` is published and maps package version `0.1.0`
+to GitHub Release tag `v0.1.0`. The `0.1.0` npm publish was a manual
+maintainer action.
+
+Homebrew is available through:
+
+```bash
+brew install guferreira1/tap/specharbor
+```
+
+The formula is maintained manually for now in the external
+`guferreira1/homebrew-tap` repository. Package publishing automation remains
+future work.
 
 ## Local Snapshot Verification
 
@@ -120,10 +168,16 @@ Snapshot versions may include GoReleaser snapshot metadata instead of a normal r
 
 ## Future Work
 
-`install.sh`, the npm wrapper package, and the external Homebrew tap are documented in [Install](install.md). The release foundation does not implement these future work items:
-- Native Linux packages such as deb, rpm, or apk.
+`install.sh`, the npm wrapper package, and the external Homebrew tap are
+available and documented in [Install](install.md). The release foundation does
+not implement these future-only items:
+
+- Native Linux packages such as `.deb`, `.rpm`, or `.apk`.
 - Windows package-manager manifests such as Winget, Scoop, or Chocolatey.
 - Signing, cosign, attestations, or SBOM generation.
 - Docker images or Docker manifests.
+- Package publishing automation for npm, Homebrew, Linux packages, Windows
+  package managers, signing, SBOMs, or Docker.
 
-Those publishing steps and supply-chain features require separate OpenSpec changes or manual maintainer action.
+Those publishing steps and supply-chain features require separate OpenSpec
+changes or manual maintainer action.
