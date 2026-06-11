@@ -350,10 +350,12 @@ func TestReleaseWorkflowUsesCommunityGoReleaserAndOnlyGitHubToken(t *testing.T) 
 func TestReleaseScopeDoesNotAddOutOfScopePackageArtifacts(t *testing.T) {
 	root := filepath.Join("..", "..")
 
+	// install.sh and packages/npm are intentionally absent from this list:
+	// the approved implement-install-channels change introduces them as
+	// checksum-verified install channels consuming official release assets.
 	for _, relativePath := range []string{
 		".goreleaser.yml",
 		".github/workflows/release.yaml",
-		"install.sh",
 		"publish.sh",
 		"release.sh",
 		"scripts/install.sh",
@@ -364,7 +366,6 @@ func TestReleaseScopeDoesNotAddOutOfScopePackageArtifacts(t *testing.T) {
 		"package.json",
 		"package-lock.json",
 		"npm",
-		"packages/npm",
 		"Formula",
 		"homebrew",
 		"nfpm.yaml",
@@ -455,7 +456,7 @@ func TestReleaseVersioningDocumentationDescribesImplementedScopeOnly(t *testing.
 			"`goreleaser release --snapshot --clean`",
 			"npm",
 			"Homebrew",
-			"install scripts",
+			"`install.sh`",
 			"SBOM",
 			"Docker",
 			"future work",
