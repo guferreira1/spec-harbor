@@ -33,8 +33,8 @@ See [Install](docs/install.md) for all options, checksum verification, and troub
   curl -sSL https://raw.githubusercontent.com/guferreira1/spec-harbor/main/install.sh | sh
   ```
 
-- **npm**: the wrapper package lives at `packages/npm/specharbor/` but is not published to the npm registry yet; `npm install -g specharbor` becomes available after a manual publish.
-- **Homebrew**: planned through the external tap `guferreira1/homebrew-tap` (`brew install guferreira1/tap/specharbor`); not available yet.
+- **npm**: install the published wrapper package with `npm install -g specharbor`.
+- **Homebrew**: install from the external tap with `brew install guferreira1/tap/specharbor`.
 - **From source**: `go install github.com/guferreira1/spec-harbor/cmd/specharbor@latest` (prints development fallback metadata).
 
 Install channels require a published GitHub Release; Linux `.deb`/`.rpm`, Scoop, and Winget are future work.
@@ -84,7 +84,7 @@ date: unknown
 dirty: unknown
 ```
 
-This is expected behavior. `dev` means no release version was injected. `unknown` means the build did not provide that metadata field. Git release tags use `vX.Y.Z`, such as `v0.1.0`, while release binaries display plain `X.Y.Z`, such as `0.1.0`. Runtime displays the injected version string as-is, does not normalize versions, and does not inspect Git tags, read `.git`, or run Git. GoReleaser builds GitHub Release assets for Linux, macOS, and Windows on `amd64` and `arm64`, injects metadata under `github.com/guferreira1/spec-harbor/internal/platform/version`, and generates `checksums.txt` with SHA-256 checksums. Snapshot releases are local verification only. Install channels are documented in [Install](docs/install.md): `install.sh` and the npm wrapper package are implemented in-repo, npm registry publishing and the Homebrew tap are manual future steps, and native Linux packages, Windows package managers, signing, SBOMs, and Docker images remain future work.
+This is expected behavior. `dev` means no release version was injected. `unknown` means the build did not provide that metadata field. Git release tags use `vX.Y.Z`, such as `v0.1.0`, while release binaries display plain `X.Y.Z`, such as `0.1.0`. Runtime displays the injected version string as-is, does not normalize versions, and does not inspect Git tags, read `.git`, or run Git. GoReleaser builds GitHub Release assets for Linux, macOS, and Windows on `amd64` and `arm64`, injects metadata under `github.com/guferreira1/spec-harbor/internal/platform/version`, and generates `checksums.txt` with SHA-256 checksums. Snapshot releases are local verification only. Install channels are documented in [Install](docs/install.md): `install.sh`, the npm wrapper package, and the Homebrew tap are available, while native Linux packages, Windows package managers, signing, SBOMs, and Docker images remain future work.
 
 `config` is a read-only alias for `config show`. It reads `.specharbor/config.yml` and prints a local config report when the project has a supported version `1` config file.
 
@@ -178,7 +178,8 @@ Implemented:
 - Deterministic version metadata reporting with `version`.
 - Tag-based GoReleaser GitHub Release assets with SHA-256 checksums.
 - Checksum-verified `install.sh` installer for Linux and macOS.
-- npm wrapper package code under `packages/npm/specharbor/` (registry publishing is a manual later step).
+- Published npm wrapper package under `packages/npm/specharbor/`.
+- External Homebrew tap formula in `guferreira1/homebrew-tap`.
 
 In progress:
 
@@ -186,7 +187,6 @@ In progress:
 
 Planned:
 
-- npm registry publishing and the Homebrew tap (`guferreira1/homebrew-tap`).
 - Native Linux packages (`.deb`/`.rpm`) and Windows package managers (Scoop, Winget).
 - Future config-driven generic runner mappings and richer templates.
 - Config mutation commands such as `config get`, `config set`, and `config unset`.

@@ -95,7 +95,7 @@ GoReleaser builds one `specharbor` binary from `./cmd/specharbor` for these arch
 
 Linux and macOS assets use `.tar.gz`. Windows assets use `.zip`. GoReleaser also generates `checksums.txt` with SHA-256 checksums.
 
-Installation options that consume these assets — manual download, `install.sh`, the npm wrapper package, and the planned Homebrew tap — are documented in [Install](install.md).
+Installation options that consume these assets — manual download, `install.sh`, the npm wrapper package, and the Homebrew tap — are documented in [Install](install.md).
 
 ## Local Snapshot Verification
 
@@ -120,10 +120,7 @@ Snapshot versions may include GoReleaser snapshot metadata instead of a normal r
 
 ## Future Work
 
-`install.sh` and the npm wrapper package are implemented in this repository and documented in [Install](install.md). The release foundation does not implement these future work items:
-
-- npm registry publishing (a manual maintainer step).
-- Homebrew tap publishing (`guferreira1/homebrew-tap`, a separate repository).
+`install.sh`, the npm wrapper package, and the external Homebrew tap are documented in [Install](install.md). The release foundation does not implement these future work items:
 - Native Linux packages such as deb, rpm, or apk.
 - Windows package-manager manifests such as Winget, Scoop, or Chocolatey.
 - Signing, cosign, attestations, or SBOM generation.
