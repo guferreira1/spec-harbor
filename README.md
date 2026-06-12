@@ -60,6 +60,7 @@ Implemented commands on the current branch:
 go run ./cmd/specharbor version
 go run ./cmd/specharbor init
 go run ./cmd/specharbor scan
+go run ./cmd/specharbor brief
 go run ./cmd/specharbor generate add-example-feature --interactive
 go run ./cmd/specharbor generate add-example-feature --blank
 go run ./cmd/specharbor generate add-feature --template feature
@@ -110,6 +111,14 @@ checksums, and build metadata.
 `validate <change-id>` runs deterministic, local, read-only validation over the required OpenSpec change files, including content-quality rules with `error` and `warning` severities. Errors (missing or empty files, malformed task checkboxes, missing acceptance criteria) exit non-zero; warnings (placeholders, boilerplate-only starter content, missing recommended sections) never change the exit code, so a freshly generated blank change validates as valid with warnings. See [Usage](docs/usage.md) for the full rule list, exit codes, and example output.
 
 The recommended workflow guide is available as `specharbor workflow`. It prints the nine-step advisory path: Spec Author Agent, Architecture Reviewer Agent, Implementer Agent, Test Engineer Agent, Change Reviewer Agent, Commit, Pull Request, Merge, and Archive. The command is read-only, does not execute command suggestions, does not commit, does not create PRs, does not merge, and does not call GitHub, GitLab, CI, provider APIs, agent CLIs, source-control automation, workflow execution, or remote automation.
+
+Interactive project briefing is available as:
+
+```bash
+specharbor brief
+```
+
+`brief` requires an interactive TTY, asks multiple-choice questions for explicit project context, and writes `.specharbor/project-brief.md` only after confirmation. It refuses to overwrite an existing project brief. The brief separates user-provided answers, detected context, and assumptions, and this command does not run repository indexing, RAG, provider APIs, agent execution, source-control automation, release, or publishing behavior. Existing prompt generation does not consume the project brief in this change.
 
 Interactive generation is available as:
 
@@ -179,6 +188,7 @@ Implemented:
 
 - OpenSpec project initialization.
 - Stack-agnostic local project scanning.
+- Interactive project briefing that writes `.specharbor/project-brief.md` after confirmation.
 - Interactive generation prompts for blank, built-in template, custom template, config template, and hybrid paths.
 - Blank OpenSpec change generation.
 - Built-in OpenSpec change template generation for `feature`, `bugfix`, `docs`, and `refactor`.

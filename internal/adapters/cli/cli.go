@@ -76,6 +76,7 @@ func commandRegistry() map[string]CommandHandler {
 		"version":  versionCommand,
 		"init":     initCommand,
 		"scan":     scanCommand,
+		"brief":    briefCommand,
 		"generate": generateCommand,
 		"prompt":   promptCommand,
 		"validate": validateCommand,
@@ -2039,6 +2040,7 @@ Usage:
 Commands:
   init        Initialize OpenSpec and SpecHarbor configuration
   scan        Detect project stack and development context
+  brief       Collect confirmed project context
   generate    Generate a new OpenSpec change
   prompt      Generate an agent-specific implementation prompt
   validate    Validate an OpenSpec change

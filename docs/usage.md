@@ -85,6 +85,84 @@ go run ./cmd/specharbor scan
 
 The report can include detected ecosystems, package managers, test command hints, CI signals, container or deployment signals, SpecHarbor/OpenSpec signals, and notes. The command does not require flags or arguments.
 
+### Brief a Project
+
+```bash
+go run ./cmd/specharbor brief
+specharbor brief
+```
+
+`brief` starts an interactive project briefing workflow for cases where repository context is missing, incomplete, or ambiguous. It accepts no positional arguments and no flags in this version. Unsupported flags such as `--force`, `--update`, `--overwrite`, `--json`, `--from-scan`, `--github`, or `--rag` are rejected.
+
+The command requires an interactive TTY. In CI, piped input, or other non-TTY contexts it fails before prompting or writing:
+
+```text
+brief requires an interactive TTY
+```
+
+Prompted context includes:
+
+- project type;
+- project purpose;
+- target users;
+- stack;
+- architecture;
+- install command;
+- test command;
+- build command;
+- run command;
+- preferred agent behavior when context is missing.
+
+Each question is multiple choice with three to five options. The final option is always `Other / custom`; choosing it prompts for a non-empty custom answer. Invalid menu choices and empty custom answers retry up to three attempts, then fail without writing.
+
+Before writing, `brief` prints the target file and safety boundaries:
+
+```text
+SpecHarbor will create:
+
+.specharbor/project-brief.md
+
+Safety:
+- Stack, architecture, and commands come from confirmed answers only.
+- Detected context remains separate from user answers.
+- Assumptions are not confirmed facts.
+- No repository indexing, RAG, provider API, agent execution, source-control automation, release, or publishing behavior will run.
+
+Confirm? [y/N]:
+```
+
+Confirmation accepts trimmed `y` and `yes` in any casing. `n`, `no`, empty confirmation, and EOF cancel with `operation cancelled` and write no file. Unsupported confirmation answers retry up to three attempts; retry exhaustion writes no file.
+
+After confirmation, `brief` creates `.specharbor/` when needed and writes:
+
+```text
+.specharbor/project-brief.md
+```
+
+The file is deterministic, human-readable Markdown with these sections:
+
+```text
+# Project Brief
+
+## Project type
+## Purpose
+## Target users
+## Stack
+## Architecture
+## Commands
+### Install
+### Test
+### Build
+### Run
+## Agent behavior
+## Context sources
+## Assumptions
+```
+
+User-provided answers, detected context, and assumptions are labeled separately. This first version records no detected context unless a future change adds shallow suggestions. It never silently converts missing or ambiguous stack, architecture, command, or project decisions into facts.
+
+If `.specharbor/project-brief.md` already exists, `brief` refuses to merge, update, overwrite, or append to it and returns a clear out-of-scope message. Existing prompt generation does not read or inject the project brief in this change.
+
 ### Show the Recommended Workflow
 
 ```bash
