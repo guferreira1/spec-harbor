@@ -27,8 +27,13 @@ func briefCommand(ctx CommandContext) error {
 	if terminal == nil {
 		terminal = newOSInteractiveTerminal(ctx.Output)
 	}
+	if !terminal.IsInputTerminal() {
+		return errors.New("brief requires an interactive TTY")
+	}
 
-	answers, err := promptProjectBriefAnswers(terminal)
+	discoveredContext := discoverProjectBriefSuggestionContext(root)
+
+	answers, err := promptProjectBriefAnswers(terminal, discoveredContext)
 	if err != nil {
 		return err
 	}
@@ -46,8 +51,10 @@ func briefCommand(ctx CommandContext) error {
 	fileSystem := filesystem.NewLocalFileSystem()
 	createBrief := usecase.NewCreateProjectBrief(fileSystem)
 	result, err := createBrief.Execute(usecase.CreateProjectBriefInput{
-		ProjectRoot: root,
-		Answers:     answers,
+		ProjectRoot:    root,
+		Answers:        answers,
+		ContextSources: contextSourcesFromDiscovery(discoveredContext),
+		Assumptions:    assumptionsFromDiscovery(discoveredContext, answers),
 	})
 	if err != nil {
 		return err
@@ -67,7 +74,10 @@ func parseBriefArguments(args []string) error {
 	return nil
 }
 
-func promptProjectBriefAnswers(terminal interactiveTerminal) (domain.ProjectBriefAnswers, error) {
+func promptProjectBriefAnswers(
+	terminal interactiveTerminal,
+	discoveredContext domain.ContextDiscoveryResult,
+) (domain.ProjectBriefAnswers, error) {
 	if terminal == nil {
 		return domain.ProjectBriefAnswers{}, errors.New("interactive terminal is required")
 	}
@@ -80,6 +90,7 @@ func promptProjectBriefAnswers(terminal interactiveTerminal) (domain.ProjectBrie
 
 	var answers domain.ProjectBriefAnswers
 	for _, question := range domain.DefaultProjectBriefQuestions() {
+		question = projectBriefQuestionWithContextSuggestions(question, discoveredContext)
 		if err := question.Validate(); err != nil {
 			return domain.ProjectBriefAnswers{}, err
 		}
@@ -92,6 +103,168 @@ func promptProjectBriefAnswers(terminal interactiveTerminal) (domain.ProjectBrie
 		}
 	}
 	return answers, nil
+}
+
+func discoverProjectBriefSuggestionContext(root string) domain.ContextDiscoveryResult {
+	fileSystem := filesystem.NewContextDiscoveryFileSystem()
+	discoverContext := usecase.NewDiscoverProjectContext(fileSystem)
+	result, err := discoverContext.Execute(usecase.DiscoverProjectContextInput{ProjectRoot: root})
+	if err != nil {
+		return domain.NewContextDiscoveryResult(nil, nil)
+	}
+	return result
+}
+
+func projectBriefQuestionWithContextSuggestions(
+	question domain.ProjectBriefQuestion,
+	discoveredContext domain.ContextDiscoveryResult,
+) domain.ProjectBriefQuestion {
+	kinds := projectBriefSuggestionKinds(question.ID)
+	if len(kinds) == 0 {
+		return question
+	}
+
+	suggestions := projectBriefSuggestionValues(discoveredContext, kinds)
+	if len(suggestions) == 0 {
+		return question
+	}
+
+	optionLabels := make([]string, 0, 5)
+	seen := make(map[string]bool)
+	addOption := func(label string) {
+		trimmed := strings.TrimSpace(label)
+		if trimmed == "" || trimmed == domain.ProjectBriefCustomOptionLabel || seen[trimmed] || len(optionLabels) >= 4 {
+			return
+		}
+		seen[trimmed] = true
+		optionLabels = append(optionLabels, trimmed)
+	}
+
+	for _, suggestion := range suggestions {
+		addOption(suggestion)
+	}
+	for _, option := range question.Options {
+		addOption(option.Label)
+	}
+	optionLabels = append(optionLabels, domain.ProjectBriefCustomOptionLabel)
+
+	options := make([]domain.ProjectBriefOption, 0, len(optionLabels))
+	for _, label := range optionLabels {
+		options = append(options, domain.ProjectBriefOption{Label: label})
+	}
+	question.Options = options
+	return question
+}
+
+func projectBriefSuggestionKinds(questionID domain.ProjectBriefQuestionID) []domain.ContextSignalKind {
+	switch questionID {
+	case domain.ProjectBriefQuestionProjectType:
+		return []domain.ContextSignalKind{domain.ContextSignalKindProjectType}
+	case domain.ProjectBriefQuestionPurpose:
+		return []domain.ContextSignalKind{domain.ContextSignalKindPurposeSummary}
+	case domain.ProjectBriefQuestionTargetUsers:
+		return []domain.ContextSignalKind{domain.ContextSignalKindTargetUsers}
+	case domain.ProjectBriefQuestionStack:
+		return []domain.ContextSignalKind{
+			domain.ContextSignalKindStack,
+			domain.ContextSignalKindLanguage,
+			domain.ContextSignalKindFramework,
+		}
+	case domain.ProjectBriefQuestionArchitecture:
+		return []domain.ContextSignalKind{domain.ContextSignalKindArchitectureHint}
+	case domain.ProjectBriefQuestionInstall:
+		return []domain.ContextSignalKind{domain.ContextSignalKindInstallCommand}
+	case domain.ProjectBriefQuestionTest:
+		return []domain.ContextSignalKind{domain.ContextSignalKindTestCommand}
+	case domain.ProjectBriefQuestionBuild:
+		return []domain.ContextSignalKind{domain.ContextSignalKindBuildCommand}
+	case domain.ProjectBriefQuestionRun:
+		return []domain.ContextSignalKind{domain.ContextSignalKindRunCommand}
+	default:
+		return nil
+	}
+}
+
+func projectBriefSuggestionValues(
+	discoveredContext domain.ContextDiscoveryResult,
+	kinds []domain.ContextSignalKind,
+) []string {
+	kindSet := make(map[domain.ContextSignalKind]bool)
+	for _, kind := range kinds {
+		kindSet[kind] = true
+	}
+
+	var values []string
+	seen := make(map[string]bool)
+	for _, classification := range []domain.ContextSignalClassification{
+		domain.ContextSignalClassificationUserConfirmedContext,
+		domain.ContextSignalClassificationDetectedFact,
+		domain.ContextSignalClassificationSuggestedAssumption,
+	} {
+		for _, signal := range discoveredContext.SignalsByClassification(classification) {
+			if !kindSet[signal.Kind] || seen[signal.Value] {
+				continue
+			}
+			seen[signal.Value] = true
+			values = append(values, signal.Value)
+		}
+	}
+	return values
+}
+
+func contextSourcesFromDiscovery(discoveredContext domain.ContextDiscoveryResult) []domain.ProjectBriefContextSource {
+	var contextSources []domain.ProjectBriefContextSource
+	for _, signal := range discoveredContext.SignalsByClassification(domain.ContextSignalClassificationDetectedFact) {
+		contextSource, err := domain.NewDetectedProjectBriefContextSource(
+			signal.Kind.Label()+" from "+formatContextSource(signal.Source),
+			signal.Value,
+		)
+		if err != nil {
+			continue
+		}
+		contextSources = append(contextSources, contextSource)
+	}
+	return contextSources
+}
+
+func assumptionsFromDiscovery(
+	discoveredContext domain.ContextDiscoveryResult,
+	answers domain.ProjectBriefAnswers,
+) []domain.ProjectBriefAssumption {
+	var assumptions []domain.ProjectBriefAssumption
+	confirmedValues := confirmedProjectBriefAnswerValues(answers)
+	for _, signal := range discoveredContext.SignalsByClassification(domain.ContextSignalClassificationSuggestedAssumption) {
+		if confirmedValues[signal.Value] {
+			continue
+		}
+		assumption, err := domain.NewProjectBriefAssumption(
+			signal.Kind.Label() + ": " + signal.Value + " (Source: " + formatContextSource(signal.Source) + ")",
+		)
+		if err != nil {
+			continue
+		}
+		assumptions = append(assumptions, assumption)
+	}
+	return assumptions
+}
+
+func confirmedProjectBriefAnswerValues(answers domain.ProjectBriefAnswers) map[string]bool {
+	values := make(map[string]bool)
+	for _, answer := range []domain.ProjectBriefAnswer{
+		answers.ProjectType,
+		answers.Purpose,
+		answers.TargetUsers,
+		answers.Stack,
+		answers.Architecture,
+		answers.Commands.Install,
+		answers.Commands.Test,
+		answers.Commands.Build,
+		answers.Commands.Run,
+		answers.AgentBehavior,
+	} {
+		values[answer.Value] = true
+	}
+	return values
 }
 
 func promptProjectBriefQuestion(

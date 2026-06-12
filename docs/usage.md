@@ -85,6 +85,68 @@ go run ./cmd/specharbor scan
 
 The report can include detected ecosystems, package managers, test command hints, CI signals, container or deployment signals, SpecHarbor/OpenSpec signals, and notes. The command does not require flags or arguments.
 
+### Discover Project Context
+
+```bash
+go run ./cmd/specharbor context discover
+specharbor context discover
+```
+
+`context discover` performs deterministic local/offline project context discovery. It reads only a bounded set of supported repository sources and prints a structured report grouped in this order:
+
+```text
+Detected project context:
+
+User-confirmed context:
+- none detected
+
+Detected facts:
+- Stack: Go
+  Source: go.mod
+  Classification: detected_fact
+  Confidence: high
+
+Suggested assumptions:
+- Test command: go test ./...
+  Source: go.mod (go.mod convention)
+  Classification: suggested_assumption
+  Confidence: medium
+
+Notes:
+- none detected
+```
+
+Signal classifications:
+
+- `user_confirmed_context`: parsed from known sections in `.specharbor/project-brief.md`.
+- `detected_fact`: explicit evidence exists in a supported repository source.
+- `suggested_assumption`: a conventional or incomplete inference; it is never treated as a fact.
+
+Confidence levels are `high`, `medium`, and `low`. Confidence does not change classification: a high-confidence fact is still not user-confirmed context, and an assumption is still an assumption.
+
+Supported discovery sources include:
+
+- `AGENTS.md`, `.specharbor/rules/`, and `.specharbor/project-brief.md`;
+- `README.md`, `CONTRIBUTING.md`, and bounded Markdown files under `docs/`;
+- `openspec/project.md` and bounded Markdown files under `openspec/specs/`;
+- `package.json`, `go.mod`, `pom.xml`, `build.gradle`, `build.gradle.kts`, `Cargo.toml`, `pyproject.toml`, and `requirements.txt`;
+- `Dockerfile`, `docker-compose.yml`, `docker-compose.yaml`, `Makefile`, `Taskfile.yml`, `Taskfile.yaml`, and `.github/workflows/`;
+- bounded repository layout checks for CLI entrypoints under `cmd/`.
+
+The command can report project type, purpose summary, stack, languages, frameworks, architecture hints, package managers, test/build/run commands, documentation sources, agent instruction sources, OpenSpec sources, container signals, workflow signals, and notes. It does not dump raw file contents.
+
+Safety boundaries:
+
+- no project commands, package managers, tests, builds, scripts, agents, shells, provider APIs, local model APIs, network APIs, source-control APIs, or workflow tools are executed;
+- no repository-wide indexing, embeddings, vector databases, RAG, retrieval, snippet ranking, remote discovery, prompt injection, merge/update behavior, or brief overwrite behavior is performed;
+- sensitive files such as `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `secrets.*`, and `credentials.*` are skipped;
+- heavy/generated folders such as `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/`, and `obj/` are skipped;
+- symlinks are not traversed.
+
+`specharbor context` without `discover`, unsupported subcommands such as `context update`, positional arguments after `discover`, and flags such as `--json`, `--path`, `--deep`, `--github`, or `--rag` are rejected.
+
+When `specharbor brief` runs, discovery can provide menu suggestions and detected context records only. The user must still select or enter every answer, confirmation is still required before writing, and an existing `.specharbor/project-brief.md` is still refused rather than merged, updated, overwritten, or appended.
+
 ### Brief a Project
 
 ```bash
@@ -159,7 +221,7 @@ The file is deterministic, human-readable Markdown with these sections:
 ## Assumptions
 ```
 
-User-provided answers, detected context, and assumptions are labeled separately. This first version records no detected context unless a future change adds shallow suggestions. It never silently converts missing or ambiguous stack, architecture, command, or project decisions into facts.
+User-provided answers, detected context, and assumptions are labeled separately. Discovery suggestions and detected context may be recorded separately in generated project briefs, but user-provided answers remain separate from detected context and assumptions. It never silently converts missing or ambiguous stack, architecture, command, or project decisions into facts.
 
 If `.specharbor/project-brief.md` already exists, `brief` refuses to merge, update, overwrite, or append to it and returns a clear out-of-scope message. Existing prompt generation does not read or inject the project brief in this change.
 

@@ -1,0 +1,123 @@
+# Acceptance Criteria: Implement Context Discovery
+
+- Local context discovery is specified and implemented.
+- The supported command is `specharbor context discover`.
+- `specharbor context discover` is deterministic, local, offline, and read-only.
+- `specharbor context discover` requires no provider API keys.
+- `specharbor context discover` calls no external APIs.
+- `specharbor context discover` runs no external commands.
+- `specharbor context discover` rejects unsupported flags.
+- `specharbor context discover` rejects unsupported positional arguments.
+- The existing `specharbor scan` command behavior is preserved.
+- The existing `specharbor brief` behavior is preserved.
+- Existing `specharbor brief` write-if-absent behavior is preserved.
+- Existing `specharbor brief` cancellation behavior is preserved.
+- Existing generated agent prompts are not changed by this feature.
+- Supported discovery sources include `AGENTS.md`.
+- Supported discovery sources include `README.md`.
+- Supported discovery sources include `CONTRIBUTING.md`.
+- Supported discovery sources include `docs/`.
+- Supported discovery sources include `openspec/project.md`.
+- Supported discovery sources include `openspec/specs/`.
+- Supported discovery sources include `.specharbor/rules/`.
+- Supported discovery sources include `.specharbor/project-brief.md`.
+- Supported discovery sources include `package.json`.
+- Supported discovery sources include `go.mod`.
+- Supported discovery sources include `pom.xml`.
+- Supported discovery sources include `build.gradle`.
+- Supported discovery sources include `Cargo.toml`.
+- Supported discovery sources include `pyproject.toml`.
+- Supported discovery sources include `requirements.txt`.
+- Supported discovery sources include `Dockerfile`.
+- Supported discovery sources include `docker-compose.yml`.
+- Supported discovery sources include `Makefile`.
+- Supported discovery sources include `Taskfile.yml`.
+- Supported discovery sources include `.github/workflows/`.
+- Discovery can report project type when supported evidence exists.
+- Discovery can report purpose summary when clearly available.
+- Discovery can report stack, languages, and frameworks.
+- Discovery can report architecture hints.
+- Discovery can report package manager signals.
+- Discovery can report test command signals.
+- Discovery can report build command signals.
+- Discovery can report run command signals.
+- Discovery can report documentation sources.
+- Discovery can report agent instruction sources.
+- Discovery can report OpenSpec sources.
+- Every context signal includes source evidence.
+- Every context signal includes a confidence level.
+- Detected facts are clearly separated from suggested assumptions.
+- User-confirmed context is clearly separated from detected facts.
+- User-confirmed context is clearly separated from suggested assumptions.
+- `detected_fact` is a supported signal classification.
+- `suggested_assumption` is a supported signal classification.
+- `user_confirmed_context` is a supported signal classification.
+- Detected facts come only from explicit repository evidence.
+- Suggested assumptions are labeled as assumptions.
+- Suggested assumptions are never treated as facts.
+- Suggested assumptions are never written as confirmed project brief answers without user confirmation.
+- Discovery does not invent stack, architecture, commands, frameworks, or project decisions.
+- Discovery prefers `.specharbor/project-brief.md` data as user-confirmed context when available.
+- Discovery does not merge, update, overwrite, or append to existing project briefs.
+- `specharbor brief` may show discovered values only as suggestions.
+- `specharbor brief` still requires user confirmation before writing confirmed project context.
+- Missing context keeps the interactive briefing behavior available.
+- Ambiguous context keeps the interactive briefing behavior available.
+- Sensitive files are skipped.
+- `.env` files are skipped.
+- `.env.*` files are skipped.
+- `*.pem` files are skipped.
+- `*.key` files are skipped.
+- `id_rsa` is skipped.
+- `id_ed25519` is skipped.
+- `secrets.*` files are skipped.
+- `credentials.*` files are skipped.
+- Heavy or generated folders are skipped.
+- `.git/` is skipped.
+- `node_modules/` is skipped.
+- `dist/` is skipped.
+- `build/` is skipped.
+- `target/` is skipped.
+- `vendor/` is skipped.
+- `coverage/` is skipped.
+- `.tmp/` is skipped.
+- `.cache/` is skipped.
+- `.next/` is skipped.
+- `.nuxt/` is skipped.
+- `out/` is skipped.
+- `bin/` is skipped.
+- `obj/` is skipped.
+- Repository-wide indexing is explicitly out of scope.
+- Embeddings are explicitly out of scope.
+- Vector databases are explicitly out of scope.
+- RAG providers are explicitly out of scope.
+- GitHub remote discovery is explicitly out of scope.
+- GitLab remote discovery is explicitly out of scope.
+- Bitbucket remote discovery is explicitly out of scope.
+- Local retrieval and snippet ranking are explicitly out of scope.
+- Prompt injection into generated agent prompts is explicitly out of scope.
+- Release, npm, Homebrew, `install.sh`, publishing, tagging, commit, push, pull request, merge, and archive flows are not changed.
+- Domain code owns context signal models, classifications, source categories, and confidence modeling.
+- Use cases orchestrate discovery.
+- Filesystem traversal and reading happen through a port and adapter boundary.
+- CLI code invokes discovery and formats reports without owning discovery rules.
+- Discovery rules are small, deterministic, and testable.
+- Unit tests cover context signal modeling.
+- Unit tests cover confidence and source classification.
+- Unit tests cover Go context detection from `go.mod`.
+- Unit tests cover Node context detection from `package.json`.
+- Unit tests cover Java context detection from `pom.xml` or `build.gradle`.
+- Unit tests cover Python context detection from `pyproject.toml` or `requirements.txt`.
+- Tests cover command detection from package and build files.
+- Tests cover skipping secrets.
+- Tests cover skipping generated and heavy folders.
+- Tests cover deterministic discovery output.
+- Tests cover project brief precedence when `.specharbor/project-brief.md` exists.
+- CLI/usecase tests cover missing context.
+- CLI/usecase tests cover ambiguous context.
+- Regression tests ensure existing `specharbor brief` behavior still works.
+- Regression tests ensure existing CLI commands still work.
+- Public documentation is updated after implementation.
+- OpenSpec validation passes with zero errors.
+- `go test ./...` passes after implementation.
+- `go run ./cmd/specharbor validate implement-context-discovery` passes with zero errors.

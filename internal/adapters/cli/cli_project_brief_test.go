@@ -157,6 +157,53 @@ func TestExecuteBriefSupportsCustomAnswers(t *testing.T) {
 	}
 }
 
+func TestExecuteBriefRecordsDiscoveredContextSeparatelyFromConfirmedAnswers(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/project\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(go.mod) error = %v", err)
+	}
+
+	inputs := []string{
+		"3",
+		"3",
+		"3",
+		"1",
+		"2",
+		"4",
+		"1",
+		"1",
+		"1",
+		"1",
+		"y",
+	}
+	output, err := executeBrief(t, inputs)
+	if err != nil {
+		t.Fatalf("execute brief with discovery error = %v\noutput:\n%s", err, output)
+	}
+
+	contents := readProjectBrief(t, root)
+	for _, want := range []string{
+		"Answer: Go",
+		"Answer: go test ./...",
+		"Answer: go build ./...",
+		"### Detected context",
+		"- Stack from go.mod: Go (Source: detected context)",
+		"- Language from go.mod: Go (Source: detected context)",
+		"- Package manager from go.mod: Go modules (Source: detected context)",
+	} {
+		if !strings.Contains(contents, want) {
+			t.Fatalf("project brief with discovery = %q, want %q", contents, want)
+		}
+	}
+	if strings.Contains(contents, "Assumption: Test command: go test ./...") {
+		t.Fatalf("confirmed test suggestion was also recorded as an assumption:\n%s", contents)
+	}
+	if strings.Contains(contents, "Source: detected context\n\n## Stack") {
+		t.Fatalf("detected context was rendered as confirmed stack:\n%s", contents)
+	}
+}
+
 func TestExecuteBriefCancellationWritesNoFile(t *testing.T) {
 	tests := []struct {
 		name   string

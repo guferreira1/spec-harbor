@@ -60,6 +60,7 @@ Implemented commands on the current branch:
 go run ./cmd/specharbor version
 go run ./cmd/specharbor init
 go run ./cmd/specharbor scan
+go run ./cmd/specharbor context discover
 go run ./cmd/specharbor brief
 go run ./cmd/specharbor generate add-example-feature --interactive
 go run ./cmd/specharbor generate add-example-feature --blank
@@ -111,6 +112,14 @@ checksums, and build metadata.
 `validate <change-id>` runs deterministic, local, read-only validation over the required OpenSpec change files, including content-quality rules with `error` and `warning` severities. Errors (missing or empty files, malformed task checkboxes, missing acceptance criteria) exit non-zero; warnings (placeholders, boilerplate-only starter content, missing recommended sections) never change the exit code, so a freshly generated blank change validates as valid with warnings. See [Usage](docs/usage.md) for the full rule list, exit codes, and example output.
 
 The recommended workflow guide is available as `specharbor workflow`. It prints the nine-step advisory path: Spec Author Agent, Architecture Reviewer Agent, Implementer Agent, Test Engineer Agent, Change Reviewer Agent, Commit, Pull Request, Merge, and Archive. The command is read-only, does not execute command suggestions, does not commit, does not create PRs, does not merge, and does not call GitHub, GitLab, CI, provider APIs, agent CLIs, source-control automation, workflow execution, or remote automation.
+
+Structured local context discovery is available as:
+
+```bash
+specharbor context discover
+```
+
+`context discover` inspects a bounded set of common repository files and directories, then prints user-confirmed context, detected facts, suggested assumptions, source evidence, and confidence levels. It is local, offline, read-only, skips sensitive files and generated folders, avoids symlink traversal, does not execute project commands, and does not perform indexing, RAG, retrieval, prompt injection, provider calls, remote discovery, or source-control automation. Existing `scan` behavior remains a shallow presence report, while `brief` remains the confirmation-first workflow for writing `.specharbor/project-brief.md`.
 
 Interactive project briefing is available as:
 
@@ -188,6 +197,7 @@ Implemented:
 
 - OpenSpec project initialization.
 - Stack-agnostic local project scanning.
+- Deterministic local context discovery with classified facts, assumptions, confirmed context, confidence, and source evidence.
 - Interactive project briefing that writes `.specharbor/project-brief.md` after confirmation.
 - Interactive generation prompts for blank, built-in template, custom template, config template, and hybrid paths.
 - Blank OpenSpec change generation.
