@@ -2915,6 +2915,9 @@ func TestExecutePreservesHelpVersionAndUnknownCommandBehavior(t *testing.T) {
 	if !strings.Contains(output.String(), "workflow    Show the recommended SpecHarbor workflow") {
 		t.Fatalf("help output = %q, want workflow command", output.String())
 	}
+	if !strings.Contains(output.String(), "brief       Collect confirmed project context") {
+		t.Fatalf("help output = %q, want brief command", output.String())
+	}
 
 	output.Reset()
 	if err := execute([]string{"version"}, &output); err != nil {

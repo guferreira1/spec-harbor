@@ -1,0 +1,69 @@
+# Acceptance Criteria: Implement Project Briefing Foundation
+
+- `specharbor brief` is specified and implemented as a new CLI command.
+- `specharbor brief` accepts no positional arguments and no flags in the first version.
+- `specharbor brief` requires an interactive TTY and writes nothing without one.
+- The command presents interactive briefing questions with multiple-choice options.
+- Every question provides three to five suggested options.
+- The last option for every question is `Other / custom`.
+- Every question supports a custom answer through `Other / custom`.
+- The command collects project type.
+- The command collects project purpose.
+- The command collects target users.
+- The command collects stack.
+- The command collects architecture.
+- The command collects an install command.
+- The command collects a test command.
+- The command collects a build command.
+- The command collects a run command.
+- The command collects preferred agent behavior when context is missing.
+- Detected local context may be shown only as suggestions until the user confirms it.
+- Missing or ambiguous context is never silently converted into a fact.
+- Stack, architecture, commands, and project decisions are not invented as facts.
+- The command prints `.specharbor/project-brief.md` as the write target before writing.
+- The command asks for user confirmation before writing.
+- Confirmation accepts trimmed `y` and `yes` in any casing.
+- Confirmation denial through `n`, `no`, empty input, or EOF writes no file.
+- Confirmation retry exhaustion writes no file.
+- The command writes `.specharbor/project-brief.md` after confirmation.
+- The generated `.specharbor/project-brief.md` is human-readable Markdown.
+- The generated Markdown includes `# Project Brief`.
+- The generated Markdown includes `## Project type`.
+- The generated Markdown includes `## Purpose`.
+- The generated Markdown includes `## Target users`.
+- The generated Markdown includes `## Stack`.
+- The generated Markdown includes `## Architecture`.
+- The generated Markdown includes `## Commands`.
+- The generated Markdown includes `### Install`.
+- The generated Markdown includes `### Test`.
+- The generated Markdown includes `### Build`.
+- The generated Markdown includes `### Run`.
+- The generated Markdown includes `## Agent behavior`.
+- The generated Markdown includes `## Context sources`.
+- The generated Markdown includes `## Assumptions`.
+- User-provided answers are clearly labeled separately from detected context.
+- Detected context is clearly labeled separately from user-provided answers.
+- Assumptions are clearly labeled separately from confirmed facts.
+- Assumptions are never treated as confirmed facts.
+- The output is deterministic for the same confirmed inputs and detected-context snapshot.
+- Existing `.specharbor/project-brief.md` files are not merged, updated, overwritten, or appended in this first version.
+- Cancellation and validation failures leave no partial `.specharbor/project-brief.md`.
+- RAG is explicitly out of scope.
+- Embeddings are explicitly out of scope.
+- Vector databases are explicitly out of scope.
+- Repository-wide indexing is explicitly out of scope.
+- GitHub remote discovery is explicitly out of scope.
+- Prompt injection into generated agent prompts is explicitly out of scope.
+- Existing generated agent prompts are not changed by this feature.
+- Provider APIs, local model APIs, and agent execution are not introduced.
+- Release, npm, Homebrew, `install.sh`, publishing, tagging, commit, push, pull request, merge, and archive flows are not changed.
+- Unit tests cover project brief data/model generation.
+- Unit tests cover Markdown rendering.
+- CLI command tests cover successful brief creation.
+- CLI command tests cover custom answers.
+- CLI command tests cover confirmation denied.
+- CLI command tests ensure no file is written when cancelled.
+- Tests validate generated `.specharbor/project-brief.md` is deterministic.
+- Regression tests ensure existing CLI commands still work.
+- `go test ./...` passes after implementation.
+- `go run ./cmd/specharbor validate implement-project-briefing-foundation` passes with zero errors.
