@@ -104,6 +104,22 @@ func (fileSystem *LocalFileSystem) ReadFile(root string, relativePath string) (s
 	return string(contents), nil
 }
 
+func (fileSystem *LocalFileSystem) ReadFileSafely(root string, relativePath string) (string, error) {
+	fullPath, info, err := fileSystem.safeExistingReadTarget(root, relativePath)
+	if err != nil {
+		return "", err
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("path is a directory: %s", relativePath)
+	}
+
+	contents, err := readFileWithoutFollowingSymlink(fullPath, info, relativePath)
+	if err != nil {
+		return "", err
+	}
+	return string(contents), nil
+}
+
 func (fileSystem *LocalFileSystem) ReadSourceFile(sourcePath string) (string, error) {
 	if strings.TrimSpace(sourcePath) == "" {
 		return "", errors.New("source file path is required")
@@ -199,6 +215,17 @@ func (fileSystem *LocalFileSystem) WriteFile(root string, relativePath string, c
 	return replaceFileWithoutFollowingSymlink(fullPath, relativePath, contents)
 }
 
+func (fileSystem *LocalFileSystem) WriteFileSafely(root string, relativePath string, contents string) error {
+	fullPath, err := fileSystem.safeFullPath(root, relativePath)
+	if err != nil {
+		return err
+	}
+	if err := fileSystem.EnsureSafeWriteTarget(root, relativePath); err != nil {
+		return err
+	}
+	return replaceFileAtomicallyWithoutFollowingSymlink(fullPath, relativePath, contents)
+}
+
 func (fileSystem *LocalFileSystem) EnsureSafeWriteTarget(root string, relativePath string) error {
 	safeRelativePath, fullPath, err := fileSystem.safeFullPathParts(root, relativePath)
 	if err != nil {
@@ -274,6 +301,49 @@ func (fileSystem *LocalFileSystem) ensureSafeExistingParents(root string, safeRe
 	}
 
 	return nil
+}
+
+func (fileSystem *LocalFileSystem) safeExistingReadTarget(
+	root string,
+	relativePath string,
+) (string, os.FileInfo, error) {
+	safeRelativePath, fullPath, err := fileSystem.safeFullPathParts(root, relativePath)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if safeRelativePath == "." {
+		info, err := os.Lstat(fullPath)
+		if err != nil {
+			return "", nil, err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return "", nil, unsafeSymlinkPathError(safeRelativePath)
+		}
+		return fullPath, info, nil
+	}
+
+	currentPath := ""
+	segments := strings.Split(safeRelativePath, "/")
+	for index, segment := range segments {
+		currentPath = path.Join(currentPath, segment)
+		componentPath := filepath.Join(root, filepath.FromSlash(currentPath))
+		info, err := os.Lstat(componentPath)
+		if err != nil {
+			return "", nil, err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return "", nil, unsafeSymlinkPathError(currentPath)
+		}
+		if index < len(segments)-1 && !info.IsDir() {
+			return "", nil, fmt.Errorf("parent path is not a directory: %s", currentPath)
+		}
+		if index == len(segments)-1 {
+			return fullPath, info, nil
+		}
+	}
+
+	return "", nil, fmt.Errorf("path does not exist: %s", relativePath)
 }
 
 func (fileSystem *LocalFileSystem) safeFullPath(root string, relativePath string) (string, error) {
@@ -398,4 +468,54 @@ func closeWithError(file *os.File, err error) error {
 		return errors.Join(err, closeErr)
 	}
 	return err
+}
+
+func replaceFileAtomicallyWithoutFollowingSymlink(fullPath string, relativePath string, contents string) error {
+	initialInfo, err := os.Lstat(fullPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err == nil && initialInfo.Mode()&os.ModeSymlink != 0 {
+		return unsafeGeneratedSymlinkTargetError(relativePath)
+	}
+
+	parent := filepath.Dir(fullPath)
+	temp, err := os.CreateTemp(parent, "."+filepath.Base(fullPath)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tempPath := temp.Name()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = os.Remove(tempPath)
+		}
+	}()
+
+	if err := temp.Chmod(0o644); err != nil {
+		return closeWithError(temp, err)
+	}
+	if _, err := io.WriteString(temp, contents); err != nil {
+		return closeWithError(temp, err)
+	}
+	if err := temp.Close(); err != nil {
+		return err
+	}
+
+	latestInfo, err := os.Lstat(fullPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err == nil && latestInfo.Mode()&os.ModeSymlink != 0 {
+		return unsafeGeneratedSymlinkTargetError(relativePath)
+	}
+	if initialInfo != nil && latestInfo != nil && !os.SameFile(initialInfo, latestInfo) {
+		return fmt.Errorf("target file changed during safety check: %s", relativePath)
+	}
+
+	if err := os.Rename(tempPath, fullPath); err != nil {
+		return err
+	}
+	cleanup = false
+	return nil
 }

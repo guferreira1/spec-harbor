@@ -62,6 +62,7 @@ go run ./cmd/specharbor init
 go run ./cmd/specharbor scan
 go run ./cmd/specharbor context discover
 go run ./cmd/specharbor brief
+go run ./cmd/specharbor brief --update
 go run ./cmd/specharbor generate add-example-feature --interactive
 go run ./cmd/specharbor generate add-example-feature --blank
 go run ./cmd/specharbor generate add-feature --template feature
@@ -128,6 +129,14 @@ specharbor brief
 ```
 
 `brief` requires an interactive TTY, asks multiple-choice questions for explicit project context, and writes `.specharbor/project-brief.md` only after confirmation. It refuses to overwrite an existing project brief. The brief separates user-provided answers, detected context, and assumptions, and this command does not run repository indexing, RAG, provider APIs, agent execution, source-control automation, release, or publishing behavior.
+
+Existing briefs can be reviewed and updated explicitly with:
+
+```bash
+specharbor brief --update
+```
+
+The update flow requires an interactive TTY and an existing `.specharbor/project-brief.md`. It parses known brief fields, reuses local `context discover` results as detected facts and suggested assumptions, shows conflicts and stale records, prints a reviewable preview, and writes only after final confirmation. Existing user-confirmed values are kept by default. Detected facts and suggested assumptions are never promoted into confirmed context unless the user explicitly selects them and confirms the final write. Cancellation leaves the existing brief unchanged.
 
 Role prompt generation is context-aware for the supported `prompt --role` roles. When confirmed or discovered local context is available, generated prompts include a bounded `## Project Context` section with user-confirmed context, detected facts, and suggested assumptions kept separate. Confirmed project brief values take precedence over detected facts; assumptions stay labeled as assumptions and include source/confidence evidence when rendered.
 
@@ -201,6 +210,7 @@ Implemented:
 - Stack-agnostic local project scanning.
 - Deterministic local context discovery with classified facts, assumptions, confirmed context, confidence, and source evidence.
 - Interactive project briefing that writes `.specharbor/project-brief.md` after confirmation.
+- Confirmation-first project brief update with conflict/stale review and safe writes.
 - Interactive generation prompts for blank, built-in template, custom template, config template, and hybrid paths.
 - Blank OpenSpec change generation.
 - Built-in OpenSpec change template generation for `feature`, `bugfix`, `docs`, and `refactor`.

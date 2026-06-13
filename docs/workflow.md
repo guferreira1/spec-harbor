@@ -65,7 +65,7 @@ The workflow relates to existing commands as follows:
 
 `specharbor context discover` is read-only local discovery. It labels repository evidence as detected facts, conventional guesses as suggested assumptions, and existing project brief values as user-confirmed context. It does not execute commands, call provider APIs, perform remote discovery, build an index, or run RAG.
 
-`specharbor brief` writes `.specharbor/project-brief.md` only after interactive confirmation. The brief is explicit context collection, not repository indexing, RAG, provider integration, agent execution, source-control automation, or remote automation. Role prompt generation can include confirmed brief values and discovered local signals in a bounded `## Project Context` section.
+`specharbor brief` writes `.specharbor/project-brief.md` only after interactive confirmation. `specharbor brief --update` is the explicit maintenance path for an existing brief: it keeps confirmed values by default, shows detected facts and assumptions as review items, previews changes, and writes only after final confirmation. Briefing is explicit context collection and maintenance, not repository indexing, RAG, provider integration, agent execution, source-control automation, or remote automation. Role prompt generation can include confirmed brief values and discovered local signals in a bounded `## Project Context` section.
 
 Commit, Pull Request, and Merge remain manual. SpecHarbor does not commit, does not push, does not create PRs, does not merge, does not call GitHub, does not call GitLab, does not inspect CI, does not call provider APIs, does not call agent CLIs, does not run source-control automation, does not run workflow execution, and does not perform remote automation.
 

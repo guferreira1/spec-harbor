@@ -8,3 +8,11 @@ type ProjectBriefFileSystem interface {
 	CreateDirectory(root string, relativePath string) error
 	WriteFileIfAbsent(root string, relativePath string, contents string) (bool, error)
 }
+
+// ProjectBriefUpdateFileSystem provides only the filesystem operations required
+// by project brief updates.
+type ProjectBriefUpdateFileSystem interface {
+	FileExists(root string, relativePath string) (bool, error)
+	ReadFileSafely(root string, relativePath string) (string, error)
+	WriteFileSafely(root string, relativePath string, contents string) error
+}

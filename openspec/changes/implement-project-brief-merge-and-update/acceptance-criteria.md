@@ -1,0 +1,101 @@
+# Acceptance Criteria: Implement Project Brief Merge And Update
+
+- `specharbor brief --update` is implemented as the explicit project brief update flow.
+- `specharbor brief --update` accepts no positional arguments.
+- `specharbor brief --update` rejects unsupported flags.
+- `specharbor brief --update` requires an interactive TTY.
+- `specharbor brief --update` requires an existing `.specharbor/project-brief.md`.
+- `specharbor brief` without `--update` remains safe and preserves write-if-absent behavior.
+- Existing `.specharbor/project-brief.md` files are not overwritten silently.
+- The update flow parses known project brief sections conservatively.
+- Unknown project brief sections are not treated as confirmed facts.
+- The update flow reuses existing context discovery output for detected facts and suggested assumptions.
+- Context discovery logic is not duplicated in CLI update code.
+- The update flow preserves `user_confirmed_context`.
+- The update flow preserves `detected_fact`.
+- The update flow preserves `suggested_assumption`.
+- Confirmed context, detected facts, and suggested assumptions remain clearly separated in the updated brief.
+- Existing user-confirmed values are preserved by default.
+- Detected facts are not promoted to confirmed context without explicit user action.
+- Suggested assumptions are not promoted to confirmed context without explicit user action.
+- A detected fact can be accepted as a confirmed value only through an explicit update decision.
+- A custom replacement value can be entered by the user.
+- Existing confirmed values can be kept.
+- Detected facts can be ignored.
+- Stale assumptions can be kept.
+- Stale assumptions can be removed.
+- The update can be cancelled.
+- Cancelling before final confirmation leaves `.specharbor/project-brief.md` unchanged.
+- Cancelling at final confirmation leaves `.specharbor/project-brief.md` unchanged.
+- Final confirmation is required before writing.
+- Core/usecase rejects update writes unless explicit final confirmation is provided.
+- The update flow shows a clear preview or diff-like summary before writing.
+- Conflicts between confirmed context and detected facts are surfaced safely.
+- Conflict handling prefers existing confirmed context by default.
+- Detected conflict evidence is shown with source information.
+- Confirmed context is never silently replaced by detected evidence.
+- Potentially stale confirmed values are surfaced.
+- Potentially stale confirmed values are not deleted automatically.
+- Potentially stale detected context is surfaced or handled explicitly.
+- Potentially stale assumptions are surfaced.
+- Potentially stale assumptions are not removed automatically.
+- The updated `.specharbor/project-brief.md` remains deterministic.
+- The updated `.specharbor/project-brief.md` remains human-readable Markdown.
+- Rendering the same update result twice produces identical Markdown.
+- Safe write behavior preserves the original project brief on write failure.
+- Symlink and unsafe path protections remain in place for project brief reads and writes.
+- CLI code owns only terminal interaction and user-facing formatting.
+- CLI code does not own merge rules.
+- Domain/core owns brief field models.
+- Domain/core owns source category models.
+- Domain/core owns merge decision models.
+- Domain/core owns conflict records.
+- Domain/core owns stale record models.
+- Core/usecase orchestrates parsing, proposals, decisions, rendering, and write policy.
+- Filesystem reads and writes happen through adapter/port boundaries.
+- `specharbor context discover` behavior remains unchanged.
+- Context-aware `specharbor prompt` remains compatible with project brief context.
+- `specharbor scan` behavior remains unchanged.
+- Existing final decision labels and agent prompt behavior do not change.
+- Repository-wide indexing is not introduced.
+- Local retrieval is not introduced.
+- Snippet ranking is not introduced.
+- Embeddings are not introduced.
+- Vector databases are not introduced.
+- RAG is not introduced.
+- GitHub remote context is not introduced.
+- Provider APIs are not introduced.
+- Automatic command verification is not introduced.
+- Automatic project command execution is not introduced.
+- Agent execution is not introduced.
+- Prompt execution is not introduced.
+- Source-control automation is not introduced.
+- Release automation is not introduced.
+- npm files are not changed.
+- Homebrew files are not changed.
+- `install.sh` is not changed.
+- GoReleaser files are not changed.
+- Publishing flows are not changed.
+- Tests cover project brief parsing.
+- Tests cover merge decision models.
+- Tests cover conflict detection.
+- Tests cover update rendering.
+- Tests cover deterministic Markdown output.
+- Tests cover update mode with no existing brief.
+- Tests cover update cancellation.
+- Tests cover update confirmation.
+- Tests cover keeping current values.
+- Tests cover replacing with detected facts.
+- Tests cover custom values.
+- Tests cover ignoring detected facts.
+- Tests prove detected facts are not promoted without confirmation.
+- Tests prove suggested assumptions are not promoted without confirmation.
+- Tests prove stale values are surfaced but not removed automatically.
+- Tests prove write failure preserves the original file.
+- CLI tests cover the interactive update flow.
+- Regression tests cover existing `specharbor brief`.
+- Regression tests cover `specharbor context discover`.
+- Regression tests cover context-aware `specharbor prompt`.
+- Regression tests cover `specharbor scan`.
+- OpenSpec validation passes with zero errors.
+- `go test ./...` passes after implementation.

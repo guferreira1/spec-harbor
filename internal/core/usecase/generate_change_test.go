@@ -1080,6 +1080,7 @@ type fakeGenerationFileSystem struct {
 	writeErrors           map[string]error
 	createdDirectories    []string
 	writtenFiles          []string
+	safelyReadFiles       []string
 	checkedDirectories    []string
 	checkedFiles          []string
 }
@@ -1141,11 +1142,20 @@ func (fileSystem *fakeGenerationFileSystem) ReadFile(_ string, relativePath stri
 	return fileSystem.files[relativePath], nil
 }
 
+func (fileSystem *fakeGenerationFileSystem) ReadFileSafely(_ string, relativePath string) (string, error) {
+	fileSystem.safelyReadFiles = append(fileSystem.safelyReadFiles, relativePath)
+	if err := fileSystem.fileErrors[relativePath]; err != nil {
+		return "", err
+	}
+	return fileSystem.files[relativePath], nil
+}
+
 func (fileSystem *fakeGenerationFileSystem) operationCount() int {
 	return len(fileSystem.checkedDirectories) +
 		len(fileSystem.checkedFiles) +
 		len(fileSystem.createdDirectories) +
-		len(fileSystem.writtenFiles)
+		len(fileSystem.writtenFiles) +
+		len(fileSystem.safelyReadFiles)
 }
 
 type fakeBlankChangeContent struct {
