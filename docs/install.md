@@ -13,12 +13,12 @@ those assets over HTTPS and verifies SHA-256 checksums before installing.
 | npm | Available as unscoped package `specharbor@0.1.0` |
 | Homebrew | Available as `brew install guferreira1/tap/specharbor` |
 | `go install` from source | Fallback/developer option; prints development fallback metadata |
+| package publishing automation | Automated on tag push for npm and Homebrew |
 | Linux `.deb` / `.rpm` packages | Future only |
 | Windows Scoop / Winget | Future only |
 | signing | Future only |
 | SBOM | Future only |
 | Docker | Future only |
-| package publishing automation | Future only |
 
 Binary install channels require a published GitHub Release with matching
 assets and checksums. The first published release is `v0.1.0`.
@@ -149,8 +149,9 @@ sh scripts/test-install-sh.sh
 
 The npm wrapper package lives in this repository at
 `packages/npm/specharbor/` and is published to the npm registry as
-`specharbor@0.1.0`. Publishing version bumps remains a manual, explicit
-maintainer step that happens outside this repository's automation.
+`specharbor`. Version bumps are published automatically when a `vX.Y.Z` tag is
+pushed, after the GitHub Release assets exist; see
+[Release metadata](release.md) for the workflow and required secrets.
 
 Install it with:
 
@@ -203,8 +204,10 @@ The formula satisfies these expectations in the tap repository:
 
 The tap validates `brew audit --strict --online specharbor`, formula install,
 `specharbor version`, `brew test specharbor`, and the user install command on
-GitHub Actions macOS runners. Formula version bumps are manual until later
-automation is specified. No Homebrew formula files are committed to this
+GitHub Actions macOS runners. The formula is updated automatically on each
+`vX.Y.Z` tag release by the `homebrew-publish` job, which renders
+`Formula/specharbor.rb` from the release `checksums.txt`; see
+[Release metadata](release.md). No Homebrew formula files are committed to this
 repository.
 
 ## Future-only channels
@@ -216,11 +219,12 @@ The following are planned but intentionally not implemented yet:
 - Windows package managers: Scoop and Winget.
 - Binary signing (for example cosign), SBOM generation, Docker images, and
   auto-update mechanisms.
-- Package publishing automation for npm, Homebrew, Linux packages, Windows
-  package managers, signing, SBOMs, and Docker.
+- Package publishing automation for Linux packages, Windows package managers,
+  signing, SBOMs, and Docker.
 
-Interim paths: Linux users have `install.sh`, npm, and manual install;
-Windows users have npm and manual `.zip` install.
+npm and Homebrew publishing are automated on tag releases; see
+[Release metadata](release.md). Interim paths: Linux users have `install.sh`,
+npm, and manual install; Windows users have npm and manual `.zip` install.
 
 ## Verifying an installation
 
@@ -371,5 +375,6 @@ All install channels follow the same rules:
   user input, requires tokens or authentication, sends telemetry, mutates Git
   state, or writes outside its install target and cache/temporary
   directories.
-- Package publishing and formula version bumps are explicit maintainer steps
-  unless a later OpenSpec change defines automation.
+- npm and Homebrew publishing are automated on `vX.Y.Z` tag releases through a
+  tag-only workflow that validates version consistency and runs package tests
+  before publishing; see [Release metadata](release.md).

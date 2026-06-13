@@ -239,7 +239,7 @@ Supported distribution paths are:
 - Homebrew tap
 - `go install` fallback
 
-Native Linux package managers and broader package-manager automation are future work.
+GitHub Releases, npm, and the Homebrew tap are published automatically on each `vX.Y.Z` tag (see [Release metadata](docs/release.md)). Native Linux package managers, Windows package managers, Docker, signing, and SBOMs remain future work.
 
 ## Documentation
 

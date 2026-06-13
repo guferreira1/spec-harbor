@@ -6,13 +6,25 @@ on:
       - v*
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
-    name: Release
+  validate-release-inputs:
+    name: Validate release inputs
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
+      - name: Validate tag and package version
+        run: sh scripts/validate-release-version.sh "${GITHUB_REF_NAME}"
+
+  goreleaser:
+    name: GitHub Release
+    needs: validate-release-inputs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,3 +47,112 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  npm-publish:
+    name: Publish npm package
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: packages/npm/specharbor
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Ensure npm supports trusted publishing and provenance
+        run: npm install --global npm@latest
+
+      - name: Validate tag and package version
+        working-directory: ${{ github.workspace }}
+        run: sh scripts/validate-release-version.sh "${GITHUB_REF_NAME}"
+
+      - name: Test npm package
+        run: npm test
+
+      - name: Validate package contents
+        run: |
+          files="$(npm pack --dry-run --json | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8"));process.stdout.write(d[0].files.map(f=>f.path).join("\n"))')"
+          printf '%s\n' "$files"
+          for required in bin/specharbor.js lib/install.js scripts/postinstall.js README.md README.pt-BR.md package.json; do
+            printf '%s\n' "$files" | grep -qx "$required" || { echo "missing $required in npm package"; exit 1; }
+          done
+          for forbidden in 'native/' 'node_modules/' 'test/'; do
+            if printf '%s\n' "$files" | grep -q "^$forbidden"; then echo "unexpected $forbidden in npm package"; exit 1; fi
+          done
+
+      - name: Publish to npm
+        # Primary: npm trusted publishing via OIDC (id-token: write) with
+        # provenance. Fallback: NODE_AUTH_TOKEN from the NPM_TOKEN secret when a
+        # trusted publisher is not configured. The token is never printed.
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  homebrew-publish:
+    name: Update Homebrew tap
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download release checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release download "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --pattern checksums.txt --dir release-assets
+
+      - name: Checkout Homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: guferreira1/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          path: homebrew-tap
+
+      - name: Render formula
+        run: |
+          mkdir -p homebrew-tap/Formula
+          sh scripts/render-homebrew-formula.sh \
+            --version "${GITHUB_REF_NAME#v}" \
+            --checksums release-assets/checksums.txt \
+            > homebrew-tap/Formula/specharbor.rb
+
+      - name: Commit and push formula
+        working-directory: homebrew-tap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/specharbor.rb
+          if git diff --cached --quiet; then
+            echo "Formula already up to date for ${GITHUB_REF_NAME}"
+          else
+            git commit -m "specharbor ${GITHUB_REF_NAME}"
+            git push
+          fi
+
+  release-summary:
+    name: Release summary
+    needs: [validate-release-inputs, goreleaser, npm-publish, homebrew-publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Summarize
+        run: |
+          {
+            echo "## Release ${GITHUB_REF_NAME}"
+            echo ""
+            echo "- GitHub Release assets and checksums.txt published via GoReleaser."
+            echo "- npm package specharbor published."
+            echo "- Homebrew tap guferreira1/homebrew-tap updated."
+          } >> "${GITHUB_STEP_SUMMARY}"
