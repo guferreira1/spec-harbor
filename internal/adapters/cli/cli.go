@@ -1540,7 +1540,9 @@ func promptCommand(ctx CommandContext) error {
 
 	roleTemplates := templates.NewRolePromptTemplates()
 	renderer := templates.NewPromptTemplateRenderer()
-	renderPrompt := usecase.NewRenderPrompt(roleTemplates, renderer)
+	contextFileSystem := filesystem.NewContextDiscoveryFileSystem()
+	contextProvider := usecase.NewDiscoverProjectContext(contextFileSystem)
+	renderPrompt := usecase.NewRenderPromptWithContext(roleTemplates, renderer, contextProvider)
 
 	result, err := renderPrompt.Execute(usecase.RenderPromptInput{
 		ProjectRoot: root,

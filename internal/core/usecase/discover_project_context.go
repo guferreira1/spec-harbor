@@ -32,6 +32,30 @@ func NewDiscoverProjectContext(fileSystem ports.ContextDiscoveryFileSystem) *Dis
 	return &DiscoverProjectContext{fileSystem: fileSystem}
 }
 
+func (useCase *DiscoverProjectContext) DiscoverPromptContext(
+	projectRoot string,
+) (domain.ContextDiscoveryResult, error) {
+	return useCase.Execute(DiscoverProjectContextInput{ProjectRoot: projectRoot})
+}
+
+func (useCase *DiscoverProjectContext) ProjectBriefExists(projectRoot string) (bool, error) {
+	if useCase == nil {
+		return false, errors.New("discover project context use case is required")
+	}
+	if useCase.fileSystem == nil {
+		return false, errors.New("context discovery filesystem is required")
+	}
+	trimmedRoot := strings.TrimSpace(projectRoot)
+	if trimmedRoot == "" {
+		return false, errors.New("project root is required")
+	}
+	exists, err := useCase.fileSystem.FileExists(trimmedRoot, ".specharbor/project-brief.md")
+	if err != nil {
+		return false, fmt.Errorf("check file .specharbor/project-brief.md: %w", err)
+	}
+	return exists, nil
+}
+
 func (useCase *DiscoverProjectContext) Execute(
 	input DiscoverProjectContextInput,
 ) (domain.ContextDiscoveryResult, error) {

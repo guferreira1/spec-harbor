@@ -9,3 +9,8 @@ type PromptTemplateRepository interface {
 type TemplateRenderer interface {
 	Render(templateSource string, data map[string]string) (string, error)
 }
+
+type PromptContextProvider interface {
+	DiscoverPromptContext(projectRoot string) (domain.ContextDiscoveryResult, error)
+	ProjectBriefExists(projectRoot string) (bool, error)
+}

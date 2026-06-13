@@ -48,6 +48,178 @@ func TestRenderPromptRendersSupportedRoles(t *testing.T) {
 	}
 }
 
+func TestRenderPromptIncludesProjectContextForSupportedRoles(t *testing.T) {
+	for _, role := range domain.SupportedPromptRoles() {
+		t.Run(string(role), func(t *testing.T) {
+			templates := &fakePromptTemplates{
+				template: "# Prompt\n{{project_brief_read_first}}{{project_context}}\nTask: {{task}}\n",
+			}
+			contextProvider := &fakePromptContextProvider{
+				result: domain.NewContextDiscoveryResult([]domain.ContextSignal{
+					renderPromptContextSignal(t, domain.ContextSignalKindLanguage, "Go", domain.ContextSignalClassificationDetectedFact, domain.ContextConfidenceHigh, domain.ContextSource{
+						Path:     "go.mod",
+						Category: domain.ContextSourceCategoryPackageManifest,
+					}),
+				}, nil),
+			}
+			useCase := NewRenderPromptWithContext(templates, fakePromptRenderer{}, contextProvider)
+
+			result, err := useCase.Execute(RenderPromptInput{
+				ProjectRoot: "/project",
+				ChangeID:    "context-aware-prompts",
+				Role:        string(role),
+			})
+			if err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+
+			for _, want := range []string{
+				"## Project Context",
+				"### Detected facts",
+				"- Language: Go",
+				"Source: go.mod",
+				"Confidence: high",
+				"Task: " + DefaultPromptTask,
+			} {
+				if !strings.Contains(result.Prompt, want) {
+					t.Fatalf("prompt = %q, want to contain %q", result.Prompt, want)
+				}
+			}
+			if contextProvider.projectRoot != "/project" {
+				t.Fatalf("context provider projectRoot = %q, want /project", contextProvider.projectRoot)
+			}
+		})
+	}
+}
+
+func TestRenderPromptIncludesProjectBriefReadFirstWhenBriefExists(t *testing.T) {
+	templates := &fakePromptTemplates{
+		template: "Read first:\n{{project_brief_read_first}}\n{{project_context}}\n",
+	}
+	contextProvider := &fakePromptContextProvider{
+		briefExists: true,
+	}
+	useCase := NewRenderPromptWithContext(templates, fakePromptRenderer{}, contextProvider)
+
+	result, err := useCase.Execute(RenderPromptInput{
+		ProjectRoot: "/project",
+		ChangeID:    "context-aware-prompts",
+		Role:        "implementer",
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !strings.Contains(result.Prompt, "- `.specharbor/project-brief.md`") {
+		t.Fatalf("prompt = %q, want project brief read-first entry", result.Prompt)
+	}
+	if !strings.Contains(result.Prompt, "No confirmed project context") {
+		t.Fatalf("prompt = %q, want missing context instructions", result.Prompt)
+	}
+}
+
+func TestRenderPromptIncludesConfirmedContextAndConflictNotes(t *testing.T) {
+	templates := &fakePromptTemplates{
+		template: "{{project_brief_read_first}}{{project_context}}\n",
+	}
+	contextProvider := &fakePromptContextProvider{
+		result: domain.NewContextDiscoveryResult([]domain.ContextSignal{
+			renderPromptContextSignal(t, domain.ContextSignalKindStack, "Go", domain.ContextSignalClassificationUserConfirmedContext, domain.ContextConfidenceHigh, domain.ContextSource{
+				Path:     ".specharbor/project-brief.md",
+				Category: domain.ContextSourceCategoryProjectBrief,
+				Evidence: "Stack",
+			}),
+			renderPromptContextSignal(t, domain.ContextSignalKindStack, "Node.js", domain.ContextSignalClassificationDetectedFact, domain.ContextConfidenceHigh, domain.ContextSource{
+				Path:     "package.json",
+				Category: domain.ContextSourceCategoryPackageManifest,
+			}),
+		}, nil),
+	}
+	useCase := NewRenderPromptWithContext(templates, fakePromptRenderer{}, contextProvider)
+
+	result, err := useCase.Execute(RenderPromptInput{
+		ProjectRoot: "/project",
+		ChangeID:    "context-aware-prompts",
+		Role:        "architecture-reviewer",
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	for _, want := range []string{
+		"- `.specharbor/project-brief.md`",
+		"### User-confirmed context",
+		"- Stack: Go",
+		"### Conflict notes",
+		"detected Stack includes Node.js from package.json",
+	} {
+		if !strings.Contains(result.Prompt, want) {
+			t.Fatalf("prompt = %q, want to contain %q", result.Prompt, want)
+		}
+	}
+}
+
+func TestRenderPromptWithoutContextProviderStillRendersMissingContextInstructions(t *testing.T) {
+	templates := &fakePromptTemplates{
+		template: "{{project_context}}\n",
+	}
+	useCase := NewRenderPrompt(templates, fakePromptRenderer{})
+
+	result, err := useCase.Execute(RenderPromptInput{
+		ProjectRoot: "/project",
+		ChangeID:    "context-aware-prompts",
+		Role:        "implementer",
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !strings.Contains(result.Prompt, "No confirmed project context") {
+		t.Fatalf("prompt = %q, want missing context instructions", result.Prompt)
+	}
+}
+
+func TestRenderPromptPreservesTemplateFinalDecisionLabels(t *testing.T) {
+	templates := &fakePromptTemplates{
+		template: "{{project_context}}\n\nFinal decision must be exactly one of:\nIMPLEMENTATION_COMPLETE\nBLOCKED\n",
+	}
+	useCase := NewRenderPrompt(templates, fakePromptRenderer{})
+
+	result, err := useCase.Execute(RenderPromptInput{
+		ProjectRoot: "/project",
+		ChangeID:    "context-aware-prompts",
+		Role:        "implementer",
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	for _, want := range []string{
+		"Final decision must be exactly one of:",
+		"IMPLEMENTATION_COMPLETE",
+		"BLOCKED",
+	} {
+		if !strings.Contains(result.Prompt, want) {
+			t.Fatalf("prompt = %q, want to preserve %q", result.Prompt, want)
+		}
+	}
+}
+
+func TestRenderPromptReturnsContextProviderErrors(t *testing.T) {
+	useCase := NewRenderPromptWithContext(&fakePromptTemplates{}, fakePromptRenderer{}, &fakePromptContextProvider{
+		discoverErr: fmt.Errorf("discovery failed"),
+	})
+
+	_, err := useCase.Execute(RenderPromptInput{
+		ProjectRoot: "/project",
+		ChangeID:    "context-aware-prompts",
+		Role:        "implementer",
+	})
+	if err == nil || !strings.Contains(err.Error(), "discover prompt context: discovery failed") {
+		t.Fatalf("Execute() error = %v, want discovery context error", err)
+	}
+}
+
 func TestRenderPromptRejectsInvalidInput(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -114,4 +286,51 @@ func (renderer fakePromptRenderer) Render(templateSource string, data map[string
 		output = strings.ReplaceAll(output, fmt.Sprintf("{{%s}}", key), value)
 	}
 	return output, nil
+}
+
+type fakePromptContextProvider struct {
+	result      domain.ContextDiscoveryResult
+	briefExists bool
+	discoverErr error
+	briefErr    error
+	projectRoot string
+}
+
+func (provider *fakePromptContextProvider) DiscoverPromptContext(projectRoot string) (domain.ContextDiscoveryResult, error) {
+	provider.projectRoot = projectRoot
+	if provider.discoverErr != nil {
+		return domain.ContextDiscoveryResult{}, provider.discoverErr
+	}
+	return provider.result, nil
+}
+
+func (provider *fakePromptContextProvider) ProjectBriefExists(projectRoot string) (bool, error) {
+	provider.projectRoot = projectRoot
+	if provider.briefErr != nil {
+		return false, provider.briefErr
+	}
+	return provider.briefExists, nil
+}
+
+func renderPromptContextSignal(
+	t *testing.T,
+	kind domain.ContextSignalKind,
+	value string,
+	classification domain.ContextSignalClassification,
+	confidence domain.ContextConfidence,
+	source domain.ContextSource,
+) domain.ContextSignal {
+	t.Helper()
+
+	signal, err := domain.NewContextSignal(domain.ContextSignalInput{
+		Kind:           kind,
+		Value:          value,
+		Classification: classification,
+		Confidence:     confidence,
+		Source:         source,
+	})
+	if err != nil {
+		t.Fatalf("NewContextSignal() error = %v", err)
+	}
+	return signal
 }

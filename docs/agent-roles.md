@@ -18,6 +18,8 @@ Supported role names:
 
 These five ids are also the agent-assisted step ids shown by `specharbor workflow`.
 
+Generated role prompts may include a `## Project Context` section when confirmed or discovered local context is available. The section separates user-confirmed context, detected facts, and suggested assumptions. Confirmed context from `.specharbor/project-brief.md` takes precedence over detected facts; assumptions are labeled as assumptions and are not facts. The context section is bounded, includes source/confidence evidence for detected facts and assumptions, and does not execute commands, run agents, call provider APIs, perform RAG, index the repository, or use remote discovery.
+
 ## Spec Author Agent
 
 Creates or refines OpenSpec change files. This role focuses on `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md`; it should not implement the change.
@@ -45,6 +47,8 @@ Spec Author -> Architecture Reviewer -> Implementer -> Test Engineer -> Change R
 ```
 
 The broader recommended workflow continues manually through Commit, Pull Request, Merge, and Archive. `specharbor workflow` shows that full advisory sequence without executing commands or automating source-control steps.
+
+Pull Request and Archive are workflow steps, not supported prompt roles in this version.
 
 For small changes:
 

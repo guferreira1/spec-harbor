@@ -1830,8 +1830,86 @@ func TestExecutePromptPrintsRenderedPromptOnly(t *testing.T) {
 	if strings.Contains(promptOutput, "{{task}}") {
 		t.Fatalf("prompt output = %q, want no raw task placeholder", promptOutput)
 	}
+	if strings.Contains(promptOutput, "{{project_context}}") {
+		t.Fatalf("prompt output = %q, want no raw project_context placeholder", promptOutput)
+	}
 	if strings.Contains(promptOutput, "not implemented") {
 		t.Fatalf("prompt output = %q, want rendered prompt instead of placeholder", promptOutput)
+	}
+}
+
+func TestExecutePromptIncludesContextAwareProjectContext(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	if err := os.MkdirAll(filepath.Join(root, ".specharbor", "rules"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(.specharbor/rules) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".specharbor", "project-brief.md"), []byte(`# Project Brief
+
+## Stack
+
+Answer: Go
+
+## Commands
+
+### Test
+
+Answer: go test ./...
+
+## Agent behavior
+
+Answer: Ask before assuming
+
+## Unknown Section
+
+Answer: Must not appear
+`), 0o644); err != nil {
+		t.Fatalf("WriteFile(project-brief.md) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".specharbor", "rules", "global.md"), []byte("# Global\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(global.md) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("# Agents\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(AGENTS.md) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/project\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(go.mod) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "package.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("WriteFile(package.json) error = %v", err)
+	}
+
+	var output bytes.Buffer
+	if err := execute([]string{"prompt", "context-aware-prompts", "--role", "spec-author"}, &output); err != nil {
+		t.Fatalf("execute(prompt) error = %v", err)
+	}
+
+	promptOutput := output.String()
+	for _, want := range []string{
+		"# Spec Author Agent",
+		"- `.specharbor/project-brief.md`",
+		"## Project Context",
+		"### User-confirmed context",
+		"- Stack: Go",
+		"- Test command: go test ./...",
+		"- Agent behavior: Ask before assuming",
+		"### Detected facts",
+		"- Agent rules: AGENTS.md",
+		"- Agent rules: .specharbor/rules/",
+		"Source: go.mod",
+		"Confidence: high",
+		"### Suggested assumptions",
+		"Build command may be `go build ./...`",
+		"### Conflict notes",
+		"detected Stack includes Node.js from package.json",
+		"Do not invent stack, architecture, commands, persistence decisions, workflow decisions, or project direction.",
+	} {
+		if !strings.Contains(promptOutput, want) {
+			t.Fatalf("prompt output = %q, want to contain %q", promptOutput, want)
+		}
+	}
+	if strings.Contains(promptOutput, "Must not appear") {
+		t.Fatalf("prompt output = %q, want unknown project brief section omitted", promptOutput)
 	}
 }
 

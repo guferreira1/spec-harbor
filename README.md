@@ -127,7 +127,9 @@ Interactive project briefing is available as:
 specharbor brief
 ```
 
-`brief` requires an interactive TTY, asks multiple-choice questions for explicit project context, and writes `.specharbor/project-brief.md` only after confirmation. It refuses to overwrite an existing project brief. The brief separates user-provided answers, detected context, and assumptions, and this command does not run repository indexing, RAG, provider APIs, agent execution, source-control automation, release, or publishing behavior. Existing prompt generation does not consume the project brief in this change.
+`brief` requires an interactive TTY, asks multiple-choice questions for explicit project context, and writes `.specharbor/project-brief.md` only after confirmation. It refuses to overwrite an existing project brief. The brief separates user-provided answers, detected context, and assumptions, and this command does not run repository indexing, RAG, provider APIs, agent execution, source-control automation, release, or publishing behavior.
+
+Role prompt generation is context-aware for the supported `prompt --role` roles. When confirmed or discovered local context is available, generated prompts include a bounded `## Project Context` section with user-confirmed context, detected facts, and suggested assumptions kept separate. Confirmed project brief values take precedence over detected facts; assumptions stay labeled as assumptions and include source/confidence evidence when rendered.
 
 Interactive generation is available as:
 
@@ -211,7 +213,7 @@ Implemented:
 - Explicit agent-assisted local runner execution in run-and-report mode for supported concrete agent targets.
 - Deterministic, local, read-only change validation with content-quality rules, error/warning severities, and grouped reports: errors (missing/empty/unusable files, malformed task checkboxes, missing acceptance criteria) exit non-zero, while quality warnings (placeholders, boilerplate-only starter content, missing recommended sections or mitigations) keep exit code `0`, so freshly generated blank changes stay valid.
 - Change review and archive.
-- Role-based prompt generation with `--role`.
+- Context-aware role-based prompt generation with `--role`.
 - Read-only local config display with `config show` and `config`.
 - Read-only advisory workflow guide with `workflow`.
 - Deterministic version metadata reporting with `version`.
