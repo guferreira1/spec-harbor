@@ -1,42 +1,58 @@
-# specharbor (npm wrapper)
+# specharbor
 
-npm wrapper package for the [SpecHarbor](https://github.com/guferreira1/spec-harbor) CLI.
+`specharbor` is the npm distribution for the SpecHarbor CLI.
 
-> **Status:** `specharbor@0.1.0` is published to the npm registry and maps to
-> GitHub Release `v0.1.0`. Publishing version bumps remains an explicit
-> manual maintainer step and is not automated.
+Português: [README.pt-BR.md](README.pt-BR.md)
 
-Install globally:
+This package installs and runs the official SpecHarbor binary for your platform. It is not just a command launcher: it gives you the same OpenSpec/SDD workflow entrypoint used in the repository:
+
+- explicit change scaffolding
+- local validation
+- role prompts
+- review and archive flows
+- installable CLI workflow commands for AI-assisted development
+
+## Install
 
 ```bash
 npm install -g specharbor
 specharbor version
 ```
 
-Run without a global install:
+You can also run without a global install:
 
 ```bash
 npx specharbor version
 ```
 
-## What it does
+## What SpecHarbor does
 
-- Exposes the `specharbor` CLI command through a small Node launcher.
-- Downloads the official prebuilt `specharbor` binary from GitHub Releases at
-  `postinstall` time, verifies its SHA-256 checksum against the release
-  `checksums.txt`, and stores it inside the package's own `native/` directory.
-- Falls back to the same checksum-verified download on first run when
-  postinstall scripts were skipped (for example `npm install --ignore-scripts`).
-- Forwards all CLI arguments and stdio to the native binary with
-  array-argument process APIs and preserves the binary's exit code. No shell
-  command strings are ever constructed.
+SpecHarbor is a Go CLI for OpenSpec-based AI coding-agent workflows. It helps you move from a scoped OpenSpec change to implementation, validation, review, and archive with explicit handoffs.
 
-## Version mapping
+## Common commands
 
-The npm package version `X.Y.Z` maps to exactly one GitHub Release tag
-`vX.Y.Z`. Package version `0.1.0` resolves to GitHub Release `v0.1.0`, which
-is the single source of the downloaded binary. At publish time the package
-version must match a published SpecHarbor release tag.
+- `specharbor init`
+- `specharbor workflow`
+- `specharbor generate ...`
+- `specharbor validate ...`
+- `specharbor prompt ...`
+- `specharbor review ...`
+- `specharbor archive ...`
+- `specharbor brief`
+- `specharbor context discover`
+- `specharbor context index`
+
+## How the npm wrapper works
+
+This package is a small Node launcher for the native binary.
+
+- The package version `X.Y.Z` maps to exactly one GitHub Release tag `vX.Y.Z`.
+- On install (or first run when scripts are skipped), it downloads the matching prebuilt asset from GitHub Releases.
+- It verifies SHA-256 against `checksums.txt` before extracting.
+- The extracted binary is stored in the package `native/` directory.
+- All CLI arguments are forwarded as an array to the binary process with inherited stdio.
+- The binary exit code is preserved.
+- No shell command-string construction is used for forwarding.
 
 ## Supported platforms
 
@@ -49,36 +65,56 @@ version must match a published SpecHarbor release tag.
 | `win32` | `x64` | `specharbor_Windows_x86_64.zip` |
 | `win32` | `arm64` | `specharbor_Windows_arm64.zip` |
 
-Unsupported platforms fail with a deterministic error naming the detected
-platform and pointing to the manual installation documentation, both at
-postinstall and at run time.
+Unsupported platforms fail with a clear, deterministic message.
+
+## Version mapping
+
+| npm version | GitHub Release tag |
+| --- | --- |
+| `0.1.0` | `v0.1.0` |
+
+The mapping is one-to-one and fixed by package version.
 
 ## Troubleshooting
 
-- `npm install --ignore-scripts -g specharbor` skips postinstall by design.
-  Run `specharbor version` or `npx specharbor version` later to trigger the
-  same checksum-verified binary download.
-- First-run download failures usually indicate offline use, proxy
-  restrictions, GitHub Release access restrictions, or an unsupported
-  platform/architecture pair. Retry with network access to GitHub Releases or
-  use the manual install guide.
-- If version output shows `SpecHarbor 0.1.0`, the wrapper resolved the
-  `v0.1.0` release binary successfully.
+- **install scripts skipped**
+  `npm install --ignore-scripts -g specharbor` skips postinstall by design.
+  The first run (`specharbor version` or `npx specharbor version`) still performs the same checksum-verified download.
 
-See
-[docs/install.md](https://github.com/guferreira1/spec-harbor/blob/main/docs/install.md)
-for the full install guide.
+- **offline/proxy/GitHub access problems**
+  First-run download failures can happen when outbound network access is restricted.
+  Retry with normal network access, or use a manual install channel from [docs/install.md](../../docs/install.md).
+
+- **unsupported platform or architecture**
+  Only Linux/macOS/Windows on `x64` and `arm64` are supported.
+  The error message points to manual install options.
+
+- **checksum verification failure**
+  The package refuses installation/boot with a mismatch. Retry the install command, then open an issue with the package version and error output.
+
+- **checking version**
+  Use:
+
+```bash
+specharbor version
+```
+
+Release binaries print injected metadata. Source builds without release metadata may print `dev`/`unknown`.
 
 ## Security model
 
-- Downloads use HTTPS only and are restricted to
-  `https://github.com/guferreira1/spec-harbor/releases/download/` URLs;
-  redirects must stay on HTTPS GitHub hosts.
-- SHA-256 checksum verification against the release `checksums.txt` is
-  mandatory; verification failure aborts the install and removes partial
-  files.
-- No tokens, no authenticated requests, no telemetry, no Git mutation, and no
-  writes outside the package's own directory.
+- HTTPS-only release source URLs under
+  `https://github.com/guferreira1/spec-harbor/releases/download/`
+- Mandatory SHA-256 verification against release `checksums.txt`.
+- No token-based access and no runtime authentication step.
+- No shell command execution for argument forwarding.
+- No writable paths outside the package directory except the package-native binary path (`native/`) and temporary runtime directories.
+
+## Related documentation
+
+- [Install and verify options](../../docs/install.md)
+- [OpenSpec product docs](https://github.com/guferreira1/spec-harbor/blob/main/README.md)
+- [Release metadata](https://github.com/guferreira1/spec-harbor/blob/main/docs/release.md)
 
 ## Tests
 
@@ -86,5 +122,4 @@ for the full install guide.
 npm test
 ```
 
-Tests run fully offline against in-memory fixtures and an injected transport;
-they never download real release assets and never publish anything.
+Tests use offline fixtures and do not publish artifacts.
