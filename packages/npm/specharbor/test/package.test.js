@@ -38,6 +38,33 @@ test('postinstall download hook is declared and no publish automation exists', (
   }
 });
 
+test('package ships the wrapper, scripts, and both READMEs but no binaries or fixtures', () => {
+  const manifest = readManifest();
+  const files = manifest.files;
+  assert.ok(Array.isArray(files), 'package.json must declare a files array');
+
+  for (const required of ['bin', 'lib', 'scripts', 'README.md', 'README.pt-BR.md', 'package.json']) {
+    if (required === 'package.json') {
+      // package.json is always included by npm; it need not be listed.
+      assert.ok(fs.existsSync(path.join(PACKAGE_ROOT, required)), 'package.json must exist');
+      continue;
+    }
+    assert.ok(files.includes(required), `files must include ${required}`);
+    assert.ok(fs.existsSync(path.join(PACKAGE_ROOT, required)), `${required} must exist on disk`);
+  }
+
+  // The English README links to the Portuguese README, so the package must
+  // ship it; a published tarball that omits it would have a broken link.
+  const readme = fs.readFileSync(path.join(PACKAGE_ROOT, 'README.md'), 'utf8');
+  assert.ok(readme.includes('README.pt-BR.md'), 'README.md must link to README.pt-BR.md');
+
+  // Downloaded native binaries, installed modules, and test fixtures must never
+  // be published.
+  for (const forbidden of ['native', 'node_modules', 'test']) {
+    assert.ok(!files.includes(forbidden), `files must not include ${forbidden}`);
+  }
+});
+
 test('package has no runtime dependencies', () => {
   const manifest = readManifest();
   assert.equal(manifest.dependencies, undefined);

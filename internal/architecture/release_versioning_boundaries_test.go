@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -280,17 +281,21 @@ func TestReleaseWorkflowTriggersOnlyOnVersionTagsWithMinimalPermissions(t *testi
 	assertExactYAMLKeys(t, "release workflow push trigger", push, []string{"tags"})
 	assertStringList(t, "on.push.tags", mustYAMLStringList(t, push["tags"], "on.push.tags"), []string{"v*"})
 
+	// Top-level permissions are least privilege (read-only); publishing jobs
+	// escalate their own permissions explicitly.
 	permissions := mustYAMLMap(t, workflow["permissions"], "permissions")
 	assertExactYAMLKeys(t, "release workflow permissions", permissions, []string{"contents"})
-	assertYAMLValue(t, "permissions.contents", permissions["contents"], "write")
+	assertYAMLValue(t, "permissions.contents", permissions["contents"], "read")
 }
 
-func TestReleaseWorkflowUsesCommunityGoReleaserAndOnlyGitHubToken(t *testing.T) {
+func TestReleaseWorkflowPublishesSupportedChannelsSafely(t *testing.T) {
 	root := filepath.Join("..", "..")
 	workflowPath := filepath.Join(root, ".github", "workflows", "release.yml")
 	source := mustReadArchitectureFile(t, workflowPath)
 
+	// Required behavior across the supported publishing channels.
 	for _, want := range []string{
+		// GitHub Release via community GoReleaser, unchanged.
 		"actions/checkout@v4",
 		"fetch-depth: 0",
 		"actions/setup-go@v5",
@@ -301,16 +306,37 @@ func TestReleaseWorkflowUsesCommunityGoReleaserAndOnlyGitHubToken(t *testing.T) 
 		"version: ~> v2",
 		"args: release --clean",
 		"GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}",
+		// Version consistency gate.
+		"scripts/validate-release-version.sh",
+		// npm publishing with provenance and OIDC, token fallback.
+		"actions/setup-node@v4",
+		"registry-url: https://registry.npmjs.org",
+		"npm test",
+		"npm publish --provenance --access public",
+		"id-token: write",
+		"NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}",
+		// Homebrew tap update via a dedicated tap token.
+		"scripts/render-homebrew-formula.sh",
+		"guferreira1/homebrew-tap",
+		"${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}",
 	} {
 		if !strings.Contains(source, want) {
 			t.Fatalf("release workflow missing %q", want)
 		}
 	}
-	if count := strings.Count(source, "secrets."); count != 1 {
-		t.Fatalf("release workflow references %d secrets, want exactly 1", count)
+
+	// Only the approved publishing secrets may be referenced, and they must be
+	// read from the secrets context (never inlined or printed).
+	allowedSecrets := map[string]struct{}{
+		"GITHUB_TOKEN":              {},
+		"NPM_TOKEN":                 {},
+		"HOMEBREW_TAP_GITHUB_TOKEN": {},
 	}
-	if count := strings.Count(source, "\npermissions:"); count != 1 {
-		t.Fatalf("release workflow defines %d top-level permissions blocks, want 1", count)
+	secretReference := regexp.MustCompile(`secrets\.([A-Za-z_][A-Za-z0-9_]*)`)
+	for _, match := range secretReference.FindAllStringSubmatch(source, -1) {
+		if _, ok := allowedSecrets[match[1]]; !ok {
+			t.Fatalf("release workflow references unexpected secret %q", match[1])
+		}
 	}
 
 	lowerSource := strings.ToLower(source)
@@ -320,30 +346,75 @@ func TestReleaseWorkflowUsesCommunityGoReleaserAndOnlyGitHubToken(t *testing.T) 
 		"schedule:",
 		"workflow_dispatch:",
 		"write-all",
-		"packages:",
-		"id-token:",
-		"pull-requests:",
-		"issues:",
-		"deployments:",
-		"security-events:",
-		"administration:",
 		"goreleaser-pro",
-		"npm",
-		"homebrew",
-		"brew",
-		"package registry",
 		"docker",
 		"cosign",
 		"signing",
 		"sbom",
+		"nfpm",
+		"scoop",
+		"winget",
+		"chocolatey",
+		"attestation",
 		"git tag",
-		"git push",
 		"gh pr",
 		"gh repo",
 	} {
 		if strings.Contains(lowerSource, forbidden) {
 			t.Fatalf("release workflow contains out-of-scope behavior %q", forbidden)
 		}
+	}
+}
+
+func TestReleaseWorkflowOrdersPublishingAfterValidationAndAssets(t *testing.T) {
+	root := filepath.Join("..", "..")
+	workflowPath := filepath.Join(root, ".github", "workflows", "release.yml")
+	workflow := mustReadYAMLMap(t, workflowPath)
+	jobs := mustYAMLMap(t, workflow["jobs"], "jobs")
+
+	for _, name := range []string{
+		"validate-release-inputs",
+		"goreleaser",
+		"npm-publish",
+		"homebrew-publish",
+	} {
+		if _, ok := jobs[name]; !ok {
+			t.Fatalf("release workflow missing job %q", name)
+		}
+	}
+
+	jobNeeds := func(name string) []string {
+		job := mustYAMLMap(t, jobs[name], name)
+		needs, ok := job["needs"]
+		if !ok {
+			return nil
+		}
+		if single, ok := needs.(string); ok {
+			return []string{single}
+		}
+		return mustYAMLStringList(t, needs, name+".needs")
+	}
+
+	contains := func(values []string, want string) bool {
+		for _, value := range values {
+			if value == want {
+				return true
+			}
+		}
+		return false
+	}
+
+	// GoReleaser (GitHub Release assets + checksums) must wait for validation.
+	if !contains(jobNeeds("goreleaser"), "validate-release-inputs") {
+		t.Fatalf("goreleaser job must depend on validate-release-inputs")
+	}
+	// npm and Homebrew publish only after the release assets exist, because the
+	// npm wrapper and the formula reference those assets and checksums.
+	if !contains(jobNeeds("npm-publish"), "goreleaser") {
+		t.Fatalf("npm-publish job must depend on goreleaser")
+	}
+	if !contains(jobNeeds("homebrew-publish"), "goreleaser") {
+		t.Fatalf("homebrew-publish job must depend on goreleaser")
 	}
 }
 
