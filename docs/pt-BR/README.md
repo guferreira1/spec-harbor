@@ -60,7 +60,7 @@ specharbor generate <change-id> ... -> specharbor validate <change-id> -> specha
   Lista as tarefas de implementação e acompanha o progresso da mudança.
 
 - **agent roles**
-  Roles suportadas: `spec-author`, `architecture-reviewer`, `implementer`, `test-engineer`, `change-reviewer`.
+  Funções suportadas: `spec-author`, `architecture-reviewer`, `implementer`, `test-engineer`, `change-reviewer`.
 
 - **project brief**
   `specharbor brief` cria `.specharbor/project-brief.md` com contexto confirmado e decisões do projeto.
@@ -112,7 +112,7 @@ Verifique com:
 specharbor version
 ```
 
-Consulte [docs/install.md](../install.md) para suporte por plataforma, checksums e troubleshooting.
+Consulte [docs/install.md](../install.md) para suporte por plataforma, checksums e solução de problemas.
 
 ## Quickstart
 
@@ -186,7 +186,7 @@ Itens planejados (já documentados):
 - comandos de mutação de config (`config get/set/unset`);
 - integração com provedores de IA e conectores de workflow mais amplos.
 
-Veja [context-initiative-remaining-plan.md](planning/context-initiative-remaining-plan.md).
+Veja [context-initiative-remaining-plan.md](../planning/context-initiative-remaining-plan.md).
 
 ## Contribuição
 

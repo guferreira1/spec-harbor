@@ -134,7 +134,7 @@ See [docs/install.md](docs/install.md) for platform support, checksum steps, and
 - change review (`review`)
 - change archive (`archive`)
 - advisory workflow guidance (`workflow`)
-- project brief and config report (`project brief`, `config`)
+- project brief and config reports (`brief`, `brief --update`, `config`)
 - release/install channels (GitHub Releases, install.sh, npm wrapper, Homebrew)
 
 ## Implementation details that matter

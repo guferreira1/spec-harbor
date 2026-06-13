@@ -83,7 +83,7 @@ The mapping is one-to-one and fixed by package version.
 
 - **offline/proxy/GitHub access problems**
   First-run download failures can happen when outbound network access is restricted.
-  Retry with normal network access, or use a manual install channel from [docs/install.md](../../docs/install.md).
+  Retry with normal network access, or use a manual install channel from [docs/install.md](https://github.com/guferreira1/spec-harbor/blob/main/docs/install.md).
 
 - **unsupported platform or architecture**
   Only Linux/macOS/Windows on `x64` and `arm64` are supported.
@@ -112,7 +112,7 @@ Release binaries print injected metadata. Source builds without release metadata
 
 ## Related documentation
 
-- [Install and verify options](../../docs/install.md)
+- [Install and verify options](https://github.com/guferreira1/spec-harbor/blob/main/docs/install.md)
 - [OpenSpec product docs](https://github.com/guferreira1/spec-harbor/blob/main/README.md)
 - [Release metadata](https://github.com/guferreira1/spec-harbor/blob/main/docs/release.md)
 

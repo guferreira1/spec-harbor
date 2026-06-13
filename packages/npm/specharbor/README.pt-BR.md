@@ -8,7 +8,7 @@ Este pacote instala e executa o binário oficial do SpecHarbor para a sua plataf
 Ele não é apenas um lançador de comandos: ele disponibiliza o ponto de entrada do
 fluxo OpenSpec/SDD usado no repositório:
 
-- scaffolding explícito de mudanças;
+- estruturação explícita de mudanças;
 - validação local;
 - prompts por função;
 - revisão e arquivamento da mudança;
@@ -86,7 +86,7 @@ O mapeamento é de um para um pela versão do pacote.
 
 - **falha offline/proxy/acesso ao GitHub**
   Falhas na primeira execução podem ocorrer com acesso de rede restrito.
-  Refaça em ambiente com acesso ao GitHub ou use uma opção manual em [docs/install.md](../../docs/install.md).
+  Refaça em ambiente com acesso ao GitHub ou use uma opção manual em [docs/install.md](https://github.com/guferreira1/spec-harbor/blob/main/docs/install.md).
 
 - **plataforma ou arquitetura não suportada**
   Apenas Linux, macOS e Windows em `x64` e `arm64` são suportados.
@@ -102,7 +102,7 @@ O mapeamento é de um para um pela versão do pacote.
 specharbor version
 ```
 
-O release oficial imprime metadados injetados. Binaries construídos sem metadados de release podem imprimir `dev`/`unknown`.
+O release oficial imprime metadados injetados. Binários construídos sem metadados de release podem imprimir `dev`/`unknown`.
 
 ## Modelo de segurança
 
@@ -115,7 +115,7 @@ O release oficial imprime metadados injetados. Binaries construídos sem metadad
 
 ## Documentação relacionada
 
-- [Instalação e verificação](../../docs/install.md)
+- [Instalação e verificação](https://github.com/guferreira1/spec-harbor/blob/main/docs/install.md)
 - [README principal do SpecHarbor](https://github.com/guferreira1/spec-harbor/blob/main/README.md)
 - [Metadados de release](https://github.com/guferreira1/spec-harbor/blob/main/docs/release.md)
 
