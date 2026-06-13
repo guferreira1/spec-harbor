@@ -12,13 +12,33 @@ import (
 )
 
 func contextCommand(ctx CommandContext) error {
-	if err := parseContextArguments(ctx.Args); err != nil {
+	arguments, err := parseContextArguments(ctx.Args)
+	if err != nil {
 		return err
 	}
 
 	root, err := os.Getwd()
 	if err != nil {
 		return err
+	}
+
+	if arguments.subcommand == "index" {
+		fileSystem := filesystem.NewRepositoryContextIndexFileSystem()
+		buildIndex := usecase.NewBuildRepositoryContextIndex(fileSystem)
+		result, err := buildIndex.Execute(usecase.RepositoryContextIndexInput{
+			ProjectRoot: root,
+			Mode:        arguments.indexMode,
+		})
+		if err != nil {
+			return err
+		}
+		printRepositoryContextIndexReport(ctx.Output, result)
+		if result.Status == domain.RepositoryContextIndexStatusMissing ||
+			result.Status == domain.RepositoryContextIndexStatusStale ||
+			result.Status == domain.RepositoryContextIndexStatusInvalid {
+			return ExitError{Code: 1}
+		}
+		return nil
 	}
 
 	fileSystem := filesystem.NewContextDiscoveryFileSystem()
@@ -32,24 +52,67 @@ func contextCommand(ctx CommandContext) error {
 	return nil
 }
 
-func parseContextArguments(args []string) error {
+type contextArguments struct {
+	subcommand string
+	indexMode  domain.RepositoryContextIndexMode
+}
+
+func parseContextArguments(args []string) (contextArguments, error) {
 	if len(args) == 0 {
-		return fmt.Errorf("context subcommand is required: discover")
+		return contextArguments{}, fmt.Errorf("context subcommand is required: discover or index")
 	}
 	if strings.HasPrefix(args[0], "-") {
-		return fmt.Errorf("unsupported flag: %s", args[0])
+		return contextArguments{}, fmt.Errorf("unsupported flag: %s", args[0])
 	}
-	if args[0] != "discover" {
-		return fmt.Errorf("unsupported context subcommand: %s", args[0])
-	}
-
-	for _, arg := range args[1:] {
-		if strings.HasPrefix(arg, "-") {
-			return fmt.Errorf("unsupported flag: %s", arg)
+	if args[0] == "discover" {
+		for _, arg := range args[1:] {
+			if strings.HasPrefix(arg, "-") {
+				return contextArguments{}, fmt.Errorf("unsupported flag: %s", arg)
+			}
+			return contextArguments{}, fmt.Errorf("unexpected argument: %s", arg)
 		}
-		return fmt.Errorf("unexpected argument: %s", arg)
+		return contextArguments{subcommand: "discover"}, nil
 	}
-	return nil
+	if args[0] == "index" {
+		return parseContextIndexArguments(args[1:])
+	}
+	return contextArguments{}, fmt.Errorf("unsupported context subcommand: %s", args[0])
+}
+
+func parseContextIndexArguments(args []string) (contextArguments, error) {
+	writeProvided := false
+	checkProvided := false
+	for _, arg := range args {
+		if arg == "--write" {
+			if writeProvided {
+				return contextArguments{}, fmt.Errorf("context index write flag specified more than once")
+			}
+			writeProvided = true
+			continue
+		}
+		if arg == "--check" {
+			if checkProvided {
+				return contextArguments{}, fmt.Errorf("context index check flag specified more than once")
+			}
+			checkProvided = true
+			continue
+		}
+		if strings.HasPrefix(arg, "-") {
+			return contextArguments{}, fmt.Errorf("unsupported flag: %s", arg)
+		}
+		return contextArguments{}, fmt.Errorf("unexpected argument: %s", arg)
+	}
+	if writeProvided && checkProvided {
+		return contextArguments{}, fmt.Errorf("context index write and check flags cannot be used together")
+	}
+	mode := domain.RepositoryContextIndexModeReport
+	if writeProvided {
+		mode = domain.RepositoryContextIndexModeWrite
+	}
+	if checkProvided {
+		mode = domain.RepositoryContextIndexModeCheck
+	}
+	return contextArguments{subcommand: "index", indexMode: mode}, nil
 }
 
 func printContextDiscoveryReport(output io.Writer, result domain.ContextDiscoveryResult) {
@@ -104,4 +167,65 @@ func formatContextSource(source domain.ContextSource) string {
 		return source.Path
 	}
 	return fmt.Sprintf("%s (%s)", source.Path, source.Evidence)
+}
+
+func printRepositoryContextIndexReport(output io.Writer, result domain.RepositoryContextIndexReport) {
+	fmt.Fprintln(output, "Repository context index:")
+	fmt.Fprintf(output, "Mode: %s\n", result.Mode)
+	fmt.Fprintf(output, "Status: %s\n", result.Status)
+	fmt.Fprintf(output, "Path: %s\n", result.IndexPath)
+	fmt.Fprintf(output, "Schema version: %d\n", result.Index.SchemaVersion)
+	fmt.Fprintf(output, "Indexed files: %d\n", len(result.Index.Entries))
+	fmt.Fprintf(output, "Skipped records: %d\n", len(result.Index.Skipped))
+	fmt.Fprintf(output, "Total indexed bytes: %d\n", repositoryContextIndexTotalBytes(result.Index))
+	fmt.Fprintf(output, "Truncated: %s\n", yesNo(result.Index.Truncated))
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Limits:")
+	fmt.Fprintf(output, "- max indexed files: %d\n", result.Index.Limits.MaxIndexedFiles)
+	fmt.Fprintf(output, "- max file size bytes: %d\n", result.Index.Limits.MaxFileSizeBytes)
+	fmt.Fprintf(output, "- max total file bytes: %d\n", result.Index.Limits.MaxTotalFileBytes)
+	fmt.Fprintf(output, "- max skipped records: %d\n", result.Index.Limits.MaxSkippedRecords)
+	fmt.Fprintf(output, "- max directory depth: %d\n", result.Index.Limits.MaxDirectoryDepth)
+
+	if result.ErrorMessage != "" {
+		fmt.Fprintln(output)
+		fmt.Fprintf(output, "Detail: %s\n", result.ErrorMessage)
+	}
+
+	if len(result.StaleReasons) > 0 {
+		fmt.Fprintln(output)
+		fmt.Fprintf(output, "Stale reasons: %d\n", len(result.StaleReasons))
+		for index, reason := range result.StaleReasons {
+			if index >= 10 {
+				fmt.Fprintln(output, "- additional stale reasons omitted")
+				break
+			}
+			if reason.Path != "" {
+				fmt.Fprintf(output, "- %s: %s (%s)\n", reason.Code, reason.Message, reason.Path)
+				continue
+			}
+			fmt.Fprintf(output, "- %s: %s\n", reason.Code, reason.Message)
+		}
+	}
+
+	if len(result.Index.Skipped) > 0 {
+		fmt.Fprintln(output)
+		fmt.Fprintln(output, "Skipped:")
+		for index, skipped := range result.Index.Skipped {
+			if index >= 10 {
+				fmt.Fprintln(output, "- additional skipped records omitted")
+				break
+			}
+			fmt.Fprintf(output, "- %s: %s\n", skipped.Reason, skipped.Path)
+		}
+	}
+}
+
+func repositoryContextIndexTotalBytes(index domain.RepositoryContextIndex) int64 {
+	var total int64
+	for _, entry := range index.Entries {
+		total += entry.SizeBytes
+	}
+	return total
 }

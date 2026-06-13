@@ -143,9 +143,67 @@ Safety boundaries:
 - heavy/generated folders such as `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/`, and `obj/` are skipped;
 - symlinks are not traversed.
 
-`specharbor context` without `discover`, unsupported subcommands such as `context update`, positional arguments after `discover`, and flags such as `--json`, `--path`, `--deep`, `--github`, or `--rag` are rejected.
+`specharbor context` without `discover` or `index`, unsupported subcommands such as `context update`, positional arguments after `discover`, and flags such as `--json`, `--path`, `--deep`, `--github`, or `--rag` are rejected.
 
 When `specharbor brief` runs, discovery can provide menu suggestions and detected context records only. The user must still select or enter every answer, confirmation is still required before writing, and an existing `.specharbor/project-brief.md` is still refused rather than merged, updated, overwritten, or appended.
+
+### Index Repository Context
+
+```bash
+go run ./cmd/specharbor context index
+go run ./cmd/specharbor context index --write
+go run ./cmd/specharbor context index --check
+specharbor context index
+specharbor context index --write
+specharbor context index --check
+```
+
+`context index` builds a deterministic local/offline repository context index for supported context sources. The index is bounded inventory metadata for future local retrieval work. It is not retrieval, snippet ranking, RAG, a semantic database, a vector store, or confirmed project context.
+
+Command modes:
+
+- no flag: build the current index in memory and print a concise report without writing files;
+- `--write`: build the current index and safely write `.specharbor/context-index.json`;
+- `--check`: read `.specharbor/context-index.json`, rebuild current metadata, and report whether the stored index is current, stale, missing, or invalid.
+
+`--write` and `--check` are mutually exclusive. Unsupported flags, unsupported positional arguments, `--json`, `--path`, `--deep`, `--github`, and `--rag` are rejected.
+
+The generated index path is:
+
+```text
+.specharbor/context-index.json
+```
+
+The file is generated local state and is ignored by source control. It is not intended to be committed. The generated index file is not included as an index entry.
+
+The stored JSON uses schema version `1` and deterministic generation metadata. It records:
+
+- selected limits;
+- a safe project root marker such as `openspec/project.md` when present;
+- entries with relative path, source category, file type, language or ecosystem hint, file size, SHA-256 content hash, modified-time metadata, retrieval support flag, classification hints, and source evidence category;
+- bounded skip records with relative path and reason code only;
+- truncation state.
+
+The index stores no raw file contents, snippets, secrets, command output, provider output, embeddings, vectors, remote API data, absolute local paths, or confirmed project context.
+
+Supported indexed sources include:
+
+- `AGENTS.md`, `.specharbor/rules/`, and `.specharbor/project-brief.md`;
+- `README.md`, `CONTRIBUTING.md`, and bounded Markdown files under `docs/`;
+- `openspec/project.md` and bounded Markdown files under `openspec/specs/`;
+- `package.json`, `go.mod`, `pom.xml`, `build.gradle`, `build.gradle.kts`, `Cargo.toml`, `pyproject.toml`, and `requirements.txt`;
+- `Dockerfile`, `docker-compose.yml`, `docker-compose.yaml`, `Makefile`, `Taskfile.yml`, `Taskfile.yaml`, and `.github/workflows/`.
+
+Safety boundaries:
+
+- no project commands, package managers, tests, builds, scripts, shells, agents, prompts, provider APIs, local model APIs, network APIs, source-control APIs, or workflow tools are executed;
+- no retrieval, snippet ranking, embeddings, vector databases, RAG, remote context, provider integration, prompt execution, agent execution, command verification, source-control automation, release automation, npm changes, Homebrew changes, `install.sh` changes, GoReleaser changes, or publishing behavior is introduced;
+- sensitive files such as `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `secrets.*`, and `credentials.*` are skipped;
+- heavy/generated folders such as `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/`, and `obj/` are skipped;
+- symlinks are not traversed;
+- path traversal, absolute paths, Windows drive paths, null-byte paths, and paths outside the project root are rejected.
+
+Default limits are 500 indexed files, 256 KiB per indexed file, 5 MiB total indexed bytes, 200 persisted skip records, and bounded depth for supported context directories. When limits are hit, the report marks the index as truncated and records stable skip reasons without dumping contents.
 
 ### Brief a Project
 
