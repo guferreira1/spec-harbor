@@ -56,6 +56,7 @@ The command suggestions are advisory. `specharbor workflow` does not execute com
 The workflow relates to existing commands as follows:
 
 - `context discover` optionally inspects bounded local repository sources and reports classified context signals before briefing or authoring.
+- `context index` optionally records bounded metadata-only inventory for supported local context sources.
 - `brief` optionally collects confirmed project context before authoring when repository context is missing or ambiguous.
 - `generate` creates or starts the OpenSpec change package for the Spec Author Agent.
 - `validate` checks required OpenSpec change files before review or implementation.
@@ -64,6 +65,8 @@ The workflow relates to existing commands as follows:
 - `archive` explicitly archives an accepted change.
 
 `specharbor context discover` is read-only local discovery. It labels repository evidence as detected facts, conventional guesses as suggested assumptions, and existing project brief values as user-confirmed context. It does not execute commands, call provider APIs, perform remote discovery, build an index, or run RAG.
+
+`specharbor context index` is local metadata inventory. It can print a report, write `.specharbor/context-index.json`, or check whether that generated index is stale. It does not retrieve snippets, rank context, build embeddings or vectors, run RAG, call remote or provider APIs, execute commands or prompts, run agents, or automate source control. The index is not confirmed project context and does not replace `brief` or `context discover`.
 
 `specharbor brief` writes `.specharbor/project-brief.md` only after interactive confirmation. `specharbor brief --update` is the explicit maintenance path for an existing brief: it keeps confirmed values by default, shows detected facts and assumptions as review items, previews changes, and writes only after final confirmation. Briefing is explicit context collection and maintenance, not repository indexing, RAG, provider integration, agent execution, source-control automation, or remote automation. Role prompt generation can include confirmed brief values and discovered local signals in a bounded `## Project Context` section.
 

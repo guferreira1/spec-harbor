@@ -2043,7 +2043,7 @@ Usage:
 Commands:
   init        Initialize OpenSpec and SpecHarbor configuration
   scan        Detect project stack and development context
-  context     Discover structured local project context
+  context     Discover and index structured local project context
   brief       Collect confirmed project context
   generate    Generate a new OpenSpec change
   prompt      Generate an agent-specific implementation prompt

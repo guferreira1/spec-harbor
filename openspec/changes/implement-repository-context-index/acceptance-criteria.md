@@ -1,0 +1,177 @@
+# Acceptance Criteria: Implement Repository Context Index
+
+- `specharbor context index` is implemented.
+- `specharbor context index --write` is implemented.
+- `specharbor context index --check` is implemented.
+- `specharbor context index` builds a current metadata-only index without writing files.
+- `specharbor context index --write` safely writes `.specharbor/context-index.json`.
+- `specharbor context index --check` reports current indexes with exit code `0`.
+- `specharbor context index --check` reports missing indexes with a non-zero exit code.
+- `specharbor context index --check` reports stale indexes with a non-zero exit code.
+- `specharbor context index --check` reports invalid indexes with a non-zero exit code.
+- `--write` and `--check` are mutually exclusive.
+- Unsupported flags are rejected.
+- Unsupported positional arguments are rejected.
+- Unsupported context subcommands remain rejected.
+- Existing `specharbor context discover` behavior is preserved.
+- Existing `specharbor brief` behavior is preserved.
+- Existing `specharbor brief --update` behavior is preserved.
+- Existing context-aware `specharbor prompt` behavior is preserved.
+- Existing `specharbor scan` behavior is preserved.
+- Existing final decision labels remain exact.
+- The index file path is `.specharbor/context-index.json`.
+- The index file is generated local state and is not intended to be committed.
+- The generated index file is not indexed.
+- The stored JSON has schema version `1`.
+- The stored JSON has a deterministic generation marker instead of a generated timestamp.
+- The stored JSON records selected limits.
+- The stored JSON records project root marker metadata without absolute local paths.
+- Index entries include safe relative paths.
+- Index entries include source category.
+- Index entries include file type.
+- Index entries include language or ecosystem hints when safely detectable.
+- Index entries include file size.
+- Index entries include SHA-256 content hash.
+- Index entries include modified-time or equivalent freshness metadata.
+- Index entries include whether the source is supported for future retrieval.
+- Index entries include classification hints.
+- Index entries include source evidence category.
+- Index entries are ordered deterministically.
+- Skip records are ordered deterministically.
+- Skip records include safe relative paths and stable reason codes only.
+- The index stores no raw file contents.
+- The index stores no large snippets.
+- The index stores no secrets.
+- The index stores no command output.
+- The index stores no provider output.
+- The index stores no embeddings or vectors.
+- The index stores no remote API data.
+- The index stores no absolute local paths.
+- Supported sources include `AGENTS.md`.
+- Supported sources include `README.md`.
+- Supported sources include `CONTRIBUTING.md`.
+- Supported sources include `docs/`.
+- Supported sources include `openspec/project.md`.
+- Supported sources include `openspec/specs/`.
+- Supported sources include `.specharbor/rules/`.
+- Supported sources include `.specharbor/project-brief.md`.
+- Supported sources include `package.json`.
+- Supported sources include `go.mod`.
+- Supported sources include `pom.xml`.
+- Supported sources include `build.gradle`.
+- Supported sources include `build.gradle.kts`.
+- Supported sources include `Cargo.toml`.
+- Supported sources include `pyproject.toml`.
+- Supported sources include `requirements.txt`.
+- Supported sources include `Dockerfile`.
+- Supported sources include `docker-compose.yml`.
+- Supported sources include `docker-compose.yaml`.
+- Supported sources include `Makefile`.
+- Supported sources include `Taskfile.yml`.
+- Supported sources include `Taskfile.yaml`.
+- Supported sources include `.github/workflows/`.
+- Sensitive files are skipped.
+- `.env` files are skipped.
+- `.env.*` files are skipped.
+- `*.pem` files are skipped.
+- `*.key` files are skipped.
+- `id_rsa` is skipped.
+- `id_ed25519` is skipped.
+- `secrets.*` files are skipped.
+- `credentials.*` files are skipped.
+- Heavy or generated folders are skipped.
+- `.git/` is skipped.
+- `node_modules/` is skipped.
+- `dist/` is skipped.
+- `build/` is skipped.
+- `target/` is skipped.
+- `vendor/` is skipped.
+- `coverage/` is skipped.
+- `.tmp/` is skipped.
+- `.cache/` is skipped.
+- `.next/` is skipped.
+- `.nuxt/` is skipped.
+- `out/` is skipped.
+- `bin/` is skipped.
+- `obj/` is skipped.
+- Symlink files are not followed.
+- Symlink directories are not followed.
+- Intermediate symlink path components are not followed.
+- Path traversal is rejected.
+- Absolute paths are rejected.
+- Windows drive paths are rejected.
+- Null-byte paths are rejected.
+- The indexer does not traverse outside the project root.
+- Max indexed file count is enforced.
+- Max individual file size is enforced.
+- Max total indexed bytes is enforced.
+- Max skip records are enforced.
+- Directory depth limits are enforced.
+- Truncation is reported when limits are hit.
+- Stale detection covers changed content hashes.
+- Stale detection covers changed file sizes.
+- Stale detection covers changed modified freshness markers.
+- Stale detection covers changed entry sets.
+- Stale detection covers changed skip or truncation state.
+- Stale detection covers unsupported schema versions.
+- Stale detection covers changed limits.
+- Stale detection never executes project commands.
+- Safe writes preserve the previous index on write failure.
+- Empty repositories are handled safely.
+- Ambiguous repositories are handled safely without inventing confirmed context.
+- CLI reports are concise.
+- CLI reports do not dump raw file contents.
+- Domain code owns index record models.
+- Domain code owns source categories or aligned index categories.
+- Domain code owns skip policy and deterministic ordering.
+- Domain code owns freshness and staleness models.
+- Core/usecase orchestrates build, write, read, check, and report behavior.
+- Filesystem traversal, metadata reads, hashing, and persistence happen through port and adapter boundaries.
+- CLI owns command parsing and user-facing formatting only.
+- Core does not import adapters.
+- Use cases depend on interfaces.
+- CLI does not contain indexing rules.
+- Repository-wide source-code indexing is not introduced.
+- Local retrieval is not introduced.
+- Snippet ranking is not introduced.
+- Embeddings are not introduced.
+- Vector databases are not introduced.
+- RAG is not introduced.
+- GitHub remote context is not introduced.
+- GitLab or Bitbucket remote context is not introduced.
+- Provider APIs are not introduced.
+- Automatic command verification is not introduced.
+- Automatic project command execution is not introduced.
+- Agent execution is not introduced.
+- Prompt execution is not introduced.
+- Source-control automation is not introduced.
+- Release automation is not introduced.
+- npm files are not changed.
+- Homebrew files are not changed.
+- `install.sh` is not changed.
+- GoReleaser files are not changed.
+- Publishing flows are not changed.
+- Tests cover index model validation.
+- Tests cover deterministic generation.
+- Tests cover stable ordering.
+- Tests cover supported source inventory.
+- Tests cover sensitive file skipping.
+- Tests cover heavy/generated folder skipping.
+- Tests cover symlink traversal blocking.
+- Tests cover unsafe path rejection.
+- Tests cover file count and size limits.
+- Tests cover hash and metadata correctness.
+- Tests cover stale index detection.
+- Tests cover safe write behavior.
+- Tests prove no raw file content is stored.
+- Tests cover empty repository behavior.
+- Tests cover ambiguous repository behavior.
+- Tests cover CLI report behavior.
+- Regression tests cover `specharbor brief`.
+- Regression tests cover `specharbor brief --update`.
+- Regression tests cover `specharbor context discover`.
+- Regression tests cover context-aware `specharbor prompt`.
+- Regression tests cover `specharbor scan`.
+- OpenSpec validation passes with zero errors.
+- `go test ./...` passes after implementation.
+- `go test -count=1 ./...` passes after implementation.

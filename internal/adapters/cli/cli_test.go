@@ -2875,13 +2875,122 @@ Notes:
 	}
 }
 
+func TestExecuteContextIndexPrintsMetadataOnlyReport(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	writeScanFile(t, root, "README.md", "# Project\nraw project prose must not appear\n")
+	writeScanFile(t, root, "go.mod", "module example.com/project\n")
+
+	var output bytes.Buffer
+	if err := execute([]string{"context", "index"}, &output); err != nil {
+		t.Fatalf("execute(context index) error = %v", err)
+	}
+
+	report := output.String()
+	for _, want := range []string{
+		"Repository context index:",
+		"Mode: report",
+		"Status: built",
+		"Path: .specharbor/context-index.json",
+		"Schema version: 1",
+		"Indexed files: 2",
+		"Truncated: no",
+		"Limits:",
+	} {
+		if !strings.Contains(report, want) {
+			t.Fatalf("context index output = %q, want %q", report, want)
+		}
+	}
+	for _, unwanted := range []string{"raw project prose", "module example.com/project"} {
+		if strings.Contains(report, unwanted) {
+			t.Fatalf("context index output dumped raw content %q: %q", unwanted, report)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, ".specharbor", "context-index.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("context index without --write created index file, stat err = %v", err)
+	}
+}
+
+func TestExecuteContextIndexWriteAndCheck(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	writeScanFile(t, root, "README.md", "# Project\n")
+
+	var output bytes.Buffer
+	if err := execute([]string{"context", "index", "--write"}, &output); err != nil {
+		t.Fatalf("execute(context index --write) error = %v", err)
+	}
+	if !strings.Contains(output.String(), "Status: written") {
+		t.Fatalf("write output = %q, want written status", output.String())
+	}
+
+	indexContents, err := os.ReadFile(filepath.Join(root, ".specharbor", "context-index.json"))
+	if err != nil {
+		t.Fatalf("ReadFile(context-index.json) error = %v", err)
+	}
+	if !strings.Contains(string(indexContents), `"path": "README.md"`) {
+		t.Fatalf("index contents = %q, want README metadata", string(indexContents))
+	}
+	if strings.Contains(string(indexContents), "# Project") {
+		t.Fatalf("index stored raw README contents: %s", string(indexContents))
+	}
+
+	output.Reset()
+	if err := execute([]string{"context", "index", "--check"}, &output); err != nil {
+		t.Fatalf("execute(context index --check) error = %v", err)
+	}
+	if !strings.Contains(output.String(), "Status: current") {
+		t.Fatalf("check output = %q, want current status", output.String())
+	}
+
+	writeScanFile(t, root, "README.md", "# Project changed\n")
+	output.Reset()
+	err = execute([]string{"context", "index", "--check"}, &output)
+	var exitErr ExitError
+	if err == nil || !errors.As(err, &exitErr) || exitErr.Code != 1 {
+		t.Fatalf("execute(stale check) error = %v, want ExitError{1}", err)
+	}
+	if !strings.Contains(output.String(), "Status: stale") || !strings.Contains(output.String(), "Stale reasons:") {
+		t.Fatalf("stale check output = %q, want stale report", output.String())
+	}
+}
+
+func TestExecuteContextIndexCheckMissingAndInvalidExitNonZero(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	var output bytes.Buffer
+	err := execute([]string{"context", "index", "--check"}, &output)
+	var exitErr ExitError
+	if err == nil || !errors.As(err, &exitErr) || exitErr.Code != 1 {
+		t.Fatalf("execute(missing check) error = %v, want ExitError{1}", err)
+	}
+	if !strings.Contains(output.String(), "Status: missing") {
+		t.Fatalf("missing check output = %q, want missing", output.String())
+	}
+
+	if err := os.MkdirAll(filepath.Join(root, ".specharbor"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(.specharbor) error = %v", err)
+	}
+	writeScanFile(t, root, ".specharbor/context-index.json", "{not json")
+
+	output.Reset()
+	err = execute([]string{"context", "index", "--check"}, &output)
+	if err == nil || !errors.As(err, &exitErr) || exitErr.Code != 1 {
+		t.Fatalf("execute(invalid check) error = %v, want ExitError{1}", err)
+	}
+	if !strings.Contains(output.String(), "Status: invalid") {
+		t.Fatalf("invalid check output = %q, want invalid", output.String())
+	}
+}
+
 func TestExecuteContextRejectsInvalidArguments(t *testing.T) {
 	tests := []struct {
 		name string
 		args []string
 		want string
 	}{
-		{name: "missing subcommand", args: []string{"context"}, want: "context subcommand is required: discover"},
+		{name: "missing subcommand", args: []string{"context"}, want: "context subcommand is required: discover or index"},
 		{name: "unsupported flag before subcommand", args: []string{"context", "--json"}, want: "unsupported flag: --json"},
 		{name: "unsupported subcommand", args: []string{"context", "update"}, want: "unsupported context subcommand: update"},
 		{name: "extra argument", args: []string{"context", "discover", "extra"}, want: "unexpected argument: extra"},
@@ -2890,6 +2999,15 @@ func TestExecuteContextRejectsInvalidArguments(t *testing.T) {
 		{name: "deep flag", args: []string{"context", "discover", "--deep"}, want: "unsupported flag: --deep"},
 		{name: "github flag", args: []string{"context", "discover", "--github"}, want: "unsupported flag: --github"},
 		{name: "rag flag", args: []string{"context", "discover", "--rag"}, want: "unsupported flag: --rag"},
+		{name: "index extra argument", args: []string{"context", "index", "extra"}, want: "unexpected argument: extra"},
+		{name: "index unsupported flag", args: []string{"context", "index", "--json"}, want: "unsupported flag: --json"},
+		{name: "index path flag", args: []string{"context", "index", "--path", "/tmp"}, want: "unsupported flag: --path"},
+		{name: "index deep flag", args: []string{"context", "index", "--deep"}, want: "unsupported flag: --deep"},
+		{name: "index github flag", args: []string{"context", "index", "--github"}, want: "unsupported flag: --github"},
+		{name: "index rag flag", args: []string{"context", "index", "--rag"}, want: "unsupported flag: --rag"},
+		{name: "index write check conflict", args: []string{"context", "index", "--write", "--check"}, want: "context index write and check flags cannot be used together"},
+		{name: "index duplicate write", args: []string{"context", "index", "--write", "--write"}, want: "context index write flag specified more than once"},
+		{name: "index duplicate check", args: []string{"context", "index", "--check", "--check"}, want: "context index check flag specified more than once"},
 	}
 
 	for _, test := range tests {
