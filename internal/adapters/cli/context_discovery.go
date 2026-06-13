@@ -40,6 +40,23 @@ func contextCommand(ctx CommandContext) error {
 		}
 		return nil
 	}
+	if arguments.subcommand == "retrieve" {
+		fileSystem := filesystem.NewRepositoryContextIndexFileSystem()
+		retrieveContext := usecase.NewRetrieveLocalContext(fileSystem)
+		result, err := retrieveContext.Execute(usecase.RetrieveLocalContextInput{
+			ProjectRoot: root,
+			Query:       arguments.retrieveQuery,
+		})
+		if err != nil {
+			return err
+		}
+		printLocalContextRetrievalReport(ctx.Output, result)
+		if result.Status != domain.LocalContextRetrievalStatusCurrent &&
+			result.Status != domain.LocalContextRetrievalStatusNoResults {
+			return ExitError{Code: 1}
+		}
+		return nil
+	}
 
 	fileSystem := filesystem.NewContextDiscoveryFileSystem()
 	discoverContext := usecase.NewDiscoverProjectContext(fileSystem)
@@ -53,8 +70,9 @@ func contextCommand(ctx CommandContext) error {
 }
 
 type contextArguments struct {
-	subcommand string
-	indexMode  domain.RepositoryContextIndexMode
+	subcommand    string
+	indexMode     domain.RepositoryContextIndexMode
+	retrieveQuery string
 }
 
 func parseContextArguments(args []string) (contextArguments, error) {
@@ -75,6 +93,9 @@ func parseContextArguments(args []string) (contextArguments, error) {
 	}
 	if args[0] == "index" {
 		return parseContextIndexArguments(args[1:])
+	}
+	if args[0] == "retrieve" {
+		return parseContextRetrieveArguments(args[1:])
 	}
 	return contextArguments{}, fmt.Errorf("unsupported context subcommand: %s", args[0])
 }
@@ -113,6 +134,37 @@ func parseContextIndexArguments(args []string) (contextArguments, error) {
 		mode = domain.RepositoryContextIndexModeCheck
 	}
 	return contextArguments{subcommand: "index", indexMode: mode}, nil
+}
+
+func parseContextRetrieveArguments(args []string) (contextArguments, error) {
+	queryProvided := false
+	query := ""
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		if arg == "--query" {
+			if queryProvided {
+				return contextArguments{}, fmt.Errorf("context retrieve query flag specified more than once")
+			}
+			if index+1 >= len(args) {
+				return contextArguments{}, fmt.Errorf("context retrieve query value is required")
+			}
+			if strings.HasPrefix(args[index+1], "-") {
+				return contextArguments{}, fmt.Errorf("unsupported flag: %s", args[index+1])
+			}
+			queryProvided = true
+			query = args[index+1]
+			index++
+			continue
+		}
+		if strings.HasPrefix(arg, "-") {
+			return contextArguments{}, fmt.Errorf("unsupported flag: %s", arg)
+		}
+		return contextArguments{}, fmt.Errorf("unexpected argument: %s", arg)
+	}
+	if !queryProvided {
+		return contextArguments{}, fmt.Errorf("context retrieve query is required")
+	}
+	return contextArguments{subcommand: "retrieve", retrieveQuery: query}, nil
 }
 
 func printContextDiscoveryReport(output io.Writer, result domain.ContextDiscoveryResult) {
@@ -228,4 +280,81 @@ func repositoryContextIndexTotalBytes(index domain.RepositoryContextIndex) int64
 		total += entry.SizeBytes
 	}
 	return total
+}
+
+func printLocalContextRetrievalReport(output io.Writer, result domain.LocalContextRetrievalReport) {
+	fmt.Fprintln(output, "Local context retrieval:")
+	fmt.Fprintf(output, "Query: %s\n", result.Query.DisplayQuery)
+	fmt.Fprintf(output, "Normalized terms: %s\n", strings.Join(result.Query.Terms, ", "))
+	fmt.Fprintf(output, "Index: %s\n", result.IndexPath)
+	fmt.Fprintf(output, "Index status: %s\n", localContextRetrievalIndexStatus(result.Status))
+	fmt.Fprintf(output, "Results: %d\n", len(result.Results))
+	if result.OutputTruncated {
+		fmt.Fprintln(output, "Output truncated: yes")
+	}
+
+	if result.Message != "" {
+		fmt.Fprintln(output)
+		fmt.Fprintf(output, "Detail: %s\n", result.Message)
+	}
+	if len(result.StaleReasons) > 0 {
+		fmt.Fprintln(output)
+		fmt.Fprintf(output, "Stale reasons: %d\n", len(result.StaleReasons))
+		for _, reason := range result.StaleReasons {
+			if reason.Path != "" {
+				fmt.Fprintf(output, "- %s: %s (%s)\n", reason.Code, reason.Message, reason.Path)
+				continue
+			}
+			fmt.Fprintf(output, "- %s: %s\n", reason.Code, reason.Message)
+		}
+	}
+	if result.Status == domain.LocalContextRetrievalStatusNoResults {
+		fmt.Fprintln(output)
+		fmt.Fprintln(output, "No matching local context found.")
+		return
+	}
+	if len(result.Results) == 0 {
+		return
+	}
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Results:")
+	for _, retrievalResult := range result.Results {
+		fmt.Fprintf(output, "%d. %s\n", retrievalResult.Rank, retrievalResult.Path)
+		fmt.Fprintf(output, "   Category: %s\n", retrievalResult.SourceCategory)
+		if retrievalResult.SourceEvidenceCategory != "" {
+			fmt.Fprintf(output, "   Evidence: %s\n", retrievalResult.SourceEvidenceCategory)
+		}
+		fmt.Fprintf(output, "   Score: %d\n", retrievalResult.Score)
+		if len(retrievalResult.ClassificationHints) > 0 {
+			fmt.Fprintf(output, "   Classification: %s\n", formatRetrievalClassificationHints(retrievalResult.ClassificationHints))
+		}
+		if retrievalResult.Snippet.Text != "" {
+			fmt.Fprintf(output, "   Lines: %d-%d\n", retrievalResult.Snippet.LineStart, retrievalResult.Snippet.LineEnd)
+			fmt.Fprintln(output, "   Snippet:")
+			for _, line := range strings.Split(retrievalResult.Snippet.Text, "\n") {
+				fmt.Fprintf(output, "   %s\n", line)
+			}
+			continue
+		}
+		if retrievalResult.Summary != "" {
+			fmt.Fprintf(output, "   Summary: %s\n", retrievalResult.Summary)
+		}
+	}
+}
+
+func localContextRetrievalIndexStatus(status domain.LocalContextRetrievalStatus) string {
+	if status == domain.LocalContextRetrievalStatusCurrent ||
+		status == domain.LocalContextRetrievalStatusNoResults {
+		return "current"
+	}
+	return string(status)
+}
+
+func formatRetrievalClassificationHints(hints []domain.RepositoryContextIndexClassificationHint) string {
+	values := make([]string, 0, len(hints))
+	for _, hint := range hints {
+		values = append(values, string(hint))
+	}
+	return strings.Join(values, ", ")
 }

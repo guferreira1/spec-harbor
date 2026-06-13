@@ -143,7 +143,7 @@ Safety boundaries:
 - heavy/generated folders such as `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/`, and `obj/` are skipped;
 - symlinks are not traversed.
 
-`specharbor context` without `discover` or `index`, unsupported subcommands such as `context update`, positional arguments after `discover`, and flags such as `--json`, `--path`, `--deep`, `--github`, or `--rag` are rejected.
+`specharbor context` without `discover`, `index`, or `retrieve`, unsupported subcommands such as `context update`, positional arguments after `discover`, and flags such as `--json`, `--path`, `--deep`, `--github`, or `--rag` are rejected.
 
 When `specharbor brief` runs, discovery can provide menu suggestions and detected context records only. The user must still select or enter every answer, confirmation is still required before writing, and an existing `.specharbor/project-brief.md` is still refused rather than merged, updated, overwritten, or appended.
 
@@ -204,6 +204,39 @@ Safety boundaries:
 - path traversal, absolute paths, Windows drive paths, null-byte paths, and paths outside the project root are rejected.
 
 Default limits are 500 indexed files, 256 KiB per indexed file, 5 MiB total indexed bytes, 200 persisted skip records, and bounded depth for supported context directories. When limits are hit, the report marks the index as truncated and records stable skip reasons without dumping contents.
+
+### Retrieve Local Context
+
+```bash
+go run ./cmd/specharbor context retrieve --query "architecture"
+specharbor context retrieve --query "architecture"
+```
+
+`context retrieve` performs deterministic local/offline retrieval over supported sources represented by `.specharbor/context-index.json`. The command requires an existing valid, current, non-truncated index written by:
+
+```bash
+go run ./cmd/specharbor context index --write
+```
+
+Missing, invalid, stale, unreadable, unsupported-schema, or truncated indexes fail safely and tell the user to run `specharbor context index --write`. Retrieval never silently creates, updates, or persists the index, and it writes no retrieval cache or output file.
+
+The query must be explicit through `--query`. Empty queries are rejected, queries longer than 512 characters are rejected, and normalized query terms are bounded. Positional queries and unsupported flags such as `--json`, `--github`, `--remote`, `--rag`, `--embed`, `--provider`, `--execute`, `--agent`, and `--deep` are rejected.
+
+Retrieval reads only supported indexed local sources marked for retrieval, including `AGENTS.md`, `README.md`, `CONTRIBUTING.md`, Markdown files under `docs/`, `openspec/project.md`, Markdown files under `openspec/specs/`, Markdown files under `.specharbor/rules/`, `.specharbor/project-brief.md`, package/build/dependency manifests, Docker and compose files, Makefile/Taskfile sources, and YAML workflow files under `.github/workflows/`.
+
+Default retrieval limits are 128 KiB per source file, 1 MiB total source reads, 10 total results, 2 snippets per file, 600 characters per snippet, 2 context lines before and after a match, and 8,000 rendered snippet/summary characters. Results include rank, path, category or evidence, score, classification hints when present, line ranges when practical, and a bounded snippet or metadata summary.
+
+Retrieval uses deterministic lexical scoring with path, filename, phrase, category, and classification-hint boosts. It does not use embeddings, vector databases, semantic providers, LLM reranking, provider APIs, remote search, command output, or RAG answer generation.
+
+Safety boundaries:
+
+- no project commands, package managers, tests, builds, scripts, shells, agents, prompts, provider APIs, local model APIs, network APIs, source-control APIs, or workflow tools are executed;
+- no embeddings, vector databases, RAG answer generation, remote context, provider integration, prompt execution, agent execution, command verification, source-control automation, release automation, npm changes, Homebrew changes, `install.sh` changes, GoReleaser changes, or publishing behavior is introduced;
+- sensitive files such as `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `secrets.*`, and `credentials.*` are skipped;
+- heavy/generated folders such as `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/`, and `obj/` are skipped;
+- symlinks are not traversed;
+- path traversal, absolute paths, Windows drive paths, null-byte paths, and paths outside the project root are rejected;
+- raw full-file dumps are not printed.
 
 ### Brief a Project
 
