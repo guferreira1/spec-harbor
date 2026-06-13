@@ -55,12 +55,15 @@ The command suggestions are advisory. `specharbor workflow` does not execute com
 
 The workflow relates to existing commands as follows:
 
+- `context discover` optionally inspects bounded local repository sources and reports classified context signals before briefing or authoring.
 - `brief` optionally collects confirmed project context before authoring when repository context is missing or ambiguous.
 - `generate` creates or starts the OpenSpec change package for the Spec Author Agent.
 - `validate` checks required OpenSpec change files before review or implementation.
 - `prompt --role ...` prints prompts for Spec Author Agent, Architecture Reviewer Agent, Implementer Agent, Test Engineer Agent, and Change Reviewer Agent.
 - `review` checks local task checkbox completion and required change files.
 - `archive` explicitly archives an accepted change.
+
+`specharbor context discover` is read-only local discovery. It labels repository evidence as detected facts, conventional guesses as suggested assumptions, and existing project brief values as user-confirmed context. It does not execute commands, call provider APIs, perform remote discovery, build an index, run RAG, or inject context into generated prompts.
 
 `specharbor brief` writes `.specharbor/project-brief.md` only after interactive confirmation. The brief is explicit context collection, not repository indexing, RAG, provider integration, prompt injection, agent execution, source-control automation, or remote automation. Current role prompt generation does not automatically consume the project brief; that requires a future OpenSpec change.
 

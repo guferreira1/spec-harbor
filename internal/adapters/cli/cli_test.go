@@ -2686,6 +2686,151 @@ func TestExecuteScanReturnsZeroWhenReportPrinted(t *testing.T) {
 	}
 }
 
+func TestExecuteContextDiscoverPrintsStructuredReport(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	writeScanFile(t, root, "go.mod", "module example.com/project\n")
+	writeScanFile(t, root, "AGENTS.md", "# Agents\n\nUse Hexagonal Architecture.\n")
+	if err := os.MkdirAll(filepath.Join(root, "openspec", "specs", "architecture"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(openspec/specs/architecture) error = %v", err)
+	}
+	writeScanFile(t, root, "openspec/specs/architecture/spec.md", "# Architecture\n\nClean Architecture applies.\n")
+
+	var output bytes.Buffer
+	if err := execute([]string{"context", "discover"}, &output); err != nil {
+		t.Fatalf("execute(context discover) error = %v", err)
+	}
+
+	report := output.String()
+	for _, want := range []string{
+		"Detected project context:",
+		"User-confirmed context:",
+		"- none detected",
+		"Detected facts:",
+		"- Stack: Go",
+		"  Source: go.mod",
+		"  Classification: detected_fact",
+		"  Confidence: high",
+		"- Agent rules: AGENTS.md",
+		"- Architecture: Hexagonal Architecture",
+		"- Architecture: Clean Architecture",
+		"Suggested assumptions:",
+		"- Test command: go test ./...",
+		"  Classification: suggested_assumption",
+		"Notes:",
+	} {
+		if !strings.Contains(report, want) {
+			t.Fatalf("context discover output = %q, want %q", report, want)
+		}
+	}
+	if strings.Contains(report, "module example.com/project") {
+		t.Fatalf("context discover output dumped raw go.mod contents: %q", report)
+	}
+}
+
+func TestExecuteContextDiscoverPrintsConfirmedContextFirst(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	if err := os.MkdirAll(filepath.Join(root, ".specharbor"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(.specharbor) error = %v", err)
+	}
+	writeScanFile(t, root, ".specharbor/project-brief.md", `# Project Brief
+
+## Stack
+
+Answer: Go
+
+## Commands
+
+### Test
+
+Answer: go test ./...
+`)
+	writeScanFile(t, root, "go.mod", "module example.com/project\n")
+
+	var output bytes.Buffer
+	if err := execute([]string{"context", "discover"}, &output); err != nil {
+		t.Fatalf("execute(context discover) error = %v", err)
+	}
+
+	report := output.String()
+	confirmedIndex := strings.Index(report, "User-confirmed context:")
+	factsIndex := strings.Index(report, "Detected facts:")
+	if confirmedIndex == -1 || factsIndex == -1 || confirmedIndex > factsIndex {
+		t.Fatalf("context discover output = %q, want confirmed context before facts", report)
+	}
+	for _, want := range []string{
+		"- Stack: Go\n  Source: .specharbor/project-brief.md (Stack)\n  Classification: user_confirmed_context\n  Confidence: high",
+		"- Test command: go test ./...\n  Source: .specharbor/project-brief.md (Test)\n  Classification: user_confirmed_context\n  Confidence: high",
+	} {
+		if !strings.Contains(report, want) {
+			t.Fatalf("context discover output = %q, want %q", report, want)
+		}
+	}
+}
+
+func TestExecuteContextDiscoverPrintsEmptyReport(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	var output bytes.Buffer
+	if err := execute([]string{"context", "discover"}, &output); err != nil {
+		t.Fatalf("execute(context discover) error = %v", err)
+	}
+
+	want := `Detected project context:
+
+User-confirmed context:
+- none detected
+
+Detected facts:
+- none detected
+
+Suggested assumptions:
+- none detected
+
+Notes:
+- No supported context sources detected.
+`
+	if output.String() != want {
+		t.Fatalf("context discover output = %q, want %q", output.String(), want)
+	}
+}
+
+func TestExecuteContextRejectsInvalidArguments(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "missing subcommand", args: []string{"context"}, want: "context subcommand is required: discover"},
+		{name: "unsupported flag before subcommand", args: []string{"context", "--json"}, want: "unsupported flag: --json"},
+		{name: "unsupported subcommand", args: []string{"context", "update"}, want: "unsupported context subcommand: update"},
+		{name: "extra argument", args: []string{"context", "discover", "extra"}, want: "unexpected argument: extra"},
+		{name: "json flag", args: []string{"context", "discover", "--json"}, want: "unsupported flag: --json"},
+		{name: "path flag", args: []string{"context", "discover", "--path", "/tmp"}, want: "unsupported flag: --path"},
+		{name: "deep flag", args: []string{"context", "discover", "--deep"}, want: "unsupported flag: --deep"},
+		{name: "github flag", args: []string{"context", "discover", "--github"}, want: "unsupported flag: --github"},
+		{name: "rag flag", args: []string{"context", "discover", "--rag"}, want: "unsupported flag: --rag"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+
+			var output bytes.Buffer
+			err := execute(test.args, &output)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("execute(%v) error = %v, want %q", test.args, err, test.want)
+			}
+			if output.String() != "" {
+				t.Fatalf("execute(%v) output = %q, want empty", test.args, output.String())
+			}
+		})
+	}
+}
+
 func TestExecuteWorkflowPrintsRecommendedWorkflow(t *testing.T) {
 	root := t.TempDir()
 	t.Chdir(root)
