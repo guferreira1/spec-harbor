@@ -154,7 +154,7 @@ go run ./cmd/specharbor brief
 specharbor brief
 ```
 
-`brief` starts an interactive project briefing workflow for cases where repository context is missing, incomplete, or ambiguous. It accepts no positional arguments and no flags in this version. Unsupported flags such as `--force`, `--update`, `--overwrite`, `--json`, `--from-scan`, `--github`, or `--rag` are rejected.
+`brief` starts an interactive project briefing workflow for cases where repository context is missing, incomplete, or ambiguous. Without flags it accepts no positional arguments and writes only when `.specharbor/project-brief.md` is absent. Unsupported flags such as `--force`, `--overwrite`, `--json`, `--from-scan`, `--github`, or `--rag` are rejected.
 
 The command requires an interactive TTY. In CI, piped input, or other non-TTY contexts it fails before prompting or writing:
 
@@ -223,7 +223,30 @@ The file is deterministic, human-readable Markdown with these sections:
 
 User-provided answers, detected context, and assumptions are labeled separately. Discovery suggestions and detected context may be recorded separately in generated project briefs, but user-provided answers remain separate from detected context and assumptions. It never silently converts missing or ambiguous stack, architecture, command, or project decisions into facts.
 
-If `.specharbor/project-brief.md` already exists, `brief` refuses to merge, update, overwrite, or append to it and returns a clear out-of-scope message. Context-aware role prompt generation can read the existing brief through the local discovery boundary, but it does not merge, update, overwrite, or append to the brief.
+If `.specharbor/project-brief.md` already exists, `brief` without `--update` refuses to overwrite or append to it. Context-aware role prompt generation can read the existing brief through the local discovery boundary, but it does not merge, update, overwrite, or append to the brief.
+
+Update an existing project brief explicitly with:
+
+```bash
+go run ./cmd/specharbor brief --update
+specharbor brief --update
+```
+
+`brief --update` requires an interactive TTY and an existing `.specharbor/project-brief.md`. It reads the current brief, reuses the existing local `context discover` use case for detected facts and suggested assumptions, and builds an update proposal. It does not duplicate discovery logic and does not execute commands.
+
+The update flow is confirmation-first:
+
+- existing user-confirmed values are kept by default;
+- detected facts are evidence only until explicitly accepted;
+- suggested assumptions remain assumptions unless explicitly accepted;
+- conflicts prefer existing confirmed context by default;
+- stale confirmed values and stale assumptions are surfaced but not deleted automatically;
+- the user can keep an existing value, enter a custom replacement, accept a detected fact, accept a suggested assumption, ignore detected facts for a field, keep stale assumptions, remove stale assumptions, or cancel;
+- a reviewable preview is printed before writing;
+- final confirmation is required before writing;
+- cancellation or EOF leaves the existing brief unchanged.
+
+Updated Markdown remains deterministic and keeps user-confirmed context, detected facts, and suggested assumptions separate. Safe write behavior avoids partial updates. The command does not perform repository-wide indexing, retrieval, snippet ranking, embeddings, vector databases, RAG, GitHub remote context, provider APIs, command verification, project command execution, agent execution, prompt execution, source-control automation, release automation, npm changes, Homebrew changes, `install.sh` changes, GoReleaser changes, or publishing flows.
 
 ### Show the Recommended Workflow
 

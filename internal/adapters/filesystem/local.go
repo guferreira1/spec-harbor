@@ -199,6 +199,17 @@ func (fileSystem *LocalFileSystem) WriteFile(root string, relativePath string, c
 	return replaceFileWithoutFollowingSymlink(fullPath, relativePath, contents)
 }
 
+func (fileSystem *LocalFileSystem) WriteFileSafely(root string, relativePath string, contents string) error {
+	fullPath, err := fileSystem.safeFullPath(root, relativePath)
+	if err != nil {
+		return err
+	}
+	if err := fileSystem.EnsureSafeWriteTarget(root, relativePath); err != nil {
+		return err
+	}
+	return replaceFileAtomicallyWithoutFollowingSymlink(fullPath, relativePath, contents)
+}
+
 func (fileSystem *LocalFileSystem) EnsureSafeWriteTarget(root string, relativePath string) error {
 	safeRelativePath, fullPath, err := fileSystem.safeFullPathParts(root, relativePath)
 	if err != nil {
@@ -398,4 +409,54 @@ func closeWithError(file *os.File, err error) error {
 		return errors.Join(err, closeErr)
 	}
 	return err
+}
+
+func replaceFileAtomicallyWithoutFollowingSymlink(fullPath string, relativePath string, contents string) error {
+	initialInfo, err := os.Lstat(fullPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err == nil && initialInfo.Mode()&os.ModeSymlink != 0 {
+		return unsafeGeneratedSymlinkTargetError(relativePath)
+	}
+
+	parent := filepath.Dir(fullPath)
+	temp, err := os.CreateTemp(parent, "."+filepath.Base(fullPath)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tempPath := temp.Name()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = os.Remove(tempPath)
+		}
+	}()
+
+	if err := temp.Chmod(0o644); err != nil {
+		return closeWithError(temp, err)
+	}
+	if _, err := io.WriteString(temp, contents); err != nil {
+		return closeWithError(temp, err)
+	}
+	if err := temp.Close(); err != nil {
+		return err
+	}
+
+	latestInfo, err := os.Lstat(fullPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err == nil && latestInfo.Mode()&os.ModeSymlink != 0 {
+		return unsafeGeneratedSymlinkTargetError(relativePath)
+	}
+	if initialInfo != nil && latestInfo != nil && !os.SameFile(initialInfo, latestInfo) {
+		return fmt.Errorf("target file changed during safety check: %s", relativePath)
+	}
+
+	if err := os.Rename(tempPath, fullPath); err != nil {
+		return err
+	}
+	cleanup = false
+	return nil
 }

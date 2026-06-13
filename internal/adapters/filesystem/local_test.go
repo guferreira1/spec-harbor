@@ -16,6 +16,7 @@ var _ ports.ArchiveFileSystem = (*LocalFileSystem)(nil)
 var _ ports.ReviewFileSystem = (*LocalFileSystem)(nil)
 var _ ports.ScanFileSystem = (*LocalFileSystem)(nil)
 var _ ports.ConfigFileSystem = (*LocalFileSystem)(nil)
+var _ ports.ProjectBriefUpdateFileSystem = (*LocalFileSystem)(nil)
 
 func TestLocalFileSystemListsImmediateEntryNamesWithoutRecursion(t *testing.T) {
 	root := t.TempDir()
@@ -138,6 +139,58 @@ func TestLocalFileSystemDoesNotOverwriteExistingFiles(t *testing.T) {
 	}
 	if string(contents) != "original" {
 		t.Fatalf("file contents = %q, want %q", string(contents), "original")
+	}
+}
+
+func TestLocalFileSystemWriteFileSafelyReplacesExistingFile(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+	if err := fileSystem.CreateDirectory(root, ".specharbor"); err != nil {
+		t.Fatalf("CreateDirectory() error = %v", err)
+	}
+	filePath := filepath.Join(root, ".specharbor", "project-brief.md")
+	if err := os.WriteFile(filePath, []byte("original"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if err := fileSystem.WriteFileSafely(root, ".specharbor/project-brief.md", "updated"); err != nil {
+		t.Fatalf("WriteFileSafely() error = %v", err)
+	}
+
+	contents, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if string(contents) != "updated" {
+		t.Fatalf("contents = %q, want updated", string(contents))
+	}
+}
+
+func TestLocalFileSystemWriteFileSafelyRejectsSymlinkTarget(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+	if err := fileSystem.CreateDirectory(root, ".specharbor"); err != nil {
+		t.Fatalf("CreateDirectory() error = %v", err)
+	}
+	outside := filepath.Join(root, "outside.md")
+	if err := os.WriteFile(outside, []byte("outside"), 0o644); err != nil {
+		t.Fatalf("WriteFile(outside) error = %v", err)
+	}
+	target := filepath.Join(root, ".specharbor", "project-brief.md")
+	if err := os.Symlink(outside, target); err != nil {
+		t.Skipf("Symlink() unsupported: %v", err)
+	}
+
+	err := fileSystem.WriteFileSafely(root, ".specharbor/project-brief.md", "updated")
+	if err == nil || !strings.Contains(err.Error(), "symlink target paths are not allowed") {
+		t.Fatalf("WriteFileSafely() error = %v, want symlink rejection", err)
+	}
+	contents, err := os.ReadFile(outside)
+	if err != nil {
+		t.Fatalf("ReadFile(outside) error = %v", err)
+	}
+	if string(contents) != "outside" {
+		t.Fatalf("outside contents = %q, want preserved", string(contents))
 	}
 }
 

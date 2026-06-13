@@ -18,8 +18,9 @@ func TestExecuteBriefRejectsArgumentsAndFlags(t *testing.T) {
 	}{
 		{name: "positional", args: []string{"brief", "extra"}, want: "unexpected argument: extra"},
 		{name: "force flag", args: []string{"brief", "--force"}, want: "unsupported flag: --force"},
-		{name: "update flag", args: []string{"brief", "--update"}, want: "unsupported flag: --update"},
+		{name: "overwrite flag", args: []string{"brief", "--overwrite"}, want: "unsupported flag: --overwrite"},
 		{name: "json flag", args: []string{"brief", "--json"}, want: "unsupported flag: --json"},
+		{name: "duplicate update flag", args: []string{"brief", "--update", "--update"}, want: "duplicate flag: --update"},
 	}
 
 	for _, test := range tests {
@@ -301,6 +302,82 @@ func TestExecuteBriefDoesNotOverwriteExistingProjectBrief(t *testing.T) {
 	}
 }
 
+func TestExecuteBriefUpdateRequiresExistingProjectBrief(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	var output bytes.Buffer
+	terminal := &cliFakeInteractiveTerminal{isTTY: true, output: &output}
+	err := executeWithTerminal([]string{"brief", "--update"}, &output, terminal)
+	if err == nil || !strings.Contains(err.Error(), "project brief does not exist at .specharbor/project-brief.md") {
+		t.Fatalf("execute brief --update error = %v, want missing brief error", err)
+	}
+	if terminal.reads != 0 {
+		t.Fatalf("terminal reads = %d, want 0", terminal.reads)
+	}
+	assertPathDoesNotExist(t, root, "openspec")
+}
+
+func TestExecuteBriefUpdateCancellationWritesNoFile(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	writeCLIUpdateProjectBrief(t, root, "Go")
+	original := readProjectBrief(t, root)
+
+	inputs := append(defaultProjectBriefUpdateKeepInputs(), "n")
+	var output bytes.Buffer
+	terminal := &cliFakeInteractiveTerminal{isTTY: true, output: &output, inputs: inputs}
+	err := executeWithTerminal([]string{"brief", "--update"}, &output, terminal)
+	if err == nil || err.Error() != "operation cancelled" {
+		t.Fatalf("execute brief --update cancel error = %v, want operation cancelled\noutput:\n%s", err, output.String())
+	}
+	if !strings.Contains(output.String(), "Project brief update preview:") {
+		t.Fatalf("output = %q, want update preview", output.String())
+	}
+	if !strings.Contains(output.String(), "Write updated project brief? [y/N]:") {
+		t.Fatalf("output = %q, want final confirmation", output.String())
+	}
+	if got := readProjectBrief(t, root); got != original {
+		t.Fatalf("project brief changed after cancellation:\n%s", got)
+	}
+}
+
+func TestExecuteBriefUpdateAcceptsDetectedFactAfterConfirmation(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	writeCLIUpdateProjectBrief(t, root, "Node.js")
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/project\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(go.mod) error = %v", err)
+	}
+
+	inputs := []string{
+		"1",
+		"1",
+		"1",
+		"4",
+		"1",
+		"1",
+		"1",
+		"1",
+		"1",
+		"y",
+	}
+	var output bytes.Buffer
+	terminal := &cliFakeInteractiveTerminal{isTTY: true, output: &output, inputs: inputs}
+	err := executeWithTerminal([]string{"brief", "--update"}, &output, terminal)
+	if err != nil {
+		t.Fatalf("execute brief --update error = %v\noutput:\n%s", err, output.String())
+	}
+
+	contents := readProjectBrief(t, root)
+	if !strings.Contains(contents, "## Stack\n\nAnswer: Go\n\nSource: user-provided answer") {
+		t.Fatalf("updated brief = %q, want accepted detected Go stack", contents)
+	}
+	if !strings.Contains(output.String(), "SpecHarbor project brief updated.") {
+		t.Fatalf("output = %q, want update success", output.String())
+	}
+}
+
 func TestExecuteBriefKeepsVersionCommandWorking(t *testing.T) {
 	var output bytes.Buffer
 	if err := execute([]string{"version"}, &output); err != nil {
@@ -347,4 +424,116 @@ func readProjectBrief(t *testing.T, root string) string {
 		t.Fatalf("ReadFile(project-brief.md) error = %v", err)
 	}
 	return string(contents)
+}
+
+func writeCLIUpdateProjectBrief(t *testing.T, root string, stack string) {
+	t.Helper()
+
+	if err := os.MkdirAll(filepath.Join(root, ".specharbor"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(.specharbor) error = %v", err)
+	}
+	contents := `# Project Brief
+
+## Project type
+
+Answer: CLI/tooling project
+
+Source: user-provided answer
+
+## Purpose
+
+Answer: Developer productivity tool
+
+Source: user-provided answer
+
+## Target users
+
+Answer: Developers or platform engineers
+
+Source: user-provided answer
+
+## Stack
+
+Answer: ` + stack + `
+
+Source: user-provided answer
+
+## Architecture
+
+Answer: Clean Architecture / Hexagonal
+
+Source: user-provided answer
+
+## Commands
+
+### Install
+
+Answer: go mod download
+
+Source: user-provided answer
+
+### Test
+
+Answer: go test ./...
+
+Source: user-provided answer
+
+### Build
+
+Answer: go build ./...
+
+Source: user-provided answer
+
+### Run
+
+Answer: go run ./cmd/specharbor
+
+Source: user-provided answer
+
+## Agent behavior
+
+Answer: Ask before assuming
+
+Source: user-provided answer
+
+## Context sources
+
+### User-provided answers
+
+- Project type: CLI/tooling project (Source: user-provided answer)
+- Purpose: Developer productivity tool (Source: user-provided answer)
+- Target users: Developers or platform engineers (Source: user-provided answer)
+- Stack: ` + stack + ` (Source: user-provided answer)
+- Architecture: Clean Architecture / Hexagonal (Source: user-provided answer)
+- Install command: go mod download (Source: user-provided answer)
+- Test command: go test ./... (Source: user-provided answer)
+- Build command: go build ./... (Source: user-provided answer)
+- Run command: go run ./cmd/specharbor (Source: user-provided answer)
+- Agent behavior: Ask before assuming (Source: user-provided answer)
+
+### Detected context
+
+None recorded.
+
+## Assumptions
+
+None recorded.
+`
+	if err := os.WriteFile(filepath.Join(root, ".specharbor", "project-brief.md"), []byte(contents), 0o644); err != nil {
+		t.Fatalf("WriteFile(project-brief.md) error = %v", err)
+	}
+}
+
+func defaultProjectBriefUpdateKeepInputs() []string {
+	return []string{
+		"1",
+		"1",
+		"1",
+		"1",
+		"1",
+		"1",
+		"1",
+		"1",
+		"1",
+	}
 }
