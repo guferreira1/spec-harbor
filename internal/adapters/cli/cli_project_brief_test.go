@@ -318,6 +318,66 @@ func TestExecuteBriefUpdateRequiresExistingProjectBrief(t *testing.T) {
 	assertPathDoesNotExist(t, root, "openspec")
 }
 
+func TestExecuteBriefUpdateRejectsSymlinkedProjectBriefParentWithoutPrintingOutsideContent(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	outsideRoot := t.TempDir()
+	writeCLIUpdateProjectBrief(t, outsideRoot, "Outside secret project context")
+	outsideBriefDirectory := filepath.Join(outsideRoot, ".specharbor")
+	outsideBriefPath := filepath.Join(outsideBriefDirectory, "project-brief.md")
+	before := readFile(t, outsideBriefPath)
+	if err := os.Symlink(outsideBriefDirectory, filepath.Join(root, ".specharbor")); err != nil {
+		t.Skipf("Symlink() unsupported: %v", err)
+	}
+
+	var output bytes.Buffer
+	terminal := &cliFakeInteractiveTerminal{isTTY: true, output: &output, inputs: defaultProjectBriefUpdateKeepInputs()}
+	err := executeWithTerminal([]string{"brief", "--update"}, &output, terminal)
+	if err == nil || !strings.Contains(err.Error(), "symlink paths are not allowed") || !strings.Contains(err.Error(), ".specharbor") {
+		t.Fatalf("execute brief --update error = %v, want symlink parent rejection", err)
+	}
+	if terminal.reads != 0 {
+		t.Fatalf("terminal reads = %d, want 0", terminal.reads)
+	}
+	if strings.Contains(output.String(), "Outside secret project context") {
+		t.Fatalf("output leaked outside project content:\n%s", output.String())
+	}
+	if got := readFile(t, outsideBriefPath); got != before {
+		t.Fatalf("outside project brief changed:\n%s", got)
+	}
+}
+
+func TestExecuteBriefUpdateRejectsSymlinkedProjectBriefTargetWithoutPrintingOutsideContent(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	if err := os.MkdirAll(filepath.Join(root, ".specharbor"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(.specharbor) error = %v", err)
+	}
+	outsideRoot := t.TempDir()
+	writeCLIUpdateProjectBrief(t, outsideRoot, "Outside secret project context")
+	outsideBriefPath := filepath.Join(outsideRoot, ".specharbor", "project-brief.md")
+	before := readFile(t, outsideBriefPath)
+	if err := os.Symlink(outsideBriefPath, filepath.Join(root, ".specharbor", "project-brief.md")); err != nil {
+		t.Skipf("Symlink() unsupported: %v", err)
+	}
+
+	var output bytes.Buffer
+	terminal := &cliFakeInteractiveTerminal{isTTY: true, output: &output, inputs: defaultProjectBriefUpdateKeepInputs()}
+	err := executeWithTerminal([]string{"brief", "--update"}, &output, terminal)
+	if err == nil || !strings.Contains(err.Error(), "symlink paths are not allowed") || !strings.Contains(err.Error(), ".specharbor/project-brief.md") {
+		t.Fatalf("execute brief --update error = %v, want symlink target rejection", err)
+	}
+	if terminal.reads != 0 {
+		t.Fatalf("terminal reads = %d, want 0", terminal.reads)
+	}
+	if strings.Contains(output.String(), "Outside secret project context") {
+		t.Fatalf("output leaked outside project content:\n%s", output.String())
+	}
+	if got := readFile(t, outsideBriefPath); got != before {
+		t.Fatalf("outside project brief changed:\n%s", got)
+	}
+}
+
 func TestExecuteBriefUpdateCancellationWritesNoFile(t *testing.T) {
 	root := t.TempDir()
 	t.Chdir(root)
@@ -419,9 +479,15 @@ func defaultProjectBriefPromptInputs() []string {
 func readProjectBrief(t *testing.T, root string) string {
 	t.Helper()
 
-	contents, err := os.ReadFile(filepath.Join(root, ".specharbor", "project-brief.md"))
+	return readFile(t, filepath.Join(root, ".specharbor", "project-brief.md"))
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+
+	contents, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("ReadFile(project-brief.md) error = %v", err)
+		t.Fatalf("ReadFile(%s) error = %v", path, err)
 	}
 	return string(contents)
 }

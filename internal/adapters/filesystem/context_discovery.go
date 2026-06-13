@@ -114,7 +114,7 @@ func (fileSystem *ContextDiscoveryFileSystem) ReadFile(
 		return "", fmt.Errorf("context discovery file exceeds %d bytes: %s", maxBytes, relativePath)
 	}
 
-	contents, err := readContextFileWithoutFollowingSymlink(pathInfo.fullPath, pathInfo.info, relativePath)
+	contents, err := readFileWithoutFollowingSymlink(pathInfo.fullPath, pathInfo.info, relativePath)
 	if err != nil {
 		return "", err
 	}
@@ -205,7 +205,7 @@ func pathInfoFromLstat(
 	}, nil
 }
 
-func readContextFileWithoutFollowingSymlink(
+func readFileWithoutFollowingSymlink(
 	fullPath string,
 	expectedInfo os.FileInfo,
 	relativePath string,

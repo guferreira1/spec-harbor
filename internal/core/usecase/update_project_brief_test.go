@@ -48,6 +48,9 @@ func TestUpdateProjectBriefFinalConfirmedFalseWritesNothing(t *testing.T) {
 	if len(fileSystem.writtenFiles) != 0 {
 		t.Fatalf("written files = %v, want none", fileSystem.writtenFiles)
 	}
+	if len(fileSystem.safelyReadFiles) != 1 || fileSystem.safelyReadFiles[0] != projectBriefRelativePath {
+		t.Fatalf("safely read files = %v, want project brief safe read", fileSystem.safelyReadFiles)
+	}
 	if !strings.Contains(result.Markdown, "Answer: Node.js") {
 		t.Fatalf("preview markdown = %q, want accepted value", result.Markdown)
 	}

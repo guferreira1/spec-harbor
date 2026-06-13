@@ -194,6 +194,92 @@ func TestLocalFileSystemWriteFileSafelyRejectsSymlinkTarget(t *testing.T) {
 	}
 }
 
+func TestLocalFileSystemReadFileSafelyReadsProjectBrief(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+	if err := os.MkdirAll(filepath.Join(root, ".specharbor"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(.specharbor) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".specharbor", "project-brief.md"), []byte("brief"), 0o644); err != nil {
+		t.Fatalf("WriteFile(project-brief.md) error = %v", err)
+	}
+
+	contents, err := fileSystem.ReadFileSafely(root, ".specharbor/project-brief.md")
+	if err != nil {
+		t.Fatalf("ReadFileSafely() error = %v", err)
+	}
+	if contents != "brief" {
+		t.Fatalf("ReadFileSafely() = %q, want brief", contents)
+	}
+}
+
+func TestLocalFileSystemReadFileSafelyRejectsSymlinkParentDirectory(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "project-brief.md"), []byte("outside secret"), 0o644); err != nil {
+		t.Fatalf("WriteFile(outside project-brief.md) error = %v", err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, ".specharbor")); err != nil {
+		t.Skipf("Symlink() unsupported: %v", err)
+	}
+
+	contents, err := fileSystem.ReadFileSafely(root, ".specharbor/project-brief.md")
+	if err == nil || !strings.Contains(err.Error(), "symlink paths are not allowed") {
+		t.Fatalf("ReadFileSafely() = %q, %v; want symlink parent rejection", contents, err)
+	}
+	if strings.Contains(contents, "outside secret") {
+		t.Fatalf("ReadFileSafely() returned outside content: %q", contents)
+	}
+}
+
+func TestLocalFileSystemReadFileSafelyRejectsSymlinkTarget(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+	if err := os.MkdirAll(filepath.Join(root, ".specharbor"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(.specharbor) error = %v", err)
+	}
+	outside := filepath.Join(t.TempDir(), "project-brief.md")
+	if err := os.WriteFile(outside, []byte("outside secret"), 0o644); err != nil {
+		t.Fatalf("WriteFile(outside project-brief.md) error = %v", err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, ".specharbor", "project-brief.md")); err != nil {
+		t.Skipf("Symlink() unsupported: %v", err)
+	}
+
+	contents, err := fileSystem.ReadFileSafely(root, ".specharbor/project-brief.md")
+	if err == nil || !strings.Contains(err.Error(), "symlink paths are not allowed") {
+		t.Fatalf("ReadFileSafely() = %q, %v; want symlink target rejection", contents, err)
+	}
+	if strings.Contains(contents, "outside secret") {
+		t.Fatalf("ReadFileSafely() returned outside content: %q", contents)
+	}
+}
+
+func TestLocalFileSystemReadFileSafelyRejectsUnsafeProjectBriefPaths(t *testing.T) {
+	root := t.TempDir()
+	fileSystem := NewLocalFileSystem()
+
+	tests := []struct {
+		name         string
+		relativePath string
+	}{
+		{name: "path traversal", relativePath: "../project-brief.md"},
+		{name: "nested traversal", relativePath: ".specharbor/../project-brief.md"},
+		{name: "absolute unix", relativePath: "/tmp/project-brief.md"},
+		{name: "absolute windows", relativePath: `C:\tmp\project-brief.md`},
+		{name: "null byte", relativePath: ".specharbor/project-brief.md\x00"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := fileSystem.ReadFileSafely(root, test.relativePath); err == nil {
+				t.Fatalf("ReadFileSafely(%q) error = nil, want unsafe path rejection", test.relativePath)
+			}
+		})
+	}
+}
+
 func TestLocalFileSystemDistinguishesMissingFilesAndDirectories(t *testing.T) {
 	root := t.TempDir()
 	fileSystem := NewLocalFileSystem()

@@ -130,7 +130,7 @@ func (useCase *UpdateProjectBrief) readParsedBriefAndDiscovery(
 		return domain.ParsedProjectBrief{}, domain.ContextDiscoveryResult{}, fmt.Errorf("project brief does not exist at %s; run specharbor brief first", projectBriefRelativePath)
 	}
 
-	contents, err := useCase.fileSystem.ReadFile(projectRoot, projectBriefRelativePath)
+	contents, err := useCase.fileSystem.ReadFileSafely(projectRoot, projectBriefRelativePath)
 	if err != nil {
 		return domain.ParsedProjectBrief{}, domain.ContextDiscoveryResult{}, fmt.Errorf("read file %s: %w", projectBriefRelativePath, err)
 	}

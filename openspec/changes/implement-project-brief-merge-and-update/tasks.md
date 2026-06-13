@@ -93,3 +93,8 @@
 - [x] Inspect `git status --short --untracked-files=all`.
 - [x] Inspect `git diff --stat`.
 - [x] Inspect `git diff`.
+
+## PR Review Follow-up
+
+- [x] Harden project brief update reads so symlink parent directories and symlink targets are rejected before parsing.
+- [x] Add regression tests proving unsafe project brief reads do not print or use outside project content.

@@ -13,6 +13,6 @@ type ProjectBriefFileSystem interface {
 // by project brief updates.
 type ProjectBriefUpdateFileSystem interface {
 	FileExists(root string, relativePath string) (bool, error)
-	ReadFile(root string, relativePath string) (string, error)
+	ReadFileSafely(root string, relativePath string) (string, error)
 	WriteFileSafely(root string, relativePath string, contents string) error
 }

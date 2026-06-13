@@ -104,6 +104,22 @@ func (fileSystem *LocalFileSystem) ReadFile(root string, relativePath string) (s
 	return string(contents), nil
 }
 
+func (fileSystem *LocalFileSystem) ReadFileSafely(root string, relativePath string) (string, error) {
+	fullPath, info, err := fileSystem.safeExistingReadTarget(root, relativePath)
+	if err != nil {
+		return "", err
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("path is a directory: %s", relativePath)
+	}
+
+	contents, err := readFileWithoutFollowingSymlink(fullPath, info, relativePath)
+	if err != nil {
+		return "", err
+	}
+	return string(contents), nil
+}
+
 func (fileSystem *LocalFileSystem) ReadSourceFile(sourcePath string) (string, error) {
 	if strings.TrimSpace(sourcePath) == "" {
 		return "", errors.New("source file path is required")
@@ -285,6 +301,49 @@ func (fileSystem *LocalFileSystem) ensureSafeExistingParents(root string, safeRe
 	}
 
 	return nil
+}
+
+func (fileSystem *LocalFileSystem) safeExistingReadTarget(
+	root string,
+	relativePath string,
+) (string, os.FileInfo, error) {
+	safeRelativePath, fullPath, err := fileSystem.safeFullPathParts(root, relativePath)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if safeRelativePath == "." {
+		info, err := os.Lstat(fullPath)
+		if err != nil {
+			return "", nil, err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return "", nil, unsafeSymlinkPathError(safeRelativePath)
+		}
+		return fullPath, info, nil
+	}
+
+	currentPath := ""
+	segments := strings.Split(safeRelativePath, "/")
+	for index, segment := range segments {
+		currentPath = path.Join(currentPath, segment)
+		componentPath := filepath.Join(root, filepath.FromSlash(currentPath))
+		info, err := os.Lstat(componentPath)
+		if err != nil {
+			return "", nil, err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return "", nil, unsafeSymlinkPathError(currentPath)
+		}
+		if index < len(segments)-1 && !info.IsDir() {
+			return "", nil, fmt.Errorf("parent path is not a directory: %s", currentPath)
+		}
+		if index == len(segments)-1 {
+			return fullPath, info, nil
+		}
+	}
+
+	return "", nil, fmt.Errorf("path does not exist: %s", relativePath)
 }
 
 func (fileSystem *LocalFileSystem) safeFullPath(root string, relativePath string) (string, error) {
