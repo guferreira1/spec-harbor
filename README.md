@@ -64,6 +64,7 @@ go run ./cmd/specharbor context discover
 go run ./cmd/specharbor context index
 go run ./cmd/specharbor context index --write
 go run ./cmd/specharbor context index --check
+go run ./cmd/specharbor context retrieve --query "architecture"
 go run ./cmd/specharbor brief
 go run ./cmd/specharbor brief --update
 go run ./cmd/specharbor generate add-example-feature --interactive
@@ -134,6 +135,14 @@ specharbor context index --check
 ```
 
 `context index` builds a deterministic metadata-only inventory for supported local context sources. Without flags it prints a concise report and writes nothing. `--write` safely persists generated local state at `.specharbor/context-index.json`, which is ignored by source control. `--check` rebuilds current metadata and reports whether the stored index is current, stale, missing, or invalid. The index stores relative paths, source categories, file types, size, hash, modified-time metadata, retrieval support flags, and classification hints. It never stores raw file contents, snippets, secrets, embeddings, vectors, command output, remote context, provider output, or confirmed project context, and it does not implement retrieval, ranking, RAG, command execution, prompt execution, agent execution, or source-control automation.
+
+Deterministic local context retrieval is available as:
+
+```bash
+specharbor context retrieve --query "architecture"
+```
+
+`context retrieve` requires a current `.specharbor/context-index.json` written by `specharbor context index --write`, then reads only supported indexed local sources with bounded file, snippet, result, and output limits. Results are lexical, local/offline, source-attributed, and include bounded snippets or metadata summaries. Retrieval is not confirmed project context, RAG answer generation, embedding search, vector storage, provider/API behavior, remote context, command execution, prompt execution, agent execution, or source-control automation.
 
 Interactive project briefing is available as:
 
@@ -223,6 +232,7 @@ Implemented:
 - Stack-agnostic local project scanning.
 - Deterministic local context discovery with classified facts, assumptions, confirmed context, confidence, and source evidence.
 - Deterministic local repository context indexing with metadata-only inventory at `.specharbor/context-index.json`.
+- Deterministic local context retrieval over current indexed local sources with bounded snippets and source attribution.
 - Interactive project briefing that writes `.specharbor/project-brief.md` after confirmation.
 - Confirmation-first project brief update with conflict/stale review and safe writes.
 - Interactive generation prompts for blank, built-in template, custom template, config template, and hybrid paths.

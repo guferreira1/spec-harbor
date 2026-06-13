@@ -1,0 +1,190 @@
+# Acceptance Criteria: Implement Local Context Retrieval
+
+- `specharbor context retrieve --query "<query>"` is implemented.
+- The command shape is nested under the existing `context` command group.
+- The command requires an explicit `--query` flag.
+- Missing query input is rejected.
+- Empty query input is rejected.
+- Queries longer than 512 characters are rejected.
+- Query normalization is deterministic.
+- Query terms are bounded.
+- Positional query arguments are rejected.
+- Duplicate query flags are rejected.
+- Unsupported flags are rejected.
+- `--github` is rejected.
+- `--remote` is rejected.
+- `--rag` is rejected.
+- `--embed` is rejected.
+- `--provider` is rejected.
+- `--json` is rejected.
+- `--execute` is rejected.
+- `--agent` is rejected.
+- `--deep` is rejected.
+- Retrieval requires `.specharbor/context-index.json`.
+- Missing index behavior fails safely.
+- Missing index behavior tells the user to run `specharbor context index --write`.
+- Invalid index behavior fails safely.
+- Unsupported schema behavior fails safely.
+- Unreadable index behavior fails safely.
+- Stale index behavior fails safely.
+- Stale index behavior includes bounded stale reason summaries when available.
+- Truncated index behavior fails safely.
+- A source file missing after index write is treated as stale before snippet reads.
+- Retrieval does not write `.specharbor/context-index.json`.
+- Retrieval does not write a retrieval cache.
+- Retrieval does not write retrieval output files.
+- Retrieval uses only supported local sources represented by the repository context index.
+- Retrieval does not duplicate context discovery traversal logic.
+- Retrieval skips entries not marked `supported_for_retrieval` or reports them as metadata-only if implemented.
+- Retrieval never indexes or retrieves `.specharbor/context-index.json`.
+- `AGENTS.md` can be retrieved when indexed and matching.
+- `README.md` can be retrieved when indexed and matching.
+- `CONTRIBUTING.md` can be retrieved when indexed and matching.
+- `docs/` Markdown files can be retrieved when indexed and matching.
+- `openspec/project.md` can be retrieved when indexed and matching.
+- `openspec/specs/` Markdown files can be retrieved when indexed and matching.
+- `.specharbor/rules/` Markdown files can be retrieved when indexed and matching.
+- `.specharbor/project-brief.md` can be retrieved when indexed and matching.
+- Package manifests can be retrieved as bounded snippets when indexed and matching.
+- Build manifests can be retrieved as bounded snippets when indexed and matching.
+- Dependency manifests can be retrieved as bounded snippets when indexed and matching.
+- Docker and compose files can be retrieved as bounded snippets when indexed and matching.
+- Makefile and Taskfile sources can be retrieved as bounded snippets when indexed and matching.
+- `.github/workflows/` YAML files can be retrieved as bounded snippets when indexed and matching.
+- Sensitive files are skipped.
+- `.env` files are skipped.
+- `.env.*` files are skipped.
+- `*.pem` files are skipped.
+- `*.key` files are skipped.
+- `id_rsa` is skipped.
+- `id_ed25519` is skipped.
+- `secrets.*` files are skipped.
+- `credentials.*` files are skipped.
+- Heavy or generated folders are skipped.
+- `.git/` is skipped.
+- `node_modules/` is skipped.
+- `dist/` is skipped.
+- `build/` is skipped.
+- `target/` is skipped.
+- `vendor/` is skipped.
+- `coverage/` is skipped.
+- `.tmp/` is skipped.
+- `.cache/` is skipped.
+- `.next/` is skipped.
+- `.nuxt/` is skipped.
+- `out/` is skipped.
+- `bin/` is skipped.
+- `obj/` is skipped.
+- Symlink files are not followed.
+- Symlink directories are not followed.
+- Intermediate symlink path components are not followed.
+- Path traversal is rejected.
+- Absolute paths are rejected.
+- Windows drive paths are rejected.
+- Null-byte paths are rejected.
+- Retrieval does not traverse outside the project root.
+- Source reads are bounded to 128 KiB per file by default.
+- Total source reads are bounded to 1 MiB by default.
+- Snippets are bounded to 600 characters by default.
+- At most 2 snippets per file are retained by default.
+- At most 10 total results are returned by default.
+- Rendered snippets and summaries are bounded to 8,000 characters by default.
+- Snippets include 1-based line ranges when practical.
+- Snippets use bounded context windows around matching lines.
+- Retrieval never switches into raw whole-file dump mode.
+- Retrieval does not leak sensitive file contents.
+- Ranking is deterministic.
+- Ranking uses lexical token matching.
+- Ranking may use exact phrase boosts.
+- Ranking may use source category priority.
+- Ranking may use filename and path boosts.
+- Ranking may use project brief and OpenSpec priority.
+- Ranking may use classification hints.
+- Tie-breaking is deterministic.
+- Tie-breaking prefers higher score.
+- Tie-breaking then prefers higher source category priority.
+- Tie-breaking then uses path lexicographically.
+- Tie-breaking then uses starting line number.
+- Tie-breaking then uses snippet text lexicographically.
+- Output includes the normalized query.
+- Output includes the index path.
+- Output includes the index status.
+- Output includes result count.
+- Each result includes rank.
+- Each result includes path.
+- Each result includes source category or evidence category.
+- Each result includes score.
+- Each snippet result includes line range metadata when practical.
+- Each result includes a bounded snippet or metadata summary.
+- Each result includes classification hints when present.
+- No-results behavior is safe and concise.
+- CLI reports do not print skipped or sensitive file contents.
+- Domain code owns query, retrieval result, snippet, scoring, ranking, limits, and tie-breaking models.
+- Core/usecase orchestrates index loading, freshness checking, local source reads, snippet extraction, ranking, and report assembly.
+- Filesystem reads go through port and adapter boundaries.
+- CLI owns command parsing and user-facing formatting only.
+- CLI does not contain retrieval or ranking rules.
+- Core does not import adapters.
+- Use cases depend on interfaces.
+- Existing repository context index models are reused where practical.
+- Existing safe path and symlink logic is reused or aligned.
+- Existing `specharbor brief` behavior is preserved.
+- Existing `specharbor brief --update` behavior is preserved.
+- Existing `specharbor context discover` behavior is preserved.
+- Existing `specharbor context index` behavior is preserved.
+- Existing context-aware `specharbor prompt` behavior is preserved.
+- Existing `specharbor scan` behavior is preserved.
+- Existing final decision labels remain exact.
+- Retrieval results are not treated as confirmed project context.
+- Prompt generation does not automatically inject retrieval results in this change.
+- Embeddings are not introduced.
+- Vector databases are not introduced.
+- Semantic search providers are not introduced.
+- RAG answer generation is not introduced.
+- LLM calls are not introduced.
+- Provider APIs are not introduced.
+- Local model APIs are not introduced.
+- GitHub remote context is not introduced.
+- GitLab or Bitbucket remote context is not introduced.
+- Network APIs are not introduced.
+- Automatic command verification is not introduced.
+- Automatic project command execution is not introduced.
+- Prompt execution is not introduced.
+- Agent execution is not introduced.
+- Source-control automation is not introduced.
+- Release automation is not introduced.
+- npm files are not changed.
+- Homebrew files are not changed.
+- `install.sh` is not changed.
+- GoReleaser files are not changed.
+- Publishing flows are not changed.
+- Tests cover query validation and normalization.
+- Tests cover missing and empty query rejection.
+- Tests cover bounded query length.
+- Tests cover missing, stale, invalid, unsupported-schema, unreadable, and truncated index behavior.
+- Tests cover supported local source retrieval.
+- Tests cover unsupported source skipping.
+- Tests cover sensitive file skipping.
+- Tests cover symlink traversal blocking.
+- Tests cover unsafe path rejection.
+- Tests cover bounded file reads.
+- Tests cover snippet extraction limits.
+- Tests cover no full-file dumps.
+- Tests cover no secret content leaks.
+- Tests cover deterministic ranking.
+- Tests cover deterministic tie-breaking.
+- Tests cover source attribution.
+- Tests cover line range metadata.
+- Tests cover result limit behavior.
+- Tests cover output size limit behavior.
+- Tests cover no embeddings, vectors, RAG, provider, remote, command, prompt, or agent behavior.
+- Tests cover CLI report behavior.
+- Regression tests cover `specharbor brief`.
+- Regression tests cover `specharbor brief --update`.
+- Regression tests cover `specharbor context discover`.
+- Regression tests cover `specharbor context index`.
+- Regression tests cover context-aware `specharbor prompt`.
+- Regression tests cover `specharbor scan`.
+- OpenSpec validation passes with zero errors.
+- `go test ./...` passes after implementation.
+- `go test -count=1 ./...` passes after implementation.
