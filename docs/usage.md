@@ -223,7 +223,7 @@ The file is deterministic, human-readable Markdown with these sections:
 
 User-provided answers, detected context, and assumptions are labeled separately. Discovery suggestions and detected context may be recorded separately in generated project briefs, but user-provided answers remain separate from detected context and assumptions. It never silently converts missing or ambiguous stack, architecture, command, or project decisions into facts.
 
-If `.specharbor/project-brief.md` already exists, `brief` refuses to merge, update, overwrite, or append to it and returns a clear out-of-scope message. Existing prompt generation does not read or inject the project brief in this change.
+If `.specharbor/project-brief.md` already exists, `brief` refuses to merge, update, overwrite, or append to it and returns a clear out-of-scope message. Context-aware role prompt generation can read the existing brief through the local discovery boundary, but it does not merge, update, overwrite, or append to the brief.
 
 ### Show the Recommended Workflow
 
@@ -858,7 +858,7 @@ Intentional behavior changes from the earlier presence-only validation:
 go run ./cmd/specharbor prompt add-example-feature --role implementer
 ```
 
-`prompt <change-id> --role <role>` prints an agent prompt for an existing OpenSpec change.
+`prompt <change-id> --role <role>` prints an agent prompt for an existing OpenSpec change. For supported roles, prompt generation is context-aware: it may include a dedicated `## Project Context` section after the read-first guidance and before the task.
 
 Supported roles:
 
@@ -869,6 +869,16 @@ Supported roles:
 - `change-reviewer`
 
 Use `--role` for prompt roles. Agent-target flags are not implemented.
+
+Project Context can include:
+
+- `User-confirmed context` from known `.specharbor/project-brief.md` sections.
+- `Detected facts` from bounded local context discovery, with source path and confidence.
+- `Suggested assumptions` from bounded local context discovery, always labeled as assumptions with source path and confidence.
+
+Precedence is conservative: user-confirmed context wins over detected facts, detected facts win over suggested assumptions, and assumptions are never rendered as facts. If confirmed context conflicts with detected facts, the prompt prefers the confirmed value and may include a concise conflict note. If context is missing or ambiguous, the generated prompt tells the receiving agent to ask or explicitly label assumptions instead of inventing stack, architecture, commands, persistence decisions, workflow decisions, or project direction.
+
+Prompt generation reads only the classified discovery result and renders bounded summaries. It does not dump raw file contents, execute commands, run tests or builds, call provider APIs, execute agents, perform RAG, build embeddings or vector databases, index the repository, perform remote discovery, or automate source control.
 
 ### Review a Change
 

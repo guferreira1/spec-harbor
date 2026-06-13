@@ -1,0 +1,96 @@
+# Acceptance Criteria: Implement Context-Aware Agent Prompts
+
+- `specharbor prompt` is specified and implemented as context-aware for existing supported prompt roles.
+- The existing command shape `specharbor prompt <change-id> --role <role>` is preserved.
+- The existing supported prompt roles are preserved: `spec-author`, `architecture-reviewer`, `implementer`, `test-engineer`, and `change-reviewer`.
+- The existing agent workflow order is preserved.
+- Existing role-specific prompt behavior is preserved.
+- Existing final decision labels are preserved.
+- Generated prompts include a dedicated `## Project Context` section when context is available.
+- The Project Context section includes `### User-confirmed context` when confirmed context exists.
+- The Project Context section includes `### Detected facts` when useful detected facts exist.
+- The Project Context section includes `### Suggested assumptions` when useful suggested assumptions exist.
+- Confirmed context from `.specharbor/project-brief.md` is preferred over detected facts.
+- `.specharbor/project-brief.md` is included in `Read first` when present or relevant.
+- Unknown or custom `.specharbor/project-brief.md` sections are not treated as user-confirmed context.
+- Detected local context can be included with source evidence.
+- Detected local context can be included with confidence.
+- Suggested assumptions are clearly labeled as assumptions.
+- Suggested assumptions are never rendered as facts.
+- Suggested assumptions are never rendered as user-confirmed context.
+- Detected facts are never silently promoted to user-confirmed context.
+- Conflicts between user-confirmed context and detected facts prefer user-confirmed context.
+- Conflict notes, when rendered, are safe and do not ask the receiving agent to decide unsupported project facts.
+- Missing context produces prompt instructions telling agents to ask or explicitly label assumptions.
+- Ambiguous context produces prompt instructions telling agents to ask or explicitly label assumptions.
+- Generated prompts instruct agents not to invent stack.
+- Generated prompts instruct agents not to invent architecture.
+- Generated prompts instruct agents not to invent commands.
+- Generated prompts instruct agents not to invent persistence decisions.
+- Generated prompts instruct agents not to invent workflow decisions.
+- Generated prompts instruct agents not to invent project decisions.
+- Spec Author Agent prompts receive Project Context when available.
+- Architecture Reviewer Agent prompts receive Project Context when available.
+- Implementer Agent prompts receive Project Context when available.
+- Test Engineer Agent prompts receive Project Context when available.
+- Change Reviewer Agent prompts receive Project Context when available.
+- Pull Request remains a manual workflow step unless another accepted change adds a prompt role.
+- Archive remains an explicit command/manual workflow step and is not converted into a new prompt role by this change.
+- If PR or Archive prompt roles already exist at implementation time, they receive only the minimal context policy specified in `design.md`.
+- Prompt generation uses discovered context through a stable core/domain or use-case boundary.
+- Prompt generation does not duplicate context discovery rules in CLI formatting.
+- Prompt generation does not create a dependency cycle between prompt generation and context discovery.
+- Filesystem reads for project brief and discovery sources happen through adapter/port boundaries.
+- CLI code invokes prompt generation and displays output only.
+- Core/usecase code orchestrates context-aware prompt generation.
+- Domain/core owns or reuses context models for classification, confidence, and source evidence.
+- Prompt rendering is deterministic.
+- Prompt rendering is testable with fake context inputs.
+- Prompt rendering enforces prompt size limits or sensible deterministic truncation.
+- Truncation does not change context classification.
+- Prompt rendering includes enough source evidence to reduce hallucinated project facts.
+- Prompt rendering remains role-aware.
+- Prompt rendering does not dump raw file contents.
+- Prompt rendering does not print secrets.
+- Prompt rendering does not print absolute local paths.
+- Prompt generation does not execute project commands.
+- Prompt generation does not run package managers.
+- Prompt generation does not run tests.
+- Prompt generation does not run builds.
+- Prompt generation does not run application commands.
+- Prompt generation does not execute agents.
+- Prompt generation does not require provider API keys.
+- Prompt generation does not call external APIs.
+- Prompt generation does not call GitHub, GitLab, Bitbucket, CI, source-control, or workflow APIs.
+- Prompt generation does not introduce RAG.
+- Prompt generation does not introduce embeddings.
+- Prompt generation does not introduce vector databases.
+- Prompt generation does not introduce repository-wide indexing.
+- Prompt generation does not introduce local retrieval or snippet ranking.
+- Prompt generation does not introduce remote discovery.
+- Prompt generation does not modify source files based on context.
+- Prompt generation does not modify `.specharbor/project-brief.md`.
+- Prompt generation does not change `specharbor brief` questionnaire behavior except where needed to preserve compatibility.
+- Prompt generation does not change `specharbor context discover` detection rules except where needed to consume its output.
+- Prompt generation does not change `specharbor scan` behavior.
+- Public docs are updated in the implementation change.
+- Documentation states that Project Context separates confirmed context, detected facts, and suggested assumptions.
+- Documentation states that assumptions are not facts.
+- Documentation states that prompt generation does not execute commands or agents.
+- Unit tests cover context-aware prompt model or rendering.
+- Unit tests cover `.specharbor/project-brief.md` confirmed context inclusion.
+- Unit tests cover unknown project brief sections not being rendered as confirmed context.
+- Unit tests cover detected facts inclusion with source and confidence.
+- Unit tests cover suggested assumption labeling.
+- Unit tests prove assumptions are not rendered as facts.
+- Unit tests cover conflict handling between confirmed context and detected facts.
+- Unit tests cover missing context behavior.
+- Unit tests cover prompt size or summary limits.
+- Tests cover each relevant role prompt.
+- Regression tests cover existing `specharbor prompt` output structure.
+- Regression tests cover existing role final decision labels.
+- Regression tests cover existing `specharbor brief` behavior.
+- Regression tests cover existing `specharbor context discover` behavior.
+- Regression tests cover existing `specharbor scan` behavior.
+- `go test ./...` passes after implementation.
+- `go run ./cmd/specharbor validate implement-context-aware-agent-prompts` passes with zero errors.

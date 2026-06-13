@@ -63,9 +63,9 @@ The workflow relates to existing commands as follows:
 - `review` checks local task checkbox completion and required change files.
 - `archive` explicitly archives an accepted change.
 
-`specharbor context discover` is read-only local discovery. It labels repository evidence as detected facts, conventional guesses as suggested assumptions, and existing project brief values as user-confirmed context. It does not execute commands, call provider APIs, perform remote discovery, build an index, run RAG, or inject context into generated prompts.
+`specharbor context discover` is read-only local discovery. It labels repository evidence as detected facts, conventional guesses as suggested assumptions, and existing project brief values as user-confirmed context. It does not execute commands, call provider APIs, perform remote discovery, build an index, or run RAG.
 
-`specharbor brief` writes `.specharbor/project-brief.md` only after interactive confirmation. The brief is explicit context collection, not repository indexing, RAG, provider integration, prompt injection, agent execution, source-control automation, or remote automation. Current role prompt generation does not automatically consume the project brief; that requires a future OpenSpec change.
+`specharbor brief` writes `.specharbor/project-brief.md` only after interactive confirmation. The brief is explicit context collection, not repository indexing, RAG, provider integration, agent execution, source-control automation, or remote automation. Role prompt generation can include confirmed brief values and discovered local signals in a bounded `## Project Context` section.
 
 Commit, Pull Request, and Merge remain manual. SpecHarbor does not commit, does not push, does not create PRs, does not merge, does not call GitHub, does not call GitLab, does not inspect CI, does not call provider APIs, does not call agent CLIs, does not run source-control automation, does not run workflow execution, and does not perform remote automation.
 
@@ -116,7 +116,7 @@ Validation checks that the required OpenSpec files exist. It does not prove the 
 go run ./cmd/specharbor prompt add-example-feature --role implementer
 ```
 
-Role prompts point an agent at the repository rules, architecture spec, and active change. Agent-assisted workflows do not require provider API keys because SpecHarbor prints prompts for external coding agents to consume.
+Role prompts point an agent at the repository rules, architecture spec, active change, and any available classified Project Context. The context section keeps user-confirmed context, detected facts, and suggested assumptions separate; assumptions remain assumptions. Agent-assisted workflows do not require provider API keys because SpecHarbor prints prompts for external coding agents to consume, without executing commands or agents.
 
 ## Implement and Review
 

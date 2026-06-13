@@ -481,6 +481,10 @@ Answer: go test ./...
 ### Build
 
 Answer: go build ./...
+
+## Agent behavior
+
+Answer: Ask before assuming
 `
 	fileSystem.files["go.mod"] = "module example.com/project\n"
 
@@ -493,9 +497,24 @@ Answer: go build ./...
 	assertContextSignal(t, result, domain.ContextSignalKindStack, "Go", domain.ContextSignalClassificationUserConfirmedContext, ".specharbor/project-brief.md")
 	assertContextSignal(t, result, domain.ContextSignalKindTestCommand, "go test ./...", domain.ContextSignalClassificationUserConfirmedContext, ".specharbor/project-brief.md")
 	assertContextSignal(t, result, domain.ContextSignalKindBuildCommand, "go build ./...", domain.ContextSignalClassificationUserConfirmedContext, ".specharbor/project-brief.md")
+	assertContextSignal(t, result, domain.ContextSignalKindAgentInstructionSource, "Ask before assuming", domain.ContextSignalClassificationUserConfirmedContext, ".specharbor/project-brief.md")
 	assertContextSignal(t, result, domain.ContextSignalKindStack, "Go", domain.ContextSignalClassificationDetectedFact, "go.mod")
 	assertNoContextSignalValue(t, result, "Must not become context")
 	assertNoContextSignal(t, result, domain.ContextSignalKindTestCommand, "go test ./...", domain.ContextSignalClassificationSuggestedAssumption)
+}
+
+func TestDiscoverProjectContextReportsProjectBriefExistenceForPromptContext(t *testing.T) {
+	fileSystem := newFakeContextDiscoveryFileSystem()
+	fileSystem.files[".specharbor/project-brief.md"] = "# Project Brief\n\n## Unknown\n\nAnswer: ignored\n"
+	useCase := NewDiscoverProjectContext(fileSystem)
+
+	exists, err := useCase.ProjectBriefExists("/project")
+	if err != nil {
+		t.Fatalf("ProjectBriefExists() error = %v", err)
+	}
+	if !exists {
+		t.Fatalf("ProjectBriefExists() = false, want true")
+	}
 }
 
 func TestDiscoverProjectContextSkipsSecretsGeneratedFoldersAndSymlinks(t *testing.T) {
