@@ -9,9 +9,9 @@ instalar.
 
 | Canal | Status |
 | --- | --- |
-| GitHub Releases | Disponível para `v0.1.0` |
+| GitHub Releases | Preparado para `v0.2.0` após a publicação da tag |
 | `install.sh` | Disponível para Linux e macOS usando ativos de release reais |
-| npm | Disponível como pacote sem escopo `specharbor@0.1.0` |
+| npm | Preparado como pacote sem escopo `specharbor@0.2.0` após a publicação da tag |
 | Homebrew | Disponível como `brew install guferreira1/tap/specharbor` |
 | `go install` from source | Opção de fallback/desenvolvedor; imprime metadados de fallback de desenvolvimento |
 | automação de publicação de pacote | Automatizada no push de tags para npm e Homebrew |
@@ -22,7 +22,7 @@ instalar.
 | Docker | Apenas futuro |
 
 Canais de instalação de binário exigem um GitHub Release publicado com ativos e
-checksums correspondentes. A primeira release publicada é `v0.1.0`.
+checksums correspondentes. A próxima release pública está preparada como `v0.2.0`.
 
 ## Assets de release
 
@@ -110,8 +110,8 @@ Opções:
 
 ```bash
 # Fixe uma versão (variável de ambiente ou flag):
-SPECHARBOR_VERSION=v0.1.0 sh install.sh
-sh install.sh --version v0.1.0
+SPECHARBOR_VERSION=v0.2.0 sh install.sh
+sh install.sh --version v0.2.0
 
 # Substitua o diretório de instalação (padrão: $HOME/.local/bin):
 SPECHARBOR_INSTALL_DIR="$HOME/bin" sh install.sh
@@ -237,7 +237,7 @@ specharbor version
 Um binário de release imprime metadados de release injetados:
 
 ```text
-SpecHarbor 0.1.0
+SpecHarbor 0.2.0
 commit: <full commit sha>
 date: <UTC RFC3339 build date>
 dirty: false
@@ -344,7 +344,7 @@ Verifique o binário instalado com:
 specharbor version
 ```
 
-Binários de release de `v0.1.0` imprimem `SpecHarbor 0.1.0` e incluem metadados
+Binários de release de `v0.2.0` imprimem `SpecHarbor 0.2.0` e incluem metadados
 de commit, date e dirty. Saída `dev`/`unknown` geralmente significa que o binário
 foi construído a partir da fonte sem metadados de release injetados, como com `go
 install`.

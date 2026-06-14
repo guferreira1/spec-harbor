@@ -4,15 +4,15 @@ SpecHarbor uses GoReleaser to build GitHub Release assets from pushed version ta
 
 ## Current Public Release
 
-The current public release is GitHub Release `v0.1.0`, built from commit
-`e6faff91feef07e5c1e47181243286268daf17b5`. Release binaries display plain
-version `0.1.0`.
+The current public release is `v0.2.0` after the `v0.2.0` tag is published.
+The exact release commit is the commit referenced by tag `v0.2.0`. Release
+binaries display plain version `0.2.0`.
 
 The validated public distribution channels for this release are:
 
 - GitHub Releases.
 - `install.sh`.
-- npm package `specharbor@0.1.0`.
+- npm package `specharbor@0.2.0`.
 - Homebrew tap install command `brew install guferreira1/tap/specharbor`.
 
 The Homebrew formula lives in the external tap repository
@@ -58,18 +58,18 @@ This is expected behavior.
 
 ## Version Convention
 
-Git release tags use `vX.Y.Z`, for example `v0.1.0`.
+Git release tags use `vX.Y.Z`, for example `v0.2.0`.
 
-Release binary version metadata uses plain `X.Y.Z`, for example `0.1.0`. GoReleaser injects the plain version value, so a release built from tag `v0.1.0` displays:
+Release binary version metadata uses plain `X.Y.Z`, for example `0.2.0`. GoReleaser injects the plain version value, so a release built from tag `v0.2.0` displays:
 
 ```text
-SpecHarbor 0.1.0
+SpecHarbor 0.2.0
 commit: <full commit sha>
 date: <UTC RFC3339 build date>
 dirty: false
 ```
 
-Runtime displays the injected version string as-is and does not normalize it. If a manual build injects `v0.1.0`, `specharbor version` may display `v0.1.0`.
+Runtime displays the injected version string as-is and does not normalize it. If a manual build injects `v0.2.0`, `specharbor version` may display `v0.2.0`.
 
 ## Build-Time Injection
 
@@ -93,8 +93,8 @@ The runtime command does not inspect Git tags, read `.git`, run Git commands, ex
 Maintainers publish a release by pushing a tag that matches `v*`, such as:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 The GitHub Actions release workflow runs only for pushed tags matching `v*`. It
@@ -140,7 +140,7 @@ Linux and macOS assets use `.tar.gz`. Windows assets use `.zip`. GoReleaser also
 
 Installation options that consume these assets — manual download, `install.sh`, the npm wrapper package, and the Homebrew tap — are documented in [Install](install.md).
 
-For `v0.1.0`, those assets cover:
+For `v0.2.0`, those assets cover:
 
 - Linux amd64.
 - Linux arm64.
@@ -242,7 +242,7 @@ Validate the rest of the publishing path without publishing:
 
 ```bash
 # Version consistency gate (and its tests).
-sh scripts/validate-release-version.sh v0.1.0
+sh scripts/validate-release-version.sh v0.2.0
 sh scripts/test-validate-release-version.sh
 
 # Homebrew formula rendering (and its tests).

@@ -74,7 +74,7 @@ Plataformas não suportadas retornam erro determinístico.
 
 | Versão do npm | Tag de release no GitHub |
 | --- | --- |
-| `0.1.0` | `v0.1.0` |
+| `0.2.0` | `v0.2.0` |
 
 O mapeamento é de um para um pela versão do pacote.
 

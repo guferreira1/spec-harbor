@@ -5,15 +5,15 @@ tags de versão enviadas.
 
 ## Release pública atual
 
-A release pública atual é o GitHub Release `v0.1.0`, construído do commit
-`e6faff91feef07e5c1e47181243286268daf17b5`. Binários de release exibem a versão
-`0.1.0` simples.
+A release pública atual é `v0.2.0` depois que a tag `v0.2.0` for publicada.
+O commit exato da release é o commit referenciado pela tag `v0.2.0`. Binários
+de release exibem a versão simples `0.2.0`.
 
 Os canais de distribuição pública validados para esta release são:
 
 - GitHub Releases.
 - `install.sh`.
-- npm package `specharbor@0.1.0`.
+- npm package `specharbor@0.2.0`.
 - Homebrew tap install command `brew install guferreira1/tap/specharbor`.
 
 A fórmula Homebrew está no repositório externo de tap
@@ -61,21 +61,21 @@ Este é o comportamento esperado.
 
 ## Convenção de versão
 
-Tags de release do Git usam `vX.Y.Z`, por exemplo `v0.1.0`.
+Tags de release do Git usam `vX.Y.Z`, por exemplo `v0.2.0`.
 
-Metadados de versão de release usam `X.Y.Z` simples, por exemplo `0.1.0`. O
+Metadados de versão de release usam `X.Y.Z` simples, por exemplo `0.2.0`. O
 GoReleaser injeta o valor simples, então uma release construída a partir da tag
-`v0.1.0` exibe:
+`v0.2.0` exibe:
 
 ```text
-SpecHarbor 0.1.0
+SpecHarbor 0.2.0
 commit: <full commit sha>
 date: <UTC RFC3339 build date>
 dirty: false
 ```
 
 O runtime exibe a string de versão injetada como está e não a normaliza. Se um build
-manual injetar `v0.1.0`, `specharbor version` pode exibir `v0.1.0`.
+manual injetar `v0.2.0`, `specharbor version` pode exibir `v0.2.0`.
 
 ## Injeção em tempo de build
 
@@ -101,8 +101,8 @@ versões.
 Mantenedores publicam uma release enviando uma tag que bate com `v*`, por exemplo:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 O workflow de release do GitHub Actions roda apenas para tags enviadas que batem com
@@ -150,7 +150,7 @@ As opções de instalação que consomem esses ativos — download manual,
 `install.sh`, pacote wrapper npm e tap Homebrew — estão documentadas em
 [Instalação](install.md).
 
-Para `v0.1.0`, esses ativos cobrem:
+Para `v0.2.0`, esses ativos cobrem:
 
 - Linux amd64.
 - Linux arm64.
@@ -255,7 +255,7 @@ Valide o restante do caminho de publicação sem publicar:
 
 ```bash
 # Version consistency gate (and its tests).
-sh scripts/validate-release-version.sh v0.1.0
+sh scripts/validate-release-version.sh v0.2.0
 sh scripts/test-validate-release-version.sh
 
 # Homebrew formula rendering (and its tests).

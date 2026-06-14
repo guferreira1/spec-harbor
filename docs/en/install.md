@@ -8,9 +8,9 @@ those assets over HTTPS and verifies SHA-256 checksums before installing.
 
 | Channel | Status |
 | --- | --- |
-| GitHub Releases | Available for `v0.1.0` |
+| GitHub Releases | Prepared for `v0.2.0` after the tag is published |
 | `install.sh` | Available for Linux and macOS using real release assets |
-| npm | Available as unscoped package `specharbor@0.1.0` |
+| npm | Prepared as unscoped package `specharbor@0.2.0` after the tag is published |
 | Homebrew | Available as `brew install guferreira1/tap/specharbor` |
 | `go install` from source | Fallback/developer option; prints development fallback metadata |
 | package publishing automation | Automated on tag push for npm and Homebrew |
@@ -21,7 +21,7 @@ those assets over HTTPS and verifies SHA-256 checksums before installing.
 | Docker | Future only |
 
 Binary install channels require a published GitHub Release with matching
-assets and checksums. The first published release is `v0.1.0`.
+assets and checksums. The next public release is prepared as `v0.2.0`.
 
 ## Release assets
 
@@ -110,8 +110,8 @@ Options:
 
 ```bash
 # Pin a version (environment variable or flag):
-SPECHARBOR_VERSION=v0.1.0 sh install.sh
-sh install.sh --version v0.1.0
+SPECHARBOR_VERSION=v0.2.0 sh install.sh
+sh install.sh --version v0.2.0
 
 # Override the install directory (default: $HOME/.local/bin):
 SPECHARBOR_INSTALL_DIR="$HOME/bin" sh install.sh
@@ -235,7 +235,7 @@ specharbor version
 A release binary prints injected release metadata:
 
 ```text
-SpecHarbor 0.1.0
+SpecHarbor 0.2.0
 commit: <full commit sha>
 date: <UTC RFC3339 build date>
 dirty: false
@@ -341,7 +341,7 @@ Verify the installed binary with:
 specharbor version
 ```
 
-Release binaries for `v0.1.0` print `SpecHarbor 0.1.0` and include commit,
+Release binaries for `v0.2.0` print `SpecHarbor 0.2.0` and include commit,
 date, and dirty metadata. `dev`/`unknown` output usually means the binary was
 built from source without injected release metadata, such as with plain
 `go install`.
