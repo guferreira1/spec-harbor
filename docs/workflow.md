@@ -58,6 +58,7 @@ The workflow relates to existing commands as follows:
 - `context discover` optionally inspects bounded local repository sources and reports classified context signals before briefing or authoring.
 - `context index` optionally records bounded metadata-only inventory for supported local context sources.
 - `context retrieve` optionally retrieves bounded, source-attributed local snippets from a current context index.
+- `context github` optionally retrieves bounded, source-attributed remote snippets from GitHub only when explicitly invoked.
 - `brief` optionally collects confirmed project context before authoring when repository context is missing or ambiguous.
 - `generate` creates or starts the OpenSpec change package for the Spec Author Agent.
 - `validate` checks required OpenSpec change files before review or implementation.
@@ -71,9 +72,11 @@ The workflow relates to existing commands as follows:
 
 `specharbor context retrieve --query "<query>"` is local/offline retrieval over a current `.specharbor/context-index.json`. It reads only supported indexed local sources with bounded source reads, snippets, result counts, and output size, then prints source-attributed lexical matches. Retrieval results are not confirmed project context, are not automatically injected into role prompts in this version, and do not use embeddings, vectors, RAG generation, remote context, provider APIs, command execution, prompt execution, agent execution, or source-control automation.
 
+`specharbor context github --repo owner/name --query "<query>"` is explicit read-only GitHub remote context retrieval. It uses network access only for that command, can optionally use `SPECHARBOR_GITHUB_TOKEN`, fetches only approved bounded repository context sources, and prints source-attributed remote snippets or summaries. Remote results are not confirmed project context, are not written to `.specharbor/context-index.json`, are not automatically injected into prompts, and do not use embeddings, vectors, RAG generation, provider APIs, command execution, prompt execution, agent execution, GitHub mutation, or source-control automation.
+
 `specharbor brief` writes `.specharbor/project-brief.md` only after interactive confirmation. `specharbor brief --update` is the explicit maintenance path for an existing brief: it keeps confirmed values by default, shows detected facts and assumptions as review items, previews changes, and writes only after final confirmation. Briefing is explicit context collection and maintenance, not repository indexing, RAG, provider integration, agent execution, source-control automation, or remote automation. Role prompt generation can include confirmed brief values and discovered local signals in a bounded `## Project Context` section.
 
-Commit, Pull Request, and Merge remain manual. SpecHarbor does not commit, does not push, does not create PRs, does not merge, does not call GitHub, does not call GitLab, does not inspect CI, does not call provider APIs, does not call agent CLIs, does not run source-control automation, does not run workflow execution, and does not perform remote automation.
+Commit, Pull Request, and Merge remain manual. Outside the explicit read-only `context github` inspection command, SpecHarbor does not commit, does not push, does not create PRs, does not merge, does not call GitHub, does not call GitLab, does not inspect CI, does not call provider APIs, does not call agent CLIs, does not run source-control automation, does not run workflow execution, and does not perform remote automation.
 
 ## Change Package
 

@@ -73,6 +73,10 @@ specharbor generate <change-id> ... -> specharbor validate <change-id> -> specha
   `specharbor context index` produces metadata-only local inventory in `.specharbor/context-index.json` for supported context sources.
   It stores no raw file contents and is ignored by source control.
 
+- **GitHub remote context**
+  `specharbor context github --repo owner/name --query "<query>"` explicitly retrieves bounded, read-only, source-attributed context from GitHub.
+  It is optional, networked only for that command, and does not change local/offline defaults.
+
 - **validation**
   `specharbor validate <change-id>` enforces required files, readable structure, and content quality signals.
   Errors fail the command; warnings do not fail by default.
@@ -102,6 +106,7 @@ Optional context preparation:
 specharbor context discover
 specharbor context index --write
 specharbor context index --check
+specharbor context github --repo guferreira1/spec-harbor --query "architecture"
 ```
 
 `context index` builds a deterministic metadata-only inventory for supported local context sources. Without flags it prints a concise report and writes nothing. `--write` safely persists generated local state at `.specharbor/context-index.json`, which is ignored by source control. `--check` rebuilds current metadata and reports whether the stored index is current, stale, missing, or invalid. The index stores relative paths, source categories, file types, size, hash, modified-time metadata, retrieval support flags, and classification hints. It never stores raw file contents, snippets, secrets, embeddings, vectors, command output, remote context, provider output, or confirmed project context, and it does not implement retrieval, ranking, RAG, command execution, prompt execution, agent execution, or source-control automation.
@@ -113,6 +118,14 @@ specharbor context retrieve --query "architecture"
 ```
 
 `context retrieve` requires a current `.specharbor/context-index.json` written by `specharbor context index --write`, then reads only supported indexed local sources with bounded file, snippet, result, and output limits. Results are lexical, local/offline, source-attributed, and include bounded snippets or metadata summaries. Retrieval is not confirmed project context, RAG answer generation, embedding search, vector storage, provider/API behavior, remote context, command execution, prompt execution, agent execution, or source-control automation.
+
+Explicit GitHub remote context is available as:
+
+```bash
+specharbor context github --repo owner/name --query "architecture"
+```
+
+`context github` uses network access only when explicitly invoked, reads from GitHub through bounded read-only API calls, and can optionally use `SPECHARBOR_GITHUB_TOKEN` for authenticated requests. It never prints or persists the token, never writes `.specharbor/context-index.json`, never mutates GitHub, and does not implement RAG, embeddings, provider APIs, prompt execution, agent execution, or source-control automation.
 
 Interactive project briefing is available as:
 
@@ -143,7 +156,7 @@ See [docs/install.md](docs/install.md) for platform support, checksum steps, and
 ## Current capabilities
 
 - OpenSpec project initialization (`specharbor init`)
-- context discovery and repository context index (`context discover`, `context index`)
+- context discovery, repository context index, and explicit GitHub remote context (`context discover`, `context index`, `context github`)
 - context collection and update (`brief`, `brief --update`)
 - change generation (blank, guided, templates, custom templates, config templates, hybrid, AI-assisted from-file, agent-assisted spec authoring)
 - change validation (`validate`)
@@ -214,6 +227,7 @@ It does not call GitHub, GitLab, CI, provider APIs, agent CLIs, source-control a
 - no auto-commit, auto-push, automatic PR creation, merge, or archive automation;
 - no production code is modified during generation, discovery, validation, prompting, reviewing, or indexing;
 - no provider API calls or local model calls in current workflows;
+- network access for context is explicit and limited to `specharbor context github`;
 - deterministic path and symlink safety; unsafe and generated paths are rejected;
 - no command execution from user prompts and no shell string construction in npm forwarding;
 - context is separated into user-confirmed context, detected facts, and assumptions;

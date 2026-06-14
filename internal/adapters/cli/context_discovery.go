@@ -7,9 +7,15 @@ import (
 	"strings"
 
 	"github.com/guferreira1/spec-harbor/internal/adapters/filesystem"
+	githubadapter "github.com/guferreira1/spec-harbor/internal/adapters/github"
 	"github.com/guferreira1/spec-harbor/internal/core/domain"
+	"github.com/guferreira1/spec-harbor/internal/core/ports"
 	"github.com/guferreira1/spec-harbor/internal/core/usecase"
 )
+
+var newGitHubRemoteContextReader = func(token string) ports.GitHubRemoteContextReader {
+	return githubadapter.NewHTTPRemoteContextClient(token)
+}
 
 func contextCommand(ctx CommandContext) error {
 	arguments, err := parseContextArguments(ctx.Args)
@@ -57,6 +63,25 @@ func contextCommand(ctx CommandContext) error {
 		}
 		return nil
 	}
+	if arguments.subcommand == "github" {
+		reader := newGitHubRemoteContextReader(os.Getenv(domain.GitHubRemoteContextTokenEnvVar))
+		retrieveContext := usecase.NewRetrieveGitHubRemoteContext(reader)
+		result, err := retrieveContext.Execute(usecase.RetrieveGitHubRemoteContextInput{
+			Repository:  arguments.githubRepo,
+			Ref:         arguments.githubRef,
+			Query:       arguments.githubQuery,
+			PathFilters: arguments.githubPaths,
+		})
+		if err != nil {
+			return err
+		}
+		printGitHubRemoteContextReport(ctx.Output, result)
+		if result.Status != domain.GitHubRemoteContextStatusCurrent &&
+			result.Status != domain.GitHubRemoteContextStatusNoResults {
+			return ExitError{Code: 1}
+		}
+		return nil
+	}
 
 	fileSystem := filesystem.NewContextDiscoveryFileSystem()
 	discoverContext := usecase.NewDiscoverProjectContext(fileSystem)
@@ -73,11 +98,15 @@ type contextArguments struct {
 	subcommand    string
 	indexMode     domain.RepositoryContextIndexMode
 	retrieveQuery string
+	githubRepo    string
+	githubRef     string
+	githubQuery   string
+	githubPaths   []string
 }
 
 func parseContextArguments(args []string) (contextArguments, error) {
 	if len(args) == 0 {
-		return contextArguments{}, fmt.Errorf("context subcommand is required: discover or index")
+		return contextArguments{}, fmt.Errorf("context subcommand is required: discover, index, retrieve, or github")
 	}
 	if strings.HasPrefix(args[0], "-") {
 		return contextArguments{}, fmt.Errorf("unsupported flag: %s", args[0])
@@ -96,6 +125,9 @@ func parseContextArguments(args []string) (contextArguments, error) {
 	}
 	if args[0] == "retrieve" {
 		return parseContextRetrieveArguments(args[1:])
+	}
+	if args[0] == "github" {
+		return parseContextGitHubArguments(args[1:])
 	}
 	return contextArguments{}, fmt.Errorf("unsupported context subcommand: %s", args[0])
 }
@@ -165,6 +197,81 @@ func parseContextRetrieveArguments(args []string) (contextArguments, error) {
 		return contextArguments{}, fmt.Errorf("context retrieve query is required")
 	}
 	return contextArguments{subcommand: "retrieve", retrieveQuery: query}, nil
+}
+
+func parseContextGitHubArguments(args []string) (contextArguments, error) {
+	repoProvided := false
+	queryProvided := false
+	refProvided := false
+	arguments := contextArguments{subcommand: "github"}
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		switch arg {
+		case "--repo":
+			if repoProvided {
+				return contextArguments{}, fmt.Errorf("context github repo flag specified more than once")
+			}
+			value, nextIndex, err := contextFlagValue(args, index, "--repo")
+			if err != nil {
+				return contextArguments{}, err
+			}
+			repoProvided = true
+			arguments.githubRepo = value
+			index = nextIndex
+		case "--query":
+			if queryProvided {
+				return contextArguments{}, fmt.Errorf("context github query flag specified more than once")
+			}
+			value, nextIndex, err := contextFlagValue(args, index, "--query")
+			if err != nil {
+				return contextArguments{}, err
+			}
+			queryProvided = true
+			arguments.githubQuery = value
+			index = nextIndex
+		case "--ref":
+			if refProvided {
+				return contextArguments{}, fmt.Errorf("context github ref flag specified more than once")
+			}
+			value, nextIndex, err := contextFlagValue(args, index, "--ref")
+			if err != nil {
+				return contextArguments{}, err
+			}
+			refProvided = true
+			arguments.githubRef = value
+			index = nextIndex
+		case "--path":
+			value, nextIndex, err := contextFlagValue(args, index, "--path")
+			if err != nil {
+				return contextArguments{}, err
+			}
+			arguments.githubPaths = append(arguments.githubPaths, value)
+			index = nextIndex
+		default:
+			if strings.HasPrefix(arg, "-") {
+				return contextArguments{}, fmt.Errorf("unsupported flag: %s", arg)
+			}
+			return contextArguments{}, fmt.Errorf("unexpected argument: %s", arg)
+		}
+	}
+	if !repoProvided {
+		return contextArguments{}, fmt.Errorf("context github repo is required")
+	}
+	if !queryProvided {
+		return contextArguments{}, fmt.Errorf("context github query is required")
+	}
+	return arguments, nil
+}
+
+func contextFlagValue(args []string, index int, flag string) (string, int, error) {
+	if index+1 >= len(args) {
+		return "", index, fmt.Errorf("context github %s value is required", strings.TrimPrefix(flag, "--"))
+	}
+	value := args[index+1]
+	if strings.HasPrefix(value, "-") {
+		return "", index, fmt.Errorf("unsupported flag: %s", value)
+	}
+	return value, index + 1, nil
 }
 
 func printContextDiscoveryReport(output io.Writer, result domain.ContextDiscoveryResult) {
@@ -357,4 +464,91 @@ func formatRetrievalClassificationHints(hints []domain.RepositoryContextIndexCla
 		values = append(values, string(hint))
 	}
 	return strings.Join(values, ", ")
+}
+
+func printGitHubRemoteContextReport(output io.Writer, result domain.GitHubRemoteContextReport) {
+	fmt.Fprintln(output, "GitHub remote context:")
+	fmt.Fprintf(output, "Repository: %s\n", result.Repository)
+	fmt.Fprintf(output, "Query: %s\n", result.Query.DisplayQuery)
+	fmt.Fprintf(output, "Normalized terms: %s\n", strings.Join(result.Query.Terms, ", "))
+	if result.RequestedRef != "" {
+		fmt.Fprintf(output, "Requested ref: %s\n", result.RequestedRef)
+	}
+	if result.DefaultBranch != "" {
+		fmt.Fprintf(output, "Default branch: %s\n", result.DefaultBranch)
+	}
+	if result.ResolvedRef != "" {
+		fmt.Fprintf(output, "Resolved ref: %s\n", result.ResolvedRef)
+	}
+	if result.CommitSHA != "" {
+		fmt.Fprintf(output, "Resolved SHA: %s\n", result.CommitSHA)
+	}
+	if len(result.PathFilters) > 0 {
+		fmt.Fprintf(output, "Path filters: %s\n", strings.Join(result.PathFilters, ", "))
+	}
+	fmt.Fprintln(output, "Remote: yes")
+	fmt.Fprintf(output, "Status: %s\n", result.Status)
+	fmt.Fprintf(output, "Results: %d\n", len(result.Results))
+	if result.OutputTruncated {
+		fmt.Fprintln(output, "Output truncated: yes")
+	}
+	if result.Message != "" {
+		fmt.Fprintln(output)
+		fmt.Fprintf(output, "Detail: %s\n", result.Message)
+	}
+	if len(result.Skipped) > 0 {
+		fmt.Fprintln(output)
+		fmt.Fprintln(output, "Skipped:")
+		for index, skipped := range result.Skipped {
+			if index >= 10 {
+				fmt.Fprintln(output, "- additional skipped records omitted")
+				break
+			}
+			fmt.Fprintf(output, "- %s: %s\n", skipped.Reason, skipped.Path)
+		}
+	}
+	if result.Status == domain.GitHubRemoteContextStatusNoResults {
+		fmt.Fprintln(output)
+		fmt.Fprintln(output, "No matching GitHub remote context found.")
+		return
+	}
+	if len(result.Results) == 0 {
+		return
+	}
+
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Results:")
+	for _, remoteResult := range result.Results {
+		fmt.Fprintf(output, "%d. %s\n", remoteResult.Rank, remoteResult.Path)
+		fmt.Fprintf(output, "   Repository: %s\n", remoteResult.Repository)
+		if remoteResult.RequestedRef != "" {
+			fmt.Fprintf(output, "   Requested ref: %s\n", remoteResult.RequestedRef)
+		}
+		if remoteResult.DefaultBranch != "" {
+			fmt.Fprintf(output, "   Default branch: %s\n", remoteResult.DefaultBranch)
+		}
+		if remoteResult.ResolvedRef != "" {
+			fmt.Fprintf(output, "   Resolved ref: %s\n", remoteResult.ResolvedRef)
+		}
+		if remoteResult.CommitSHA != "" {
+			fmt.Fprintf(output, "   Resolved SHA: %s\n", remoteResult.CommitSHA)
+		}
+		fmt.Fprintln(output, "   Remote: yes")
+		fmt.Fprintf(output, "   Category: %s\n", remoteResult.SourceCategory)
+		if remoteResult.SourceEvidenceCategory != "" {
+			fmt.Fprintf(output, "   Evidence: %s\n", remoteResult.SourceEvidenceCategory)
+		}
+		fmt.Fprintf(output, "   Score: %d\n", remoteResult.Score)
+		if remoteResult.Snippet.Text != "" {
+			fmt.Fprintf(output, "   Lines: %d-%d\n", remoteResult.Snippet.LineStart, remoteResult.Snippet.LineEnd)
+			fmt.Fprintln(output, "   Snippet:")
+			for _, line := range strings.Split(remoteResult.Snippet.Text, "\n") {
+				fmt.Fprintf(output, "   %s\n", line)
+			}
+			continue
+		}
+		if remoteResult.Summary != "" {
+			fmt.Fprintf(output, "   Summary: %s\n", remoteResult.Summary)
+		}
+	}
 }

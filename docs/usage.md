@@ -143,7 +143,7 @@ Safety boundaries:
 - heavy/generated folders such as `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/`, and `obj/` are skipped;
 - symlinks are not traversed.
 
-`specharbor context` without `discover`, `index`, or `retrieve`, unsupported subcommands such as `context update`, positional arguments after `discover`, and flags such as `--json`, `--path`, `--deep`, `--github`, or `--rag` are rejected.
+`specharbor context` without `discover`, `index`, `retrieve`, or `github`, unsupported subcommands such as `context update`, positional arguments after `discover`, and flags such as `--json`, `--path`, `--deep`, `--github`, or `--rag` are rejected.
 
 When `specharbor brief` runs, discovery can provide menu suggestions and detected context records only. The user must still select or enter every answer, confirmation is still required before writing, and an existing `.specharbor/project-brief.md` is still refused rather than merged, updated, overwritten, or appended.
 
@@ -237,6 +237,56 @@ Safety boundaries:
 - symlinks are not traversed;
 - path traversal, absolute paths, Windows drive paths, null-byte paths, and paths outside the project root are rejected;
 - raw full-file dumps are not printed.
+
+### Retrieve GitHub Remote Context
+
+```bash
+go run ./cmd/specharbor context github --repo owner/name --query "architecture"
+specharbor context github --repo owner/name --query "architecture"
+```
+
+`context github` performs explicit, bounded, read-only remote context retrieval from GitHub. It is separate from local retrieval and does not read or write `.specharbor/context-index.json`.
+
+Supported forms:
+
+```bash
+specharbor context github --repo owner/name --query "architecture"
+specharbor context github --repo https://github.com/owner/name --query "architecture"
+specharbor context github --repo owner/name --ref main --query "architecture"
+specharbor context github --repo owner/name --query "architecture" --path docs
+specharbor context github --repo owner/name --query "architecture" --path docs/usage.md --path README.md
+```
+
+Repository input supports `owner/name` and `https://github.com/<owner>/<repo>`, which is normalized to `owner/name`. Unsupported hosts, GitHub Enterprise URLs, credentials, query strings, fragments, filesystem paths, path traversal, whitespace, and control characters are rejected.
+
+`--query` is required. Empty queries are rejected, queries longer than 512 characters are rejected, and normalized query terms are bounded. Positional queries and unsupported flags such as `--json`, `--rag`, `--embed`, `--provider`, `--execute`, `--agent`, and `--deep` are rejected.
+
+`--ref` is optional. When omitted, SpecHarbor resolves the repository default branch through GitHub. Ref input is bounded and rejects traversal, null bytes, URLs, credentials, query strings, fragments, and suspicious slash forms.
+
+`--path` is optional and repeatable. Path filters narrow the approved source set only; they cannot expand retrieval to arbitrary files. Path filters must be safe repository-relative paths and reject traversal, absolute paths, Windows drive paths, null bytes, query strings, fragments, and wildcard expansion.
+
+Supported remote sources are bounded to `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, Markdown files under `docs/`, `openspec/project.md`, Markdown files under `openspec/specs/`, Markdown files under `.specharbor/rules/`, `.specharbor/project-brief.md`, supported manifest/config files such as `go.mod`, `package.json`, `Cargo.toml`, `pyproject.toml`, `Dockerfile`, `Makefile`, `Taskfile.yml`, compose files, and YAML workflow files under `.github/workflows/`.
+
+Default limits are 50 fetched files, 128 KiB per file, 1 MiB total file content, 10 total results, 2 snippets per file, 600 characters per snippet, 8,000 rendered snippet/summary characters, 500 scanned tree or directory entries, bounded directory depth, and 10 second HTTP timeouts. Results include repository, default/requested/resolved ref details when available, resolved SHA when available, rank, path, category or evidence, score, line range when practical, bounded snippet or summary, and `Remote: yes`.
+
+Authentication is optional. Public repository access works without a token when GitHub allows it. If `SPECHARBOR_GITHUB_TOKEN` is set, SpecHarbor sends it as a GitHub bearer token for this command only. The token is never printed, persisted, included in reports, or included in error messages.
+
+Safe errors are returned for invalid input, unsupported hosts, network failures, timeouts, rate limits, unauthorized or forbidden responses, not found responses, invalid tokens, oversized files, oversized responses, unsupported content, and too many candidates.
+
+Safety boundaries:
+
+- network access is used only when `context github` is explicitly invoked;
+- GitHub requests are HTTPS read-only requests to `api.github.com`;
+- no GitHub write APIs, commits, branches, PRs, issues, comments, labels, releases, tags, workflow runs, or repository mutations are performed;
+- no local `git`, `gh`, shell commands, package managers, scripts, project commands, prompts, or agents are executed;
+- no remote context is cached or persisted by default;
+- `.specharbor/context-index.json` is not written or modified;
+- remote results are not user-confirmed context and are not automatically injected into prompts;
+- sensitive files such as `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `secrets.*`, `credentials.*`, `.npmrc`, `.pypirc`, and `.netrc` are skipped;
+- heavy/generated folders such as `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/`, and `obj/` are skipped;
+- binary and unsupported files are skipped;
+- ranking is deterministic lexical matching with path, filename, phrase, category, and heading boosts;
+- no embeddings, vector databases, RAG answer generation, provider APIs, LLM reranking, prompt execution, agent execution, or source-control automation are introduced.
 
 ### Brief a Project
 
