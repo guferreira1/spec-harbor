@@ -261,8 +261,8 @@ Source builds without injected release metadata commonly print `SpecHarbor dev`.
 
 Current release conventions include:
 
-- Git tags: `v0.1.0`
-- Release binary metadata: `0.1.0`
+- Git tags: `v0.2.0`
+- Release binary metadata: `0.2.0`
 - GitHub Release assets built with GoReleaser
 - checksums in `checksums.txt` consumed by supported install channels
 

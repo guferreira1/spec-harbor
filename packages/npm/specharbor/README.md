@@ -71,7 +71,7 @@ Unsupported platforms fail with a clear, deterministic message.
 
 | npm version | GitHub Release tag |
 | --- | --- |
-| `0.1.0` | `v0.1.0` |
+| `0.2.0` | `v0.2.0` |
 
 The mapping is one-to-one and fixed by package version.
 

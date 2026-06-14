@@ -39,7 +39,7 @@ Campos:
 - `date`: data de build fornecida pelo build.
 - `dirty`: estado da árvore de trabalho fornecido pelo build.
 
-`dev` significa que nenhuma versão de release foi injetada. `unknown` significa que o build não forneceu esse campo de metadado. Tags de release do Git usam `vX.Y.Z`, por exemplo `v0.1.0`, enquanto o metadado de binário de release usa `X.Y.Z`, por exemplo `0.1.0`.
+`dev` significa que nenhuma versão de release foi injetada. `unknown` significa que o build não forneceu esse campo de metadado. Tags de release do Git usam `vX.Y.Z`, por exemplo `v0.2.0`, enquanto o metadado de binário de release usa `X.Y.Z`, por exemplo `0.2.0`.
 
 `go install` puro sem `-ldflags` usa o mesmo metadado de fallback de desenvolvimento. Um binário instalado dessa forma deve imprimir:
 
@@ -57,7 +57,7 @@ Builds de release injetam metadados por meio de variáveis Go `-ldflags -X` em `
 ```bash
 go build \
   -ldflags "
-    -X github.com/guferreira1/spec-harbor/internal/platform/version.Version=0.1.0
+    -X github.com/guferreira1/spec-harbor/internal/platform/version.Version=0.2.0
     -X github.com/guferreira1/spec-harbor/internal/platform/version.Commit=abc1234
     -X github.com/guferreira1/spec-harbor/internal/platform/version.Date=2026-06-10T19:00:00Z
     -X github.com/guferreira1/spec-harbor/internal/platform/version.Dirty=false
@@ -65,7 +65,7 @@ go build \
   ./cmd/specharbor
 ```
 
-A execução exibe a string de versão injetada como recebida e não a normaliza. Não inspeciona tags Git, não lê `.git`, não executa Git e não normaliza versões. O GoReleaser injeta metadados de release ao construir assets do GitHub Release a partir de tags como `v0.1.0`, e esses binários exibem metadados simples como `0.1.0`. As opções de instalação estão documentadas em [Instalação](install.md): `install.sh`, o pacote wrapper npm e o tap do Homebrew estão disponíveis, enquanto pacotes Linux nativos, gerenciadores Windows, assinatura, SBOMs e imagens Docker seguem como próximos passos.
+A execução exibe a string de versão injetada como recebida e não a normaliza. Não inspeciona tags Git, não lê `.git`, não executa Git e não normaliza versões. O GoReleaser injeta metadados de release ao construir assets do GitHub Release a partir de tags como `v0.2.0`, e esses binários exibem metadados simples como `0.2.0`. As opções de instalação estão documentadas em [Instalação](install.md): `install.sh`, o pacote wrapper npm e o tap do Homebrew estão disponíveis, enquanto pacotes Linux nativos, gerenciadores Windows, assinatura, SBOMs e imagens Docker seguem como próximos passos.
 
 ### Inicializar um projeto
 

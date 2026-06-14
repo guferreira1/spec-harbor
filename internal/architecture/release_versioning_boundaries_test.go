@@ -493,8 +493,8 @@ func TestReleaseVersioningDocumentationDescribesImplementedScopeOnly(t *testing.
 		"README.md": {
 			"specharbor version",
 			"SpecHarbor dev",
-			"`v0.1.0`",
-			"`0.1.0`",
+			"`v0.2.0`",
+			"`0.2.0`",
 			"GoReleaser",
 			"GitHub Release assets",
 			"`checksums.txt`",
@@ -509,8 +509,8 @@ func TestReleaseVersioningDocumentationDescribesImplementedScopeOnly(t *testing.
 			"GoReleaser",
 			"displays the injected version string as-is",
 			"does not normalize",
-			"`v0.1.0`",
-			"`0.1.0`",
+			"`v0.2.0`",
+			"`0.2.0`",
 		},
 		"docs/release.md": {
 			"GoReleaser",

@@ -39,7 +39,7 @@ Fields:
 - `date`: build date supplied by the build.
 - `dirty`: working tree state supplied by the build.
 
-`dev` means no release version was injected. `unknown` means the build did not provide that metadata field. Git release tags use `vX.Y.Z`, for example `v0.1.0`, while release binary metadata uses plain `X.Y.Z`, for example `0.1.0`.
+`dev` means no release version was injected. `unknown` means the build did not provide that metadata field. Git release tags use `vX.Y.Z`, for example `v0.2.0`, while release binary metadata uses plain `X.Y.Z`, for example `0.2.0`.
 
 Plain `go install` without `-ldflags` uses the same development fallback metadata. An installed binary built that way is expected to print:
 
@@ -57,7 +57,7 @@ Release builds inject metadata through Go `-ldflags -X` variables in `github.com
 ```bash
 go build \
   -ldflags "
-    -X github.com/guferreira1/spec-harbor/internal/platform/version.Version=0.1.0
+    -X github.com/guferreira1/spec-harbor/internal/platform/version.Version=0.2.0
     -X github.com/guferreira1/spec-harbor/internal/platform/version.Commit=abc1234
     -X github.com/guferreira1/spec-harbor/internal/platform/version.Date=2026-06-10T19:00:00Z
     -X github.com/guferreira1/spec-harbor/internal/platform/version.Dirty=false
@@ -65,7 +65,7 @@ go build \
   ./cmd/specharbor
 ```
 
-Runtime displays the injected version string as-is and does not normalize it. It does not inspect Git tags, read `.git`, run Git, or normalize versions. GoReleaser injects release metadata when building GitHub Release assets from tags such as `v0.1.0`, and those binaries display plain metadata such as `0.1.0`. Installation options are documented in [Install](install.md): `install.sh`, the npm wrapper package, and the Homebrew tap are available, while native Linux packages, Windows package managers, signing, SBOMs, and Docker images remain future steps.
+Runtime displays the injected version string as-is and does not normalize it. It does not inspect Git tags, read `.git`, run Git, or normalize versions. GoReleaser injects release metadata when building GitHub Release assets from tags such as `v0.2.0`, and those binaries display plain metadata such as `0.2.0`. Installation options are documented in [Install](install.md): `install.sh`, the npm wrapper package, and the Homebrew tap are available, while native Linux packages, Windows package managers, signing, SBOMs, and Docker images remain future steps.
 
 ### Initialize a Project
 
