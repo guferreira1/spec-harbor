@@ -1,0 +1,71 @@
+# Acceptance Criteria: Implement GitHub Remote Context
+
+- `specharbor context github --repo owner/name --query "<query>"` is implemented.
+- The command is explicit and separate from local/offline context commands.
+- `specharbor context discover` remains local/offline.
+- `specharbor context index` remains local/offline.
+- `specharbor context retrieve` remains local/offline and index-backed.
+- `specharbor brief` remains local/offline.
+- `specharbor prompt` does not automatically call GitHub or inject remote context.
+- Repository locator `owner/name` is supported.
+- `https://github.com/<owner>/<repo>` is supported and normalized to `owner/name`.
+- Empty owner or repo is rejected.
+- Path traversal in repo input is rejected.
+- Full filesystem paths are rejected.
+- Query strings, fragments, credentials, whitespace/control characters, and unsupported hosts are rejected.
+- GitHub Enterprise is not supported.
+- Optional `--ref` is supported.
+- Omitted `--ref` resolves the default branch through GitHub.
+- Ref input is length-bounded.
+- Ref traversal, null bytes, URLs, credentials, query strings, and fragments are rejected.
+- Output includes requested ref/default branch and resolved SHA when available.
+- `--query` is required.
+- Empty queries are rejected.
+- Queries longer than 512 characters are rejected.
+- Query terms are normalized deterministically and bounded.
+- No regex, shell, glob, provider, or semantic remote query execution is performed.
+- Optional repeatable `--path` filters are supported.
+- Path filters are relative repository paths only.
+- Path traversal, absolute paths, Windows drive paths, null bytes, query strings, fragments, and wildcard expansion are rejected.
+- Path filters cannot expand beyond the approved source set.
+- Supported remote sources include `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `docs/**/*.md`, `openspec/project.md`, `openspec/specs/**/*.md`, `.specharbor/rules/**/*.md`, `.specharbor/project-brief.md`, supported manifests/configs, and `.github/workflows/*.yml`/`*.yaml`.
+- The implementation does not fetch the entire repository.
+- Candidate fetching is bounded by file count, file size, total bytes, tree entries, and directory depth.
+- Sensitive files are skipped: `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `secrets.*`, `credentials.*`, `.npmrc`, `.pypirc`, and `.netrc`.
+- Generated/heavy folders are skipped: `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/`, and `obj/`.
+- Binary and unsupported file types are skipped.
+- Oversized files are skipped safely.
+- Public repositories work without a token when GitHub allows it.
+- Optional authentication uses `SPECHARBOR_GITHUB_TOKEN`.
+- Tokens are never printed, persisted, included in reports, or included in errors.
+- GitHub requests use HTTPS and `api.github.com` only.
+- HTTP timeouts and response body sizes are bounded.
+- Rate limit, unauthorized, forbidden, not found, network failure, timeout, invalid token, oversized response, and invalid response errors are safe and concise.
+- No GitHub write API is called.
+- No commits, branches, PRs, issues, comments, labels, releases, tags, workflow runs, or repository mutations are created.
+- No local `git`, `gh`, shell commands, package managers, scripts, agents, prompts, tests, builds, or run commands are executed by the feature.
+- No remote context is cached or persisted by default.
+- `.specharbor/context-index.json` is not written or modified by `context github`.
+- Remote results are not treated as user-confirmed context.
+- Remote results are not automatically injected into role prompts.
+- Output includes repository, ref/default branch, resolved SHA when available, rank, score, path, source category/evidence, line range when practical, bounded snippet or summary, and remote marker.
+- Output excludes tokens, credentials, credential-bearing URLs, huge contents, binary contents, generated contents, and sensitive contents.
+- No-results behavior is safe and concise.
+- Ranking is deterministic and local.
+- Ranking uses lexical token matching, optional phrase boosts, path/filename boosts, source category priority, and heading hints.
+- Ranking does not use embeddings, vectors, LLMs, provider APIs, RAG generation, or GitHub ranking as final ordering.
+- Tie-breaking is deterministic by score, category priority, path, line start, and snippet text.
+- Domain owns validation, limits, source set, scoring, ranking, report, and skip policy.
+- Core/usecase orchestrates remote fetching through ports and assembles reports.
+- Ports define read-only GitHub remote context interfaces.
+- The GitHub HTTP adapter lives outside core.
+- CLI parses flags and formats reports only.
+- Core does not import adapters, CLI, `net/http`, `os/exec`, provider SDKs, source-control SDKs, or workflow packages.
+- Tests use fake GitHub adapters/transports and do not require real network or tokens.
+- Tests cover repo/ref/query/path validation, token redaction, bounded fetching, skip rules, oversized files, unsupported content, scoring, tie-breaking, source attribution, line ranges, output limits, no-results, and error mapping.
+- Tests prove no GitHub mutation methods are present in ports/adapters.
+- Tests prove no shell/exec, embeddings, RAG, provider APIs, prompt execution, or agent execution behavior is introduced.
+- Regression tests cover existing local commands where practical.
+- Documentation explains that remote context is explicit, optional, networked only for `context github`, read-only, token-optional, not local context, not confirmed context, not RAG, not embeddings, and not provider behavior.
+- OpenSpec validation passes with zero errors.
+- `go test ./...` passes after implementation.
