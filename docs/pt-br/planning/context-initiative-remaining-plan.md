@@ -1,6 +1,6 @@
-# Remaining Context Initiative Plan
+# Plano restante do Context Initiative
 
-## Purpose
+## Objetivo
 
 This document plans the remaining Context Initiative work. It is a planning artifact only. It does not create active OpenSpec changes, does not implement product code, and does not modify production behavior.
 
@@ -44,7 +44,7 @@ A single branch is acceptable for this plan because it is one documentation arti
 
 Each implementation branch should contain exactly one active OpenSpec change and one feature's product edits. After that feature merges, archive it from a fresh branch based on updated `main` so archive housekeeping is separated from implementation review.
 
-## Subagent Strategy
+## Estratégia de subagentes
 
 Use a main coordinator with planning subagents.
 
@@ -77,7 +77,7 @@ Subagents must not:
 
 Every subagent must follow OpenSpec/SDD discipline. The coordinator validates every subagent output before any implementation begins. Parallelism is for planning and review only; production edits should be sequenced by feature.
 
-## Recommended Execution Order
+## Ordem recomendada de execução
 
 Use this order:
 
@@ -141,7 +141,7 @@ Testing focus:
 
 Documentation impact:
 
-- Update `README.md`, `docs/usage.md`, and `docs/workflow.md` only if the implementation exposes a user-facing update command or flag.
+- Update `README.md`, `../usage.md`, and `../workflow.md` only if the implementation exposes a user-facing update command or flag.
 - Document that update behavior is confirmation-first and not indexing, RAG, remote discovery, or command verification.
 
 Main risks:

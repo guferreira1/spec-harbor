@@ -6,7 +6,15 @@ It helps teams convert a loose idea into a scoped change package that humans and
 
 ## Português
 
-Português: [docs/pt-BR/README.md](docs/pt-BR/README.md)
+Documentation languages:
+
+- English: `docs/en/`
+- Português (Brasil): `docs/pt-br/`
+
+See:
+
+- English docs: [docs/en/README.md](docs/en/README.md)
+- Documentação em português: [docs/pt-br/README.md](docs/pt-br/README.md)
 
 ## What is SpecHarbor
 
@@ -146,7 +154,7 @@ Interactive project briefing is available as:
 specharbor brief
 ```
 
-Move to `docs/usage.md` for the full command reference.
+Move to `docs/en/usage.md` for the full command reference.
 
 ## Installation
 
@@ -164,7 +172,7 @@ Supported channels:
   `go install github.com/guferreira1/spec-harbor/cmd/specharbor@latest`
 
 Use `specharbor version` to confirm installation.
-See [docs/install.md](docs/install.md) for platform support, checksum steps, and troubleshooting.
+See [docs/en/install.md](docs/en/install.md) for platform support, checksum steps, and troubleshooting.
 
 ## Current capabilities
 
@@ -266,17 +274,17 @@ Supported distribution paths are:
 - Homebrew tap
 - `go install` fallback
 
-GitHub Releases, npm, and the Homebrew tap are published automatically on each `vX.Y.Z` tag (see [Release metadata](docs/release.md)). Native Linux package managers, Windows package managers, Docker, signing, and SBOMs remain future work.
+GitHub Releases, npm, and the Homebrew tap are published automatically on each `vX.Y.Z` tag (see [Release metadata](docs/en/release.md)). Native Linux package managers, Windows package managers, Docker, signing, and SBOMs remain future work.
 
 ## Documentation
 
-- [Install](docs/install.md)
-- [Usage](docs/usage.md)
-- [Workflow](docs/workflow.md)
-- [Agent roles](docs/agent-roles.md)
-- [Generation modes](docs/generation-modes.md)
-- [Release metadata](docs/release.md)
-- [Contributing](docs/contributing.md)
+- [Install](docs/en/install.md)
+- [Usage](docs/en/usage.md)
+- [Workflow](docs/en/workflow.md)
+- [Agent roles](docs/en/agent-roles.md)
+- [Generation modes](docs/en/generation-modes.md)
+- [Release metadata](docs/en/release.md)
+- [Contributing](docs/en/contributing.md)
 
 ## Status and roadmap
 
@@ -297,7 +305,7 @@ Planned features are documented in planning artifacts and not yet implemented:
 - generic runner mapping for agent execution;
 - broader AI-provider and workflow connector automation.
 
-See [docs/planning/context-initiative-remaining-plan.md](docs/planning/context-initiative-remaining-plan.md) for current context initiative planning.
+See [docs/en/planning/context-initiative-remaining-plan.md](docs/en/planning/context-initiative-remaining-plan.md) for current context initiative planning.
 
 ## Contributing
 
@@ -308,7 +316,7 @@ See [docs/planning/context-initiative-remaining-plan.md](docs/planning/context-i
 - Preserve architecture boundaries:
   `internal/core/domain`, `internal/core/ports`, `internal/core/usecase`, and `internal/adapters`.
 
-See [docs/contributing.md](docs/contributing.md).
+See [docs/en/contributing.md](docs/en/contributing.md).
 
 ## Local checks
 
