@@ -46,7 +46,7 @@ Revisa o diff final contra a mudança OpenSpec ativa. Esse papel deve priorizar 
 Spec Author -> Architecture Reviewer -> Implementer -> Test Engineer -> Change Reviewer
 ```
 
-The broader recommended workflow continues manually through Commit, Pull Request, Merge, and Archive. `specharbor workflow` shows that full advisory sequence without executing commands or automating source-control steps.
+O fluxo recomendado mais amplo continua manualmente por Commit, Pull Request, Merge e Archive. `specharbor workflow` mostra a sequência completa de orientação sem executar comandos ou automatizar etapas de controle de fonte.
 
 Pull Request e Archive são etapas de workflow, não papéis de prompt suportados nesta versão.
 

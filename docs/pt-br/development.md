@@ -1,16 +1,14 @@
 # Desenvolvimento
 
-# Desenvolvimento
-
 O SpecHarbor é uma CLI em Go. A versão do Go do repositório está declarada em `go.mod`:
 
 ```text
 go 1.23
 ```
 
-Use Go 1.23 or a compatible newer Go toolchain.
+Use Go 1.23 ou uma toolchain Go compatível e mais nova.
 
-## Local Commands
+## Comandos locais
 
 Execute testes:
 
@@ -46,13 +44,13 @@ Formate arquivos Go alterados com `gofmt` antes de finalizar mudanças.
 
 ## CI
 
-O CI do SpecHarbor é específico para Go porque o SpecHarbor é escrito em Go.
+O CI do SpecHarbor é específico para Go porque o SpecHarbor é implementado em Go.
 
-GitHub Actions runs on pull requests and pushes to `main`. The workflow:
+O GitHub Actions roda em pull requests e pushes para `main`. O fluxo:
 
-- uses the repository Go module through `go.mod`;
-- checks `gofmt`;
-- runs `go test -count=1 ./...`.
+- usa o módulo Go do repositório via `go.mod`;
+- verifica `gofmt`;
+- executa `go test -count=1 ./...`.
 
 Isso não torna `specharbor scan` específico de Go. `specharbor scan` foi feito para ser stack-agnostic e não deve assumir que projetos de usuário são Go.
 

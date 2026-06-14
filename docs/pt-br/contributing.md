@@ -2,26 +2,26 @@
 
 O SpecHarbor usa changes OpenSpec para manter o trabalho de implementação com escopo e revisável. Recursos de recurso, arquitetura, comportamento, testes, CI ou documentação devem começar com uma mudança OpenSpec em `openspec/changes/<change-id>/`.
 
-## Required Reading
+## Leitura obrigatória
 
 Antes de implementar uma mudança significativa, contribuidores e agentes devem ler:
 
 - `AGENTS.md`
 - `.specharbor/rules/global.md`
-- the relevant role rule under `.specharbor/rules/`
+- a regra de papel relevante em `.specharbor/rules/`
 - `openspec/project.md`
 - `openspec/specs/architecture/spec.md`
-- the active change under `openspec/changes/<change-id>/`
+- a change ativa em `openspec/changes/<change-id>/`
 
 ## Arquivos OpenSpec
 
 Cada mudança ativa deve explicar o trabalho com:
 
-- `proposal.md`: problem, goal, scope, out-of-scope work, and success criteria.
-- `design.md`: technical approach and tradeoffs.
-- `tasks.md`: implementation and verification checklist.
-- `acceptance-criteria.md`: observable completion criteria.
-- `risks.md`: risks and mitigations.
+- `proposal.md`: problema, meta, escopo, out-of-scope e critérios de sucesso.
+- `design.md`: abordagem técnica e trade-offs.
+- `tasks.md`: lista de implementação e verificação.
+- `acceptance-criteria.md`: critérios de conclusão observáveis.
+- `risks.md`: riscos e mitigação.
 
 Mantenha esses arquivos alinhados. Atualize `tasks.md` apenas para trabalho que realmente foi concluído.
 
@@ -35,15 +35,15 @@ Não misture documentação, código, testes e CI em uma única change ampla, a 
 
 O SpecHarbor segue a arquitetura hexagonal:
 
-- Domain code belongs in `internal/core/domain`.
-- Ports belong in `internal/core/ports`.
-- Use cases belong in `internal/core/usecase`.
-- Concrete implementations belong in `internal/adapters`.
-- Core must not import adapters.
-- Use cases must depend on interfaces.
-- CLI code must not contain business rules.
+- O código de domínio pertence a `internal/core/domain`.
+- Ports pertencem a `internal/core/ports`.
+- Casos de uso pertencem a `internal/core/usecase`.
+- Implementações concretas pertencem a `internal/adapters`.
+- Core não deve importar adapters.
+- Casos de uso devem depender de interfaces.
+- O código da CLI não deve conter regras de negócio.
 
-Use `openspec/specs/architecture/spec.md` as the source of detail instead of duplicating the full architecture spec here.
+Use `openspec/specs/architecture/spec.md` como fonte de detalhe em vez de duplicar toda a especificação de arquitetura aqui.
 
 ## Verificação
 
@@ -53,7 +53,7 @@ Execute os testes após a implementação:
 go test ./...
 ```
 
-Inspect diffs before finalizing work:
+Revise os diff antes de finalizar:
 
 ```bash
 git status --short
@@ -62,20 +62,20 @@ git diff --name-only
 git diff
 ```
 
-Check that the diff matches the active change and that `tasks.md` does not claim work that was not completed.
+Verifique se o diff corresponde à mudança ativa e que `tasks.md` não afirma trabalho não concluído.
 
 ## Higiene de Branches
 
-Use branches ou worktrees separados para changes OpenSpec separados. Prefira um `change-id` ativo por branch.
+Use branches ou worktrees separados para `changes` OpenSpec separadas. Prefira um `change-id` ativo por branch.
 
-Avoid multiple agents editing the same files without explicit coordination. If parallel feature branches are merged, reconcile the docs afterward so command lists and status labels match the stabilized branch.
+Evite que múltiplos agentes editem os mesmos arquivos sem coordenação explícita. Se branches de feature paralelas forem mescladas, reconcilie a documentação depois para que listas de comandos e rótulos de status correspondam à branch estabilizada.
 
-Before starting and before finalizing, run:
+Antes de começar e antes de finalizar, execute:
 
 ```bash
 git status --short
 ```
 
-Do not revert, overwrite, or clean up unrelated dirty worktree changes. Treat unrelated local changes as someone else's work unless coordination says otherwise.
+Não reverta, sobrescreva ou limpe mudanças sujas no worktree que não estão relacionadas. Trate mudanças locais não relacionadas como trabalho de outra pessoa, a menos que a coordenação diga o contrário.
 
-Do not describe scan, config, CI, or other recently worked features as complete until the relevant branch is merged into the branch being documented and the behavior is verified there.
+Não descreva `scan`, `config`, CI ou outras features recentemente trabalhadas como completas até que a branch relevante seja mesclada na branch em documentação e o comportamento esteja verificado ali.

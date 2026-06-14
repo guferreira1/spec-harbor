@@ -2,7 +2,7 @@
 
 ## Overview
 
-- [README](../README.md)
+- [README](../../README.md)
 - [Getting Started](./getting-started.md)
 - [Usage](./usage.md)
 

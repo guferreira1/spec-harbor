@@ -1,33 +1,34 @@
 # Metadados de release
 
-SpecHarbor uses GoReleaser to build GitHub Release assets from pushed version tags.
+O SpecHarbor usa GoReleaser para construir ativos do GitHub Release a partir de
+tags de versão enviadas.
 
 ## Release pública atual
 
-The current public release is GitHub Release `v0.1.0`, built from commit
-`e6faff91feef07e5c1e47181243286268daf17b5`. Release binaries display plain
-version `0.1.0`.
+A release pública atual é o GitHub Release `v0.1.0`, construído do commit
+`e6faff91feef07e5c1e47181243286268daf17b5`. Binários de release exibem a versão
+`0.1.0` simples.
 
-The validated public distribution channels for this release are:
+Os canais de distribuição pública validados para esta release são:
 
 - GitHub Releases.
 - `install.sh`.
 - npm package `specharbor@0.1.0`.
 - Homebrew tap install command `brew install guferreira1/tap/specharbor`.
 
-The Homebrew formula lives in the external tap repository
-`guferreira1/homebrew-tap`; the validated tap commit is
+A fórmula Homebrew está no repositório externo de tap
+`guferreira1/homebrew-tap`; o commit de tap validado é
 `a61783bcfa44f7eafdce72c70043b76e6f80df9c`.
 
 ## Verificar versão
 
-Use:
+Execute:
 
 ```bash
 specharbor version
 ```
 
-Default development output:
+Saída padrão de desenvolvimento:
 
 ```text
 SpecHarbor dev
@@ -36,16 +37,18 @@ date: unknown
 dirty: unknown
 ```
 
-Fields:
+Campos:
 
-- `version`: product version metadata displayed on the first line.
-- `commit`: source commit supplied by the build.
-- `date`: build timestamp supplied by the build.
-- `dirty`: working tree state supplied by the build.
+- `version`: metadado de versão do produto exibido na primeira linha.
+- `commit`: commit de origem fornecido pelo build.
+- `date`: timestamp de build fornecido pelo build.
+- `dirty`: estado do working tree fornecido pelo build.
 
-`dev` means no release version was injected. `unknown` means the build did not provide that metadata field.
+`dev` significa que nenhuma versão de release foi injetada. `unknown` significa que
+o build não forneceu aquele campo de metadado.
 
-Plain `go install` without `-ldflags` uses the same development fallback metadata. An installed binary built that way is expected to print:
+`go install` puro sem `-ldflags` usa o mesmo metadado de fallback de
+desenvolvimento. Um binário instalado construído dessa forma deve imprimir:
 
 ```text
 SpecHarbor dev
@@ -54,13 +57,15 @@ date: unknown
 dirty: unknown
 ```
 
-This is expected behavior.
+Este é o comportamento esperado.
 
 ## Convenção de versão
 
-Git release tags use `vX.Y.Z`, for example `v0.1.0`.
+Tags de release do Git usam `vX.Y.Z`, por exemplo `v0.1.0`.
 
-Release binary version metadata uses plain `X.Y.Z`, for example `0.1.0`. GoReleaser injects the plain version value, so a release built from tag `v0.1.0` displays:
+Metadados de versão de release usam `X.Y.Z` simples, por exemplo `0.1.0`. O
+GoReleaser injeta o valor simples, então uma release construída a partir da tag
+`v0.1.0` exibe:
 
 ```text
 SpecHarbor 0.1.0
@@ -69,65 +74,67 @@ date: <UTC RFC3339 build date>
 dirty: false
 ```
 
-Runtime displays the injected version string as-is and does not normalize it. If a manual build injects `v0.1.0`, `specharbor version` may display `v0.1.0`.
+O runtime exibe a string de versão injetada como está e não a normaliza. Se um build
+manual injetar `v0.1.0`, `specharbor version` pode exibir `v0.1.0`.
 
 ## Injeção em tempo de build
 
-Release builds inject metadata through Go `-ldflags -X` variables in:
+Builds de release injetam metadados usando variáveis Go `-ldflags -X` em:
 
 ```text
 github.com/guferreira1/spec-harbor/internal/platform/version
 ```
 
-GoReleaser injects exactly:
+GoReleaser injeta exatamente:
 
 - `Version={{ .Version }}`
 - `Commit={{ .FullCommit }}`
 - `Date={{ .Date }}`
 - `Dirty={{ .IsGitDirty }}`
 
-The runtime command does not inspect Git tags, read `.git`, run Git commands, execute shell commands, call the network, write files, or normalize versions.
+O comando runtime não inspeciona tags Git, não lê `.git`, não executa comandos Git,
+não executa comandos shell, não chama rede, não escreve arquivos e não normaliza
+versões.
 
 ## Workflow de release
 
-Maintainers publish a release by pushing a tag that matches `v*`, such as:
+Mantenedores publicam uma release enviando uma tag que bate com `v*`, por exemplo:
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The GitHub Actions release workflow runs only for pushed tags matching `v*`. It
-does not run on normal branch pushes or pull requests, so a pull request can
-never publish. The workflow is least privilege: the top-level permission is
-`contents: read` and only the jobs that need more escalate.
+O workflow de release do GitHub Actions roda apenas para tags enviadas que batem com
+`v*`. Ele não roda em pushes de branch normais nem em pull requests, então um PR
+não pode publicar. O workflow segue menor privilégio: permissão de topo `contents:
+read` e apenas jobs que precisam escalam mais.
 
-The workflow runs ordered jobs:
+O workflow executa os jobs em ordem:
 
-1. `validate-release-inputs` — runs `scripts/validate-release-version.sh` to
-   reject any tag that is not an exact stable SemVer tag `vX.Y.Z` and to fail
-   if the tag's `X.Y.Z` does not equal the npm `package.json` version.
-2. `goreleaser` (`contents: write`) — runs `go test ./...` and GoReleaser
-   `release --clean` with the repository `GITHUB_TOKEN` to create the GitHub
-   Release, upload assets, and publish `checksums.txt`.
+1. `validate-release-inputs` — executa `scripts/validate-release-version.sh` para
+   rejeitar qualquer tag que não seja exatamente `vX.Y.Z` e falhar se `X.Y.Z` da
+   tag não coincidir com a versão em `package.json` do npm.
+2. `goreleaser` (`contents: write`) — executa `go test ./...` e
+   `release --clean` com `GITHUB_TOKEN` do repositório para criar o GitHub
+   Release, fazer upload dos ativos e publicar `checksums.txt`.
 3. `npm-publish` (`contents: read`, `id-token: write`, `needs: goreleaser`) —
-   re-validates the version, runs the npm package tests and packaged-contents
-   validation, then publishes `specharbor@X.Y.Z`.
-4. `homebrew-publish` (`contents: read`, `needs: goreleaser`) — renders the
-   formula from the release `checksums.txt` and updates the
-   `guferreira1/homebrew-tap` repository.
-5. `release-summary` — records a per-channel summary.
+   revalida a versão, executa testes do pacote npm e validação de conteúdo
+   empacotado, depois publica `specharbor@X.Y.Z`.
+4. `homebrew-publish` (`contents: read`, `needs: goreleaser`) — renderiza a
+   fórmula a partir de `checksums.txt` da release e atualiza o repositório
+   `guferreira1/homebrew-tap`.
+5. `release-summary` — registra um resumo por canal.
 
-`npm-publish` and `homebrew-publish` wait for `goreleaser` because both consume
-the published GitHub Release assets and `checksums.txt`. This tag-based workflow
-now publishes GitHub Release assets, `checksums.txt`, the npm package, and the
-Homebrew tap. It does not publish Linux native packages, publish Windows
-package-manager manifests, sign binaries, generate SBOMs, or publish Docker
-images.
+`npm-publish` e `homebrew-publish` esperam `goreleaser` porque ambos consomem os
+ativos publicados do GitHub Release e `checksums.txt`. Este workflow baseado em
+tag agora publica ativos do GitHub Release, `checksums.txt`, o pacote npm e o tap
+Homebrew. Não publica pacotes nativos Linux, manifests de gerenciadores Windows,
+assinatura de binários, geração de SBOMs ou imagens Docker.
 
-## Assets da release
+## Ativos da release
 
-GoReleaser builds one `specharbor` binary from `./cmd/specharbor` for these archives:
+GoReleaser constrói um binário `specharbor` de `./cmd/specharbor` para estes arquivos:
 
 - `specharbor_Linux_x86_64.tar.gz`
 - `specharbor_Linux_arm64.tar.gz`
@@ -136,11 +143,14 @@ GoReleaser builds one `specharbor` binary from `./cmd/specharbor` for these arch
 - `specharbor_Windows_x86_64.zip`
 - `specharbor_Windows_arm64.zip`
 
-Linux and macOS assets use `.tar.gz`. Windows assets use `.zip`. GoReleaser also generates `checksums.txt` with SHA-256 checksums.
+Ativos de Linux e macOS usam `.tar.gz`. Ativos de Windows usam `.zip`. O
+GoReleaser também gera `checksums.txt` com checksums SHA-256.
 
-Installation options that consume these assets — manual download, `install.sh`, the npm wrapper package, and the Homebrew tap — are documented in [Install](install.md).
+As opções de instalação que consomem esses ativos — download manual,
+`install.sh`, pacote wrapper npm e tap Homebrew — estão documentadas em
+[Instalação](install.md).
 
-For `v0.1.0`, those assets cover:
+Para `v0.1.0`, esses ativos cobrem:
 
 - Linux amd64.
 - Linux arm64.
@@ -152,93 +162,96 @@ For `v0.1.0`, those assets cover:
 
 ## Canais de pacote
 
-npm package `specharbor@X.Y.Z` is published automatically by the `npm-publish`
-job and maps package version `X.Y.Z` to GitHub Release tag `vX.Y.Z`. Before
-publishing, the job runs `scripts/validate-release-version.sh`, the npm package
-tests (`npm test`), and a `npm pack --dry-run` contents check that requires
-`bin/`, `lib/`, `scripts/`, `README.md`, `README.pt-BR.md`, and `package.json`
-and rejects `native/`, `node_modules/`, and test fixtures. Publishing uses
-`npm publish --provenance --access public`.
+O pacote npm `specharbor@X.Y.Z` é publicado automaticamente pelo job
+`npm-publish` e mapeia a versão do pacote `X.Y.Z` para a tag GitHub Release
+`vX.Y.Z`. Antes de publicar, o job executa `scripts/validate-release-version.sh`,
+os testes do pacote npm (`npm test`) e uma validação de conteúdo com
+`npm pack --dry-run` que exige `bin/`, `lib/`, `scripts/`, `README.md`,
+`README.pt-BR.md` e `package.json` e rejeita `native/`, `node_modules/` e
+fixtures de teste. A publicação usa `npm publish --provenance --access public`.
 
-Homebrew is available through:
+Homebrew está disponível por:
 
 ```bash
 brew install guferreira1/tap/specharbor
 ```
 
-The macOS formula in the external `guferreira1/homebrew-tap` repository is
-updated automatically by the `homebrew-publish` job, which renders
-`Formula/specharbor.rb` from the release `checksums.txt` with
-`scripts/render-homebrew-formula.sh` and commits it to the tap. The formula
-pins each download to its SHA-256 and keeps a `test do` block running
-`specharbor version`.
+A fórmula macOS no repositório externo `guferreira1/homebrew-tap` é atualizada
+automaticamente pelo job `homebrew-publish`, que renderiza
+`Formula/specharbor.rb` a partir de `checksums.txt` da release com
+`scripts/render-homebrew-formula.sh` e faz commit no tap. A fórmula fixa cada
+download em SHA-256 e mantém um bloco `test do` executando `specharbor version`.
 
 ### Segredos obrigatórios e configuração de publicador confiável
 
-| Secret / setting | Purpose |
+| Segredo/configuração | Propósito |
 | --- | --- |
-| `GITHUB_TOKEN` (built in) | Create the GitHub Release and read its assets. |
-| npm trusted publisher (recommended) | Configure a trusted publisher for the `specharbor` package on npmjs.com pointing at `guferreira1/spec-harbor` and `.github/workflows/release.yml`. With `id-token: write` and npm >= 11.5, the `npm-publish` job publishes without a long-lived token. |
-| `NPM_TOKEN` (fallback) | A granular npm automation token used as `NODE_AUTH_TOKEN` when a trusted publisher is not configured. |
-| `HOMEBREW_TAP_GITHUB_TOKEN` | A token with write access to `guferreira1/homebrew-tap` so the `homebrew-publish` job can commit the formula. The default `GITHUB_TOKEN` cannot write to a separate repository. |
+| `GITHUB_TOKEN` (built in) | Cria o GitHub Release e lê seus ativos. |
+| npm trusted publisher (recommended) | Configura um publisher confiável para `specharbor` em npmjs.com apontando para `guferreira1/spec-harbor` e `.github/workflows/release.yml`. Com `id-token: write` e npm >= 11.5, o job `npm-publish` publica sem token de longa duração. |
+| `NPM_TOKEN` (fallback) | Token granular de automação npm usado como `NODE_AUTH_TOKEN` quando não há publisher confiável configurado. |
+| `HOMEBREW_TAP_GITHUB_TOKEN` | Token com acesso de escrita em `guferreira1/homebrew-tap` para que o job `homebrew-publish` possa fazer commit da fórmula. O `GITHUB_TOKEN` padrão não escreve em repositório separado. |
 
-Tokens are read only from the `secrets` context and are never printed.
+Os tokens são lidos apenas do contexto `secrets` e nunca impressos.
 
 ## Checklist de release para mantenedores
 
-1. Bump `packages/npm/specharbor/package.json` `version` to `X.Y.Z`.
-2. Ensure the tag you will push is `vX.Y.Z` and matches the package version
-   (locally: `sh scripts/validate-release-version.sh vX.Y.Z`).
-3. Ensure the npm trusted publisher or `NPM_TOKEN` is configured.
-4. Ensure `HOMEBREW_TAP_GITHUB_TOKEN` is configured.
-5. Push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-6. Verify the GitHub Release assets and `checksums.txt`.
-7. Verify the npm package: `npm view specharbor@X.Y.Z`.
-8. Verify the Homebrew formula updated in `guferreira1/homebrew-tap`.
-9. Verify `install.sh` resolves the new release.
-10. Verify `specharbor version` prints `X.Y.Z`.
+1. Atualize `packages/npm/specharbor/package.json` `version` para `X.Y.Z`.
+2. Garanta que a tag enviada seja `vX.Y.Z` e corresponda à versão do pacote
+   (localmente: `sh scripts/validate-release-version.sh vX.Y.Z`).
+3. Configure o publisher confiável npm ou `NPM_TOKEN`.
+4. Configure `HOMEBREW_TAP_GITHUB_TOKEN`.
+5. Envie a tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+6. Verifique os ativos do GitHub Release e `checksums.txt`.
+7. Verifique o pacote npm: `npm view specharbor@X.Y.Z`.
+8. Verifique a fórmula Homebrew atualizada em `guferreira1/homebrew-tap`.
+9. Verifique se `install.sh` resolve a nova release.
+10. Verifique se `specharbor version` imprime `X.Y.Z`.
 
 ## Falhas e rollback
 
-- **GitHub Release succeeds but npm fails.** Re-run the `npm-publish` job; it is
-  idempotent until the version exists on npm. npm forbids republishing the same
-  version, so never attempt to overwrite — if the package version was already
-  published, bump to a new `X.Y.Z`, retag, and release again.
-- **npm succeeds but Homebrew fails.** Re-run the `homebrew-publish` job; it
-  re-renders the formula from the existing release `checksums.txt` and pushes
-  only if the formula changed, so re-runs are safe.
-- **Version mismatch.** `validate-release-inputs` fails the release before any
-  publish; fix `package.json` or the tag and release again.
-- **Manual recovery.** The Homebrew formula can be regenerated locally with
-  `scripts/render-homebrew-formula.sh` against a downloaded `checksums.txt` and
-  committed to the tap by hand if CI is unavailable.
+- **GitHub Release funciona, mas npm falha.** Reexecute o job `npm-publish`; ele
+  é idempotente até a versão existir no npm. O npm proíbe republicar a mesma
+  versão, então nunca tente sobrescrever — se a versão do pacote já foi publicada,
+  atualize para novo `X.Y.Z`, retague e publique novamente.
+- **npm funciona, mas Homebrew falha.** Reexecute o job `homebrew-publish`; ele
+  re-renderiza a fórmula com o `checksums.txt` da release existente e faz push
+  apenas se a fórmula mudou, por isso reapresentações são seguras.
+- **Versão incompatível.** `validate-release-inputs` falha a release antes de
+  publicar; corrija `package.json` ou a tag e publique novamente.
+- **Recuperação manual.** A fórmula Homebrew pode ser regenerada localmente com
+  `scripts/render-homebrew-formula.sh` usando um `checksums.txt` baixado e
+  enviada manualmente ao tap se a CI estiver indisponível.
 
 ## Snapshot local e verificação dry-run
 
-Release workflow changes are reviewable without pushing a real tag. Pull
-requests never publish because the workflow is tag-only, and every publishing
-step has a local dry-run equivalent.
+As mudanças do workflow de release podem ser revisadas sem enviar uma tag real.
+Pull requests nunca publicam porque o workflow é só por tag, e cada etapa tem
+equivalente local com dry-run.
 
-Local snapshot releases are for verification only. They write generated artifacts under `dist/`, which is ignored by Git.
+Releases locais de snapshot são apenas para verificação. Elas escrevem artefatos
+gerados em `dist/`, que é ignorado pelo Git.
 
-Use `goreleaser check` and `goreleaser release --snapshot --clean` before publishing release changes.
+Use `goreleaser check` e `goreleaser release --snapshot --clean` antes de
+publicar mudanças de release.
 
-Run:
+Execute:
 
 ```bash
 goreleaser check
 goreleaser release --snapshot --clean
 ```
 
-Then run one generated snapshot binary:
+Em seguida, execute um binário snapshot gerado:
 
 ```bash
 ./dist/specharbor_linux_amd64_v1/specharbor version
 ```
 
-Snapshot versions may include GoReleaser snapshot metadata instead of a normal release version. They should still show injected `commit`, `date`, and `dirty` values instead of the default `unknown` fallback values.
+As versões snapshot podem incluir metadados de snapshot do GoReleaser em vez de uma
+versão de release normal. Elas devem ainda exibir valores injetados de `commit`,
+`date` e `dirty` em vez dos valores padrão `unknown` de fallback.
 
-Validate the rest of the publishing path without publishing:
+Valide o restante do caminho de publicação sem publicar:
 
 ```bash
 # Version consistency gate (and its tests).
@@ -257,14 +270,14 @@ cd -
 
 ## Trabalho futuro
 
-GitHub Releases, `checksums.txt`, `install.sh`, the npm wrapper package, and the
-external Homebrew tap are automated and documented in [Install](install.md).
-Publishing automation does not implement these future-only items:
+GitHub Releases, `checksums.txt`, `install.sh`, o pacote wrapper npm e o tap
+externo Homebrew são automatizados e documentados em [Instalação](install.md).
+A automação de publicação não implementa estes itens de futuro:
 
-- Native Linux packages such as `.deb`, `.rpm`, or `.apk`.
-- Windows package-manager manifests such as Winget, Scoop, or Chocolatey.
-- Signing, cosign, attestations, or SBOM generation.
-- Docker images or Docker manifests.
+- Pacotes nativos Linux como `.deb`, `.rpm` ou `.apk`.
+- Manifests de gerenciadores Windows como Winget, Scoop ou Chocolatey.
+- Assinatura, cosign, atestações ou geração de SBOM.
+- Imagens Docker ou manifests Docker.
 
-Those channels and supply-chain features remain future work and require
-separate OpenSpec changes or manual maintainer action.
+Esses canais e recursos de supply chain permanecem para o futuro e exigem
+mudanças OpenSpec separadas ou ação manual de mantenedores.

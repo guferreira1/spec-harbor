@@ -2,7 +2,7 @@
 
 ## Visão geral
 
-- [README](../README.md)
+- [README](../../README.md)
 - [Início rápido](./getting-started.md)
 - [Uso](./usage.md)
 

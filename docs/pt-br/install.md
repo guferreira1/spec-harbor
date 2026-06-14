@@ -1,31 +1,32 @@
 # Instalação do SpecHarbor
 
-SpecHarbor is distributed through official GitHub Release assets built by
-GoReleaser for `guferreira1/spec-harbor`. Every install channel downloads
-those assets over HTTPS and verifies SHA-256 checksums before installing.
+SpecHarbor é distribuído por meio de ativos oficiais do GitHub Release construídos
+pelas builds do `GoReleaser` para `guferreira1/spec-harbor`. Cada canal de
+instalação baixa esses ativos por HTTPS e verifica checksums SHA-256 antes de
+instalar.
 
 ## Status dos canais
 
-| Channel | Status |
+| Canal | Status |
 | --- | --- |
-| GitHub Releases | Available for `v0.1.0` |
-| `install.sh` | Available for Linux and macOS using real release assets |
-| npm | Available as unscoped package `specharbor@0.1.0` |
-| Homebrew | Available as `brew install guferreira1/tap/specharbor` |
-| `go install` from source | Fallback/developer option; prints development fallback metadata |
-| package publishing automation | Automated on tag push for npm and Homebrew |
-| Linux `.deb` / `.rpm` packages | Future only |
-| Windows Scoop / Winget | Future only |
-| signing | Future only |
-| SBOM | Future only |
-| Docker | Future only |
+| GitHub Releases | Disponível para `v0.1.0` |
+| `install.sh` | Disponível para Linux e macOS usando ativos de release reais |
+| npm | Disponível como pacote sem escopo `specharbor@0.1.0` |
+| Homebrew | Disponível como `brew install guferreira1/tap/specharbor` |
+| `go install` from source | Opção de fallback/desenvolvedor; imprime metadados de fallback de desenvolvimento |
+| automação de publicação de pacote | Automatizada no push de tags para npm e Homebrew |
+| Pacotes Linux `.deb` / `.rpm` | Apenas futuro |
+| Scoop / Winget do Windows | Apenas futuro |
+| assinatura | Apenas futuro |
+| SBOM | Apenas futuro |
+| Docker | Apenas futuro |
 
-Binary install channels require a published GitHub Release with matching
-assets and checksums. The first published release is `v0.1.0`.
+Canais de instalação de binário exigem um GitHub Release publicado com ativos e
+checksums correspondentes. A primeira release publicada é `v0.1.0`.
 
 ## Assets de release
 
-Each release tag `vX.Y.Z` publishes these assets:
+Cada tag de release `vX.Y.Z` publica estes ativos:
 
 ```text
 specharbor_Linux_x86_64.tar.gz
@@ -37,39 +38,39 @@ specharbor_Windows_arm64.zip
 checksums.txt
 ```
 
-Archives contain the `specharbor` binary (`specharbor.exe` on Windows).
-`checksums.txt` contains one SHA-256 line per asset. Asset download URLs
-follow this pattern:
+Os ativos compactados contém o binário `specharbor` (`specharbor.exe` no
+Windows). `checksums.txt` contém uma linha SHA-256 por ativo. As URLs de
+download dos ativos seguem este padrão:
 
 ```text
 https://github.com/guferreira1/spec-harbor/releases/download/vX.Y.Z/<asset>
 ```
 
-Release assets cover Linux `amd64`, Linux `arm64`, macOS `amd64`, macOS
-`arm64`, Windows `amd64`, and Windows `arm64`. `install.sh` supports Linux
-and macOS. The npm wrapper supports Linux, macOS, and Windows on `x64` and
-`arm64`. The current Homebrew formula is macOS-only.
+Os ativos de release cobrem Linux `amd64`, Linux `arm64`, macOS `amd64`, macOS
+`arm64`, Windows `amd64` e Windows `arm64`. O `install.sh` suporta Linux e
+macOS. O wrapper npm suporta Linux, macOS e Windows em `x64` e `arm64`. A
+fórmula atual do Homebrew é somente para macOS.
 
 ## Instalação manual via GitHub Releases
 
-1. Download the archive for your OS/arch and `checksums.txt` from the
-   [releases page](https://github.com/guferreira1/spec-harbor/releases).
+1. Baixe o arquivo compactado para seu SO/arquitetura e `checksums.txt` a partir da
+   [página de releases](https://github.com/guferreira1/spec-harbor/releases).
 
-2. Verify the checksum. On Linux:
+2. Verifique o checksum. No Linux:
 
    ```bash
    grep specharbor_Linux_x86_64.tar.gz checksums.txt | sha256sum -c -
    ```
 
-   On macOS:
+   No macOS:
 
    ```bash
    grep specharbor_Darwin_arm64.tar.gz checksums.txt | shasum -a 256 -c -
    ```
 
-   Do not install an archive whose checksum does not verify.
+   Não instale um arquivo compactado cujo checksum falhe na verificação.
 
-3. Extract and place the binary on your `PATH`:
+3. Extraia e coloque o binário no seu `PATH`:
 
    ```bash
    tar -xzf specharbor_Linux_x86_64.tar.gz specharbor
@@ -77,10 +78,10 @@ and macOS. The npm wrapper supports Linux, macOS, and Windows on `x64` and
    install -m 0755 specharbor "$HOME/.local/bin/specharbor"
    ```
 
-   On Windows, extract `specharbor.exe` from the `.zip` and place it in a
-   directory on your `PATH`.
+   No Windows, extraia `specharbor.exe` do `.zip` e coloque-o em um diretório
+   presente no seu `PATH`.
 
-4. Verify the install:
+4. Verifique a instalação:
 
    ```bash
    specharbor version
@@ -88,17 +89,16 @@ and macOS. The npm wrapper supports Linux, macOS, and Windows on `x64` and
 
 ## install.sh (Linux e macOS)
 
-The repository root contains a POSIX `sh` install script that automates the
-manual flow: it detects OS and architecture, resolves the latest release (or
-a pinned version), downloads the matching archive and `checksums.txt` over
-HTTPS, verifies the SHA-256 checksum, and installs the binary to a user-local
-directory.
+A raiz do repositório contém um script de instalação POSIX `sh` que automatiza o
+fluxo manual: ele detecta SO e arquitetura, resolve a release mais recente (ou
+uma versão fixada), baixa o arquivo correspondente e `checksums.txt` por HTTPS,
+verifica o checksum SHA-256 e instala o binário em um diretório local do usuário.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/guferreira1/spec-harbor/main/install.sh | sh
 ```
 
-If you prefer to review the script before running it (recommended):
+Se preferir revisar o script antes de executá-lo (recomendado):
 
 ```bash
 curl -sSLO https://raw.githubusercontent.com/guferreira1/spec-harbor/main/install.sh
@@ -106,133 +106,135 @@ less install.sh
 sh install.sh
 ```
 
-Options:
+Opções:
 
 ```bash
-# Pin a version (environment variable or flag):
+# Fixe uma versão (variável de ambiente ou flag):
 SPECHARBOR_VERSION=v0.1.0 sh install.sh
 sh install.sh --version v0.1.0
 
-# Override the install directory (default: $HOME/.local/bin):
+# Substitua o diretório de instalação (padrão: $HOME/.local/bin):
 SPECHARBOR_INSTALL_DIR="$HOME/bin" sh install.sh
 sh install.sh --install-dir "$HOME/bin"
 
-# Dry run: print resolved OS, arch, version, asset URL, and install target
-# without downloading the archive or writing anything:
+# Dry run: imprime SO, arquitetura, versão, URL do ativo e destino de
+# instalação sem baixar o arquivo ou gravar algo:
 sh install.sh --dry-run
 ```
 
-Behavior and guarantees:
+Comportamento e garantias:
 
-- Supports Linux and macOS (Darwin) on `x86_64`/`amd64` and
-  `aarch64`/`arm64`. Other platforms fail with a clear error pointing here.
-- Version strings are strictly validated (`X.Y.Z` or `vX.Y.Z`) before being
-  used in URLs.
-- Downloads are HTTPS-only and restricted to
-  `https://github.com/guferreira1/spec-harbor/releases/` URLs.
-- SHA-256 verification against `checksums.txt` is mandatory. If no
-  `sha256sum` or `shasum` tool is available, the script fails instead of
-  skipping verification.
-- Never invokes `sudo`. If the install directory is not writable, the script
-  fails with guidance to pick a user-local directory.
-- Never executes downloaded content and writes only to its temporary
-  directory and the install target. Failures clean up temporary files and
-  leave no partial binary in the install target.
+- Suporta Linux e macOS (Darwin) em `x86_64`/`amd64` e
+  `aarch64`/`arm64`. Outras plataformas falham com erro claro apontando para isso.
+- Strings de versão são validadas estritamente (`X.Y.Z` ou `vX.Y.Z`) antes de
+  serem usadas em URLs.
+- Os downloads são somente por HTTPS e restritos a
+  URLs `https://github.com/guferreira1/spec-harbor/releases/`.
+- A verificação SHA-256 contra `checksums.txt` é obrigatória. Se não houver
+  ferramentas `sha256sum` ou `shasum`, o script falha ao invés de pular a
+  verificação.
+- Nunca invoca `sudo`. Se o diretório de instalação não permite escrita, o script
+  falha com orientação para escolher um diretório local ao usuário.
+- Nunca executa conteúdo baixado e escreve apenas em seu diretório temporário e no
+  destino de instalação. Falhas removem arquivos temporários e não deixam binário
+  parcial no destino de instalação.
 
-Test the script offline with:
+Teste o script sem conexão com:
 
 ```bash
 sh scripts/test-install-sh.sh
 ```
 
-## npm global package
+## Pacote npm global
 
-The npm wrapper package lives in this repository at
-`packages/npm/specharbor/` and is published to the npm registry as
-`specharbor`. Version bumps are published automatically when a `vX.Y.Z` tag is
-pushed, after the GitHub Release assets exist; see
-[Release metadata](release.md) for the workflow and required secrets.
+O pacote wrapper npm está neste repositório em
+`packages/npm/specharbor/` e é publicado no registro npm como `specharbor`.
+Atualizações de versão são publicadas automaticamente quando uma tag `vX.Y.Z` é
+enviada, após a existência dos ativos do GitHub Release; veja
+[Metadados de release](release.md) para o workflow e segredos obrigatórios.
 
-Install it with:
+Instale com:
 
 ```bash
 npm install -g specharbor
 specharbor version
 ```
 
-You can also run the published package without a global install:
+Você também pode executar o pacote publicado sem instalação global:
 
 ```bash
 npx specharbor version
 ```
 
-How the wrapper works:
+Como o wrapper funciona:
 
-- The package version `X.Y.Z` pins exactly one release tag `vX.Y.Z`.
-- At `postinstall`, the wrapper detects `process.platform`/`process.arch`,
-  downloads the matching release asset and `checksums.txt` over HTTPS from
-  `https://github.com/guferreira1/spec-harbor/releases/download/` only,
-  verifies the SHA-256 checksum with Node's `crypto`, and extracts the binary
-  into the package's own `native/` directory.
-- Installs with `--ignore-scripts` skip postinstall; the launcher then
-  performs the same checksum-verified download on first run.
-- The launcher forwards arguments and stdio to the native binary with
-  array-argument process APIs (no shell strings) and preserves the exit code.
-- Unsupported platforms fail with a deterministic error naming the platform
-  and pointing to this document, both at postinstall and at run time.
+- A versão do pacote `X.Y.Z` fixa exatamente uma tag de release `vX.Y.Z`.
+- Em `postinstall`, o wrapper detecta `process.platform`/`process.arch`,
+  baixa o ativo de release correspondente e `checksums.txt` somente por HTTPS de
+  `https://github.com/guferreira1/spec-harbor/releases/download/`,
+  valida o checksum SHA-256 com `crypto` do Node e extrai o binário no diretório
+  `native/` do pacote.
+- A instalação com `--ignore-scripts` pula o `postinstall`; o launcher faz o
+  mesmo download verificado com checksum na primeira execução.
+- O launcher encaminha argumentos e stdio para o binário nativo usando APIs de
+  chamada por array (sem strings de shell) e preserva o código de saída.
+- Plataformas não suportadas falham com erro determinístico informando a
+  plataforma e apontando para este documento, tanto em postinstall quanto na
+  execução.
 
-See [packages/npm/specharbor/README.md](../packages/npm/specharbor/README.md)
-for details and `npm test` for its offline test suite.
+Consulte [packages/npm/specharbor/README.md](../packages/npm/specharbor/README.md)
+para mais detalhes e execute `npm test` para a suíte de testes offline.
 
-## Homebrew tap
+## Tap do Homebrew
 
-Homebrew support is available through the personal external tap repository
-`guferreira1/homebrew-tap`, with formula name `specharbor`. Install it with:
+O suporte do Homebrew está disponível pelo repositório externo de tap pessoal
+`guferreira1/homebrew-tap`, com a fórmula chamada `specharbor`. Instale com:
 
 ```bash
 brew install guferreira1/tap/specharbor
 ```
 
-The formula satisfies these expectations in the tap repository:
+A fórmula satisfaz estas expectativas no repositório de tap:
 
-- `url` points at an official pinned GitHub Release asset.
-- A `sha256` value, copied from the release `checksums.txt`, is mandatory for
-  every referenced asset.
-- The formula installs the prebuilt binary; it does not build from source.
-- The formula `test do` block runs `specharbor version` and asserts the
-  output contains the expected version.
+- `url` aponta para um ativo oficial e fixado do GitHub Release.
+- O valor `sha256`, copiado de `checksums.txt` da release, é obrigatório para
+  cada ativo referenciado.
+- A fórmula instala o binário pré-compilado; não faz build da fonte.
+- O bloco `test do` da fórmula executa `specharbor version` e valida se a saída
+  contém a versão esperada.
 
-The tap validates `brew audit --strict --online specharbor`, formula install,
-`specharbor version`, `brew test specharbor`, and the user install command on
-GitHub Actions macOS runners. The formula is updated automatically on each
-`vX.Y.Z` tag release by the `homebrew-publish` job, which renders
-`Formula/specharbor.rb` from the release `checksums.txt`; see
-[Release metadata](release.md). No Homebrew formula files are committed to this
-repository.
+O tap valida `brew audit --strict --online specharbor`, instalação da fórmula,
+`specharbor version`, `brew test specharbor` e o comando de instalação do usuário
+nos runners macOS do GitHub Actions. A fórmula é atualizada automaticamente a
+cada release de tag `vX.Y.Z` pelo job `homebrew-publish`, que gera
+`Formula/specharbor.rb` a partir de `checksums.txt`; veja
+[Metadados de release](release.md). Nenhum arquivo de fórmula Homebrew é commitado
+neste repositório.
 
-## Future-only channels
+## Canais somente futuros
 
-The following are planned but intentionally not implemented yet:
+Os itens a seguir estão planejados, mas ainda não implementados:
 
-- Linux native packages (`.deb` and `.rpm`), likely via nfpm in a later
-  change.
-- Windows package managers: Scoop and Winget.
-- Binary signing (for example cosign), SBOM generation, Docker images, and
-  auto-update mechanisms.
-- Package publishing automation for Linux packages, Windows package managers,
-  signing, SBOMs, and Docker.
+- Pacotes nativos Linux (`.deb` e `.rpm`), provavelmente via nfpm em uma mudança
+  futura.
+- Gerenciadores de pacote do Windows: Scoop e Winget.
+- Assinatura de binário (por exemplo, cosign), geração de SBOM, imagens Docker e
+  mecanismos de atualização automática.
+- Automação de publicação de pacote para pacotes Linux, gerenciadores Windows,
+  assinatura, SBOMs e Docker.
 
-npm and Homebrew publishing are automated on tag releases; see
-[Release metadata](release.md). Interim paths: Linux users have `install.sh`,
-npm, and manual install; Windows users have npm and manual `.zip` install.
+A publicação de npm e Homebrew é automatizada em releases de tag; veja
+[Metadados de release](release.md). Caminhos intermediários: usuários Linux têm
+`install.sh`, npm e instalação manual; usuários Windows têm npm e instalação
+manual via `.zip`.
 
-## Verifying an installation
+## Verificando uma instalação
 
 ```bash
 specharbor version
 ```
 
-A release binary prints injected release metadata:
+Um binário de release imprime metadados de release injetados:
 
 ```text
 SpecHarbor 0.1.0
@@ -241,7 +243,7 @@ date: <UTC RFC3339 build date>
 dirty: false
 ```
 
-A source build without injected metadata prints the development fallback:
+Uma build de fonte sem metadados injetados imprime o fallback de desenvolvimento:
 
 ```text
 SpecHarbor dev
@@ -250,78 +252,79 @@ date: unknown
 dirty: unknown
 ```
 
-See [Release metadata](release.md) for the full version convention.
+Veja [Metadados de release](release.md) para a convenção completa de versão.
 
-## Troubleshooting
+## Solução de problemas
 
 ### `specharbor: command not found`
 
-User-local install directories such as `$HOME/.local/bin` may not be on your
-`PATH`. Add the directory to your shell profile:
+Diretórios de instalação locais do usuário, como `$HOME/.local/bin`, podem não
+estar no seu `PATH`. Adicione o diretório ao perfil do shell:
 
 ```bash
 # bash: ~/.bashrc — zsh: ~/.zshrc
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Then restart the shell or `source` the profile. Verify with:
+Em seguida, reinicie o shell ou execute `source` no perfil. Verifique com:
 
 ```bash
 command -v specharbor
 ```
 
-If a shell still resolves an old binary after replacing it, clear the command
-cache and retry:
+Se um shell ainda resolver um binário antigo após a substituição, limpe o cache
+de comandos e tente novamente:
 
 ```bash
 hash -r
 specharbor version
 ```
 
-### Permission denied
+### Permissão negada
 
-`install.sh` never invokes `sudo`. If the install directory is not writable,
-choose a user-writable directory:
+`install.sh` nunca invoca `sudo`. Se o diretório de instalação não permitir
+escrita, escolha um diretório gravável pelo usuário:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/guferreira1/spec-harbor/main/install.sh | sh -s -- --install-dir "$HOME/bin"
 ```
 
-For manual installs, create the target directory yourself and use a directory
-already on `PATH`.
+Para instalações manuais, crie você mesmo o diretório de destino e utilize um
+diretório que já esteja no `PATH`.
 
-### Checksum mismatch
+### Incompatibilidade de checksum
 
-Do not install an archive whose checksum does not verify. Delete the partial
-download, fetch the archive and `checksums.txt` again from the official
-GitHub Release, and retry. If the mismatch persists, treat the artifact as
-untrusted and open an issue with the release URL and checksum output.
+Não instale um arquivo compactado cujo checksum não valide. Exclua o download
+parcial, baixe novamente o arquivo e `checksums.txt` do GitHub Release oficial e
+tente novamente. Se a incompatibilidade persistir, trate o artefato como não
+confiável e abra uma issue com a URL da release e a saída de checksum.
 
-### Unsupported platform or architecture
+### Plataforma ou arquitetura não suportada
 
-Release assets exist for Linux, macOS, and Windows on `amd64`/`x64` and
-`arm64`. `install.sh` supports only Linux and macOS. For unsupported systems,
-use a supported machine, try the npm package if Node supports your
-OS/architecture pair, or build from source with Go.
+Existem ativos de release para Linux, macOS e Windows em `amd64`/`x64` e
+`arm64`. `install.sh` suporta apenas Linux e macOS. Para sistemas sem suporte,
+use uma máquina suportada, teste o pacote npm se o Node suportar seu par
+SO/arquitetura, ou faça build da fonte com Go.
 
-### npm postinstall skipped or first-run download failed
+### `postinstall` do npm ignorado ou falha no download da primeira execução
 
-`npm install --ignore-scripts -g specharbor` skips the postinstall download.
-That is supported: `npx specharbor version` or `specharbor version` performs
-the same checksum-verified download on first run. First-run download failures
-usually indicate offline use, proxy restrictions, GitHub access restrictions,
-or an unsupported platform. Re-run with network access to GitHub Releases, or
-use a manual GitHub Release install.
+`npm install --ignore-scripts -g specharbor` pula o download de `postinstall`.
+Isso é suportado: `npx specharbor version` ou `specharbor version` fazem o mesmo
+download verificado por checksum na primeira execução. Falhas na primeira
+execução geralmente indicam uso offline, restrições de proxy, restrições de acesso
+ao GitHub ou uma plataforma não suportada. Reexecute com acesso de rede aos GitHub
+Releases, ou use uma instalação manual por GitHub Release.
 
-### Homebrew tap/install issues
+### Problemas do tap/instalação Homebrew
 
-Use the tap shorthand exactly:
+Use o atalho da tap exatamente:
 
 ```bash
 brew install guferreira1/tap/specharbor
 ```
 
-If Homebrew cannot find or update the formula, refresh taps and retry:
+Se o Homebrew não encontrar ou atualizar a fórmula, atualize os taps e tente
+novamente:
 
 ```bash
 brew update
@@ -330,51 +333,51 @@ brew tap guferreira1/tap
 brew install guferreira1/tap/specharbor
 ```
 
-The external tap repository is `guferreira1/homebrew-tap`; no formula files
-live in this repository.
+O repositório de tap externo é `guferreira1/homebrew-tap`; nenhum arquivo de
+fórmula vive neste repositório.
 
-### Version metadata looks unexpected
+### Os metadados de versão parecem inesperados
 
-Verify the installed binary with:
+Verifique o binário instalado com:
 
 ```bash
 specharbor version
 ```
 
-Release binaries for `v0.1.0` print `SpecHarbor 0.1.0` and include commit,
-date, and dirty metadata. `dev`/`unknown` output usually means the binary was
-built from source without injected release metadata, such as with plain
-`go install`.
+Binários de release de `v0.1.0` imprimem `SpecHarbor 0.1.0` e incluem metadados
+de commit, date e dirty. Saída `dev`/`unknown` geralmente significa que o binário
+foi construído a partir da fonte sem metadados de release injetados, como com `go
+install`.
 
-## go install fallback
+## fallback `go install`
 
-Building from source is the documented manual fallback and requires Go:
+Build a partir da fonte é o fallback manual documentado e exige Go:
 
 ```bash
 go install github.com/guferreira1/spec-harbor/cmd/specharbor@latest
 ```
 
-Pin a tag with `@vX.Y.Z` once releases exist. Binaries built this way use the
-development fallback metadata (`dev`/`unknown`) because no release metadata
-is injected; that output is expected and documented in
-[Release metadata](release.md).
+Fixe uma tag com `@vX.Y.Z` quando já existirem releases. Binários construídos
+dessa forma usam metadados de fallback de desenvolvimento (`dev`/`unknown`) porque
+nenhum metadado de release é injetado; essa saída é esperada e documentada em
+[Metadados de release](release.md).
 
-## Security model
+## Modelo de segurança
 
-All install channels follow the same rules:
+Todos os canais de instalação seguem as mesmas regras:
 
-- HTTPS only; downloads are restricted to official
-  `https://github.com/guferreira1/spec-harbor/releases/` URLs.
-- SHA-256 checksum verification against the release `checksums.txt` is
-  mandatory for every downloaded archive; verification failure aborts the
-  install and removes partial files.
-- Checksums protect against corruption and tampering in transit; they are
-  served from the same release as the assets, so they do not protect against
-  a fully compromised release. Signing is future work.
-- No channel executes downloaded scripts, builds shell command strings from
-  user input, requires tokens or authentication, sends telemetry, mutates Git
-  state, or writes outside its install target and cache/temporary
-  directories.
-- npm and Homebrew publishing are automated on `vX.Y.Z` tag releases through a
-  tag-only workflow that validates version consistency and runs package tests
-  before publishing; see [Release metadata](release.md).
+- Somente HTTPS; os downloads são restritos a URLs oficiais
+  `https://github.com/guferreira1/spec-harbor/releases/`.
+- A verificação do checksum SHA-256 contra `checksums.txt` da release é
+  obrigatória para cada pacote baixado; falha na verificação aborta a instalação
+  e remove arquivos parciais.
+- Checksums protegem contra corrupção e adulteração em trânsito; são servidos a
+  partir da mesma release dos ativos, portanto não protegem contra uma release
+  totalmente comprometida. Assinatura é trabalho futuro.
+- Nenhum canal executa scripts baixados, monta strings de shell a partir da
+  entrada do usuário, exige tokens ou autenticação, envia telemetria, altera estado
+  do Git, ou grava fora do diretório de instalação e pastas cache/temporárias.
+- A publicação de npm e Homebrew é automatizada em releases de tag `vX.Y.Z` por
+  meio de um fluxo de trabalho somente de tag que valida consistência de versão e
+  executa testes de pacote antes de publicar; veja
+  [Metadados de release](release.md).

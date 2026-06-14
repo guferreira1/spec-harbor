@@ -1,6 +1,11 @@
 # Modos de geração
 
-SpecHarbor currently implements interactive generation prompts, blank generation, built-in template generation, project-local custom template generation, config-driven template aliases, hybrid generation, guided generation, AI-assisted from-file generation, dry-run agent-assisted spec authoring, and explicit agent-assisted local runner execution in run-and-report mode.
+O SpecHarbor implementa atualmente prompts de geração interativa, geração em
+branco, geração por template integrado, geração por template customizado local ao
+projeto, aliases de template orientados por configuração, geração híbrida,
+geração guiada, geração assistida por IA a partir de arquivo, autoria de
+especificação com `agent-assisted` em dry-run e execução local explícita de runner
+com `agent-assisted` no modo run-and-report.
 
 ## Implementado
 
@@ -10,29 +15,33 @@ SpecHarbor currently implements interactive generation prompts, blank generation
 go run ./cmd/specharbor generate <change-id> --interactive
 ```
 
-Interactive generation is a CLI prompt layer over existing generation behavior. It keeps `<change-id>` explicit on the command line, requires a TTY, collects only path-specific values, validates answers, prints a deterministic pre-confirmation summary, and delegates to the selected existing generation path only after confirmation.
+A geração interativa é uma camada de prompt de CLI sobre o comportamento de geração
+existente. Ela mantém `<change-id>` explícito na linha de comando, exige um TTY,
+coleta apenas valores de caminho específicos, valida respostas, imprime um
+resumo de pré-confirmação determinístico e delega para o caminho de geração
+existente apenas após confirmação.
 
-Supported interactive paths in this version:
+Caminhos interativos suportados nesta versão:
 
 - blank
-- built-in template
-- custom template
-- config template
+- template integrado
+- template customizado
+- template por configuração
 - hybrid
 
-Excluded from interactive prompts in this version:
+Excluídos dos prompts interativos nesta versão:
 
-- direct guided generation
-- AI-assisted generation
-- agent-assisted generation
-- local agent runner execution
-- live runner output application
-- raw remote template URLs or checksums
+- geração guiada direta
+- geração assistida por IA
+- geração com `agent-assisted`
+- execução local de runner de agente
+- aplicação de saída de runner ao vivo
+- URLs de template remoto em bruto ou checksums
 
-The first menu has deterministic ordering:
+O primeiro menu possui ordenação determinística:
 
 ```text
-Select generation path:
+Selecione o caminho de geração:
 1. blank
 2. built-in template
 3. custom template
@@ -40,15 +49,15 @@ Select generation path:
 5. hybrid
 ```
 
-Path-specific prompts:
+Prompts específicos de caminho:
 
-- Blank asks no additional questions.
-- Built-in template asks for one supported built-in template: `feature`, `bugfix`, `docs`, or `refactor`.
-- Custom template asks for a custom template name plus optional title and summary.
-- Config template asks for a config alias plus optional title and summary.
-- Hybrid asks for exactly one source namespace (`built-in template`, `custom template`, or `config template`), the source value, required title, required summary, and optional type.
+- Blank não faz perguntas adicionais.
+- Template integrado pede um dos templates integrados suportados: `feature`, `bugfix`, `docs` ou `refactor`.
+- Template customizado pede o nome do template customizado e título/resumo opcionais.
+- Template por configuração pede um alias de configuração e título/resumo opcionais.
+- Híbrido pede exatamente um namespace de fonte (`built-in template`, `custom template` ou `config template`), o valor da fonte, título obrigatório, resumo obrigatório e tipo opcional.
 
-Example answer sequences:
+Exemplos de sequência de respostas:
 
 ```text
 blank:           1 -> y
@@ -58,35 +67,53 @@ config:          4 -> default-feature -> empty title -> empty summary -> y
 hybrid built-in: 5 -> 1 -> feature -> Add login -> Add login support -> empty type -> y
 ```
 
-Before writes, every interactive flow prints a deterministic summary with change id, selected path, selected source values, expected write target, approved filenames, validation behavior, and safety notes. Blank, built-in template, custom template, and config template summaries show:
+Antes da escrita, cada fluxo interativo imprime um resumo determinístico com id da
+mudança, caminho selecionado, valores de fonte selecionados, destino de escrita
+esperado, nomes de arquivos aprovados, comportamento de validação e notas de
+segurança.
+Resumos de blank, template integrado, template customizado e template por
+configuração mostram:
 
 ```text
 Validation: automatic no
 ```
 
-Hybrid summaries show:
+Resumos híbridos mostram:
 
 ```text
 Validation: automatic yes
 ```
 
-The safety section is always printed before confirmation:
+A seção de segurança é sempre exibida antes da confirmação:
 
 ```text
 Safety:
-- Writes are limited to OpenSpec change files.
-- Production code will not be modified.
-- Source-control commands will not be run.
-- Workflow automation will not be triggered.
-- Provider, LLM, and agent APIs will not be called.
-- No auto-commit, auto-push, PR creation, merge, or archive will be performed.
+- A escrita está limitada a arquivos de mudança OpenSpec.
+- O código de produção não será modificado.
+- Comandos de controle de fonte não serão executados.
+- A automação de workflow não será acionada.
+- APIs de provedor, LLM e agente não serão chamadas.
+- Nenhum auto-commit, auto-push, criação de PR, merge ou archive será realizado.
 ```
 
-Confirmation is trimmed and case-insensitive. `y` and `yes` proceed in any casing; `n` and `no` cancel in any casing. Empty confirmation and EOF cancel. Cancellation exits non-zero with `operation cancelled` and writes nothing. Invalid required answers and invalid confirmation answers retry up to three attempts, then fail clearly and write nothing.
+A confirmação é com trim e insensível a maiúsculas/minúsculas. `y` e `yes`
+avançam em qualquer caixa; `n` e `no` cancelam em qualquer caixa. Confirmação
+vazia e EOF também cancelam. O cancelamento encerra com código não-zero,
+`operation cancelled` e sem escrita. Respostas obrigatórias inválidas e respostas
+de confirmação inválidas tentam até 3 vezes, depois falham claramente e não escrevem.
 
-Interactive mode preserves selected-mode write and validation behavior. It does not resolve config aliases, fetch remote templates, or call generation use cases before confirmation. Remote templates remain reachable only through existing config aliases and keep the existing HTTPS, checksum, ZIP, no-credential, no-query, no-fragment, no-script, no-production-code, and OpenSpec-only write safeguards.
+O modo interativo preserva o comportamento de escrita e validação do modo
+selecionado. Ele não resolve aliases de configuração, não busca templates remotos
+e não chama casos de uso de geração antes da confirmação. Templates remotos
+continuam alcançáveis apenas por aliases de configuração existentes e mantêm as
+salvaguardas existentes de HTTPS, checksum, ZIP, sem credencial, sem query,
+sem fragmento, sem script, sem código de produção e escrita apenas de OpenSpec.
 
-Interactive mode does not call provider APIs, LLM APIs, local model APIs, agents, source-control tools, workflow tools, shell commands, or scripts. It performs no production-code writes, config mutation, auto-commit, auto-push, pull request creation, merge, or archive automation.
+O modo interativo não chama APIs de provedor, APIs LLM, APIs de modelo local,
+agentes, ferramentas de controle de fonte, ferramentas de workflow, comandos shell
+ou scripts. Não realiza escrita de código de produção, mutação de configuração,
+auto-commit, auto-push, criação de pull request, merge ou automação de
+`archive`.
 
 ### Geração em branco
 
@@ -94,7 +121,8 @@ Interactive mode does not call provider APIs, LLM APIs, local model APIs, agents
 go run ./cmd/specharbor generate add-example-feature --blank
 ```
 
-Blank generation creates the OpenSpec change file structure so the user can write the content manually.
+A geração em branco cria a estrutura de arquivos de mudança OpenSpec para o usuário
+preencher o conteúdo manualmente.
 
 ### Geração por template built-in
 
@@ -102,14 +130,15 @@ Blank generation creates the OpenSpec change file structure so the user can writ
 go run ./cmd/specharbor generate <change-id> --template <template-name>
 ```
 
-Implemented built-in templates are exactly:
+Os templates integrados implementados são exatamente:
 
 - `feature`
 - `bugfix`
 - `docs`
 - `refactor`
 
-Built-in template generation writes deterministic, local, generic starter content for the selected template.
+A geração por template integrado escreve conteúdo inicial genérico, local e
+independente, para o template selecionado.
 
 ### Geração com template customizado
 
@@ -117,7 +146,9 @@ Built-in template generation writes deterministic, local, generic starter conten
 go run ./cmd/specharbor generate <change-id> --custom-template <template-name>
 ```
 
-Custom template generation renders reusable, project-local OpenSpec change templates. A custom template is a plain directory under the fixed root `.specharbor/templates/` containing all five required OpenSpec change files:
+A geração com template customizado renderiza templates locais reutilizáveis de OpenSpec
+no projeto. Um template customizado é um diretório simples em `.specharbor/templates/`
+com todos os cinco arquivos obrigatórios da mudança OpenSpec:
 
 ```text
 .specharbor/templates/<template-name>/
@@ -128,35 +159,56 @@ Custom template generation renders reusable, project-local OpenSpec change templ
   risks.md
 ```
 
-All five files are required and must be non-empty. A missing template directory, missing required files, or an empty (whitespace-only) file fails with a clear error and produces zero writes — not even the change directory is created. Unknown extra files and subdirectories inside the template directory are ignored and never copied.
+Todos os cinco arquivos são obrigatórios e devem ser não vazios. Um diretório de
+template ausente, arquivos obrigatórios ausentes ou arquivo vazio (`whitespace`)
+causam erro claro e geram zero escritas — nem mesmo o diretório da mudança é criado.
+Arquivos extras e subdiretórios desconhecidos dentro do diretório do template são
+ignorados e nunca copiados.
 
-Custom template names are validated before any filesystem access: allowed characters are `[A-Za-z0-9._-]`, names must be a single path segment with no `/` or `\`, no `..` sequences, no leading `.` or `-`, and at most 128 characters.
+Nomes de template customizado são validados antes de qualquer acesso ao sistema de
+arquivos: caracteres permitidos `[A-Za-z0-9._-]`, nome com um único segmento,
+sem `/` ou `\`, sem sequências `..`, sem início com `.` ou `-`, e no máximo
+128 caracteres.
 
-Template content supports minimal deterministic variable substitution only:
+O conteúdo do template suporta apenas substituição determinística mínima de variáveis:
 
-- `{{change_id}}` is always replaced with the change id.
-- `{{title}}` is replaced only when the optional `--title` flag is provided.
-- `{{summary}}` is replaced only when the optional `--summary` flag is provided.
-- Unresolved and unknown `{{...}}` tokens remain in the output verbatim; they are never an error.
+- `{{change_id}}` é sempre substituído pelo id da mudança.
+- `{{title}}` é substituído apenas quando a flag opcional `--title` é informada.
+- `{{summary}}` é substituído apenas quando a flag opcional `--summary` é informada.
+- Tokens `{{...}}` não reconhecidos ou não resolvidos permanecem sem erros na saída.
 
 ```bash
 go run ./cmd/specharbor generate <change-id> --custom-template <template-name> --title "<title>" --summary "<summary>"
 ```
 
-There is no templating language: no conditionals, no loops, no functions, no includes, and no template-defined variables. Templates are static Markdown content and are never executed; no scripts, hooks, shell commands, or external processes run during generation.
+Não existe linguagem de template: sem condicionais, sem laços, sem funções, sem
+`includes` e sem variáveis definidas no template. Templates são conteúdo Markdown
+estático e nunca são executados; não há scripts, hooks, comandos shell ou
+processos externos durante a geração.
 
-Built-in and custom templates resolve from disjoint sources:
+Templates integrados e customizados resolvem de fontes distintas:
 
-- `--template <name>` resolves only the four built-in templates; its behavior, content, output, and unknown-name errors are unchanged.
-- `--custom-template <name>` resolves only `.specharbor/templates/<name>/`.
-- `--config-template <alias>` resolves only aliases declared in `.specharbor/config.yml`.
-- A custom template sharing a built-in name (for example `feature`) never shadows or overrides the built-in template.
+- `--template <name>` resolve apenas os quatro templates integrados; seu
+  comportamento, conteúdo, saída e erros por nome desconhecido não mudam.
+- `--custom-template <name>` resolve apenas `.specharbor/templates/<name>/`.
+- `--config-template <alias>` resolve apenas aliases declarados em
+  `.specharbor/config.yml`.
+- Um template customizado com nome igual a um integrado (ex.: `feature`) não sobrescreve
+  nem oculta o template integrado.
 
-`--custom-template` is mutually exclusive with `--blank`, `--template`, `--guided`, and `--agent-assisted`. The success report identifies the template as custom, shows the relative template source path, lists created and skipped files, and notes that only OpenSpec change files were written.
+`--custom-template` é mutuamente exclusivo com `--blank`, `--template`, `--guided`
+e `--agent-assisted`. O relatório de sucesso identifica o template como custom,
+mostra o caminho relativo da fonte e lista arquivos criados e ignorados, além de
+registrar que apenas arquivos OpenSpec foram gravados.
 
-Generated changes work with `specharbor validate <change-id>` like any other change; generation does not run validation automatically, and validation findings depend on the template's content quality.
+Gerações personalizadas funcionam com `specharbor validate <change-id>` como qualquer
+outra mudança; a geração não executa validação automaticamente, e as falhas de validação
+dependem da qualidade do conteúdo do template.
 
-Safety boundaries for direct custom templates: templates are local and project-scoped; there is no marketplace, no provider call, no credentials, and no writes outside `openspec/changes/<change-id>/`. Existing files are skipped, never overwritten.
+Limites de segurança para templates customizados diretos: templates são locais e de
+escopo do projeto; não há marketplace, não há chamadas de provedor, não há
+credenciais e não há gravações fora de `openspec/changes/<change-id>/`.
+Arquivos existentes são ignorados e nunca sobrescritos.
 
 ### Aliases de template por configuração
 
@@ -165,7 +217,10 @@ go run ./cmd/specharbor generate <change-id> --config-template <alias>
 go run ./cmd/specharbor generate <change-id> --config-template <alias> --title "<title>" --summary "<summary>"
 ```
 
-Config-driven templates let a project define stable aliases for built-in, project-local custom, or pinned HTTPS remote templates. Remote templates are used only through `--config-template`; there is no `--remote-template` flag. The alias map lives in `.specharbor/config.yml`:
+Templates orientados por configuração permitem que o projeto defina aliases estáveis
+para templates integrados, customizados locais ou remotos HTTPS fixos. Templates
+remotos são usados apenas por `--config-template`; não existe `--remote-template`.
+Os aliases ficam em `.specharbor/config.yml`:
 
 ```yaml
 version: 1
@@ -187,19 +242,29 @@ templates:
       format: zip
 ```
 
-`version: 1` is required for config-driven generation. Omitted `templates` or omitted `templates.aliases` means there are no aliases. A missing config file, missing version, unsupported version, invalid YAML, invalid alias entry, or missing requested alias returns a clear error.
+`version: 1` é obrigatória para geração orientada por configuração. A ausência de
+`templates` ou `templates.aliases` significa que não há aliases. Arquivo de config
+ausente, versão ausente/inválida, YAML inválido, entrada de alias inválida ou alias
+solicitado inexistente retornam erro claro.
 
-Supported source kinds are exactly:
+Os tipos de fonte suportados são exatamente:
 
-- `builtin`, resolving the named built-in template only.
-- `custom`, resolving `.specharbor/templates/<template-name>/` only.
-- `remote`, fetching one explicit HTTPS ZIP URL with a required `sha256:<64-hex>` checksum.
+- `builtin`, resolve apenas o template integrado informado.
+- `custom`, resolve apenas `.specharbor/templates/<template-name>/`.
+- `remote`, busca uma única URL HTTPS de ZIP com checksum obrigatório
+  `sha256:<64-hex>`.
 
-Remote aliases require `url`, `checksum`, and `format`; only `format: zip` is supported. Remote aliases reject `template` and unknown fields. Built-in and custom aliases continue to require `template` and reject remote-only fields such as `url`, `checksum`, and `format`.
+Aliases remotos exigem `url`, `checksum` e `format`; somente `format: zip` é
+suportado. Aliases remotos rejeitam `template` e campos desconhecidos. Aliases
+integrados e customizados continuam exigindo `template` e rejeitam campos exclusivos de
+remoto, como `url`, `checksum` e `format`.
 
-Remote URL rules are intentionally strict: HTTPS only, host and path required, no credentials/userinfo, no query string, no fragment, no redirects, no local file URLs, no SSH or git URLs, and no SCP-style git targets. The checksum is verified over the downloaded ZIP bytes before any archive parsing.
+As regras de URL remota são estritas: apenas HTTPS, host e caminho obrigatórios,
+sem credenciais/userinfo, sem query string, sem fragmento, sem redirects, sem URLs
+locais, sem SSH/git/git+ssh/FTP e sem alvos no estilo SCP. O checksum é
+verificado sobre os bytes do ZIP baixado antes de qualquer parsing de arquivo.
 
-Remote ZIP bundles must contain exactly these five non-empty root-level regular files:
+Pacotes ZIP remotos devem conter exatamente estes cinco arquivos raiz não vazios:
 
 ```text
 proposal.md
@@ -209,22 +274,45 @@ acceptance-criteria.md
 risks.md
 ```
 
-Nested paths, absolute paths, path traversal, Windows drive paths, symlinks, executable entries, duplicate files, extra files, missing files, empty files, malformed ZIPs, oversized HTTP responses, and oversized uncompressed content are rejected and produce zero writes.
+Caminhos aninhados, caminhos absolutos, traversal, caminhos de disco Windows,
+symlinks, entradas executáveis, arquivos duplicados, arquivos extras, arquivos
+faltantes, arquivos vazios, ZIPs malformados, HTTP oversized e conteúdo não
+comprimido oversized são rejeitados e não gravam nada.
 
-Aliases are safe single path segments: non-empty, at most 128 characters, allowed characters `[A-Za-z0-9._-]`, no `/` or `\`, no absolute paths, no traversal or `..` sequence, no leading `.` or `-`. Invalid CLI aliases fail before template resolution, and invalid alias names in config fail during config validation.
+Aliases são segmentos de caminho seguros: não vazios, no máximo 128 caracteres,
+caracteres permitidos `[A-Za-z0-9._-]`, sem `/` ou `\`, sem caminhos absolutos,
+sem traversal nem sequência `..`, sem `.` ou `-` no início. Aliases CLI inválidos
+falham antes da resolução do template, e aliases inválidos no config falham durante
+validação.
 
-Config-driven generation delegates to the resolved source behavior:
+A geração orientada por configuração delega ao comportamento da origem resolvida:
 
-- A built-in alias produces the same files as direct `--template <name>`.
-- A custom alias uses the same custom-template directory, required-file validation, and deterministic `{{change_id}}`, `{{title}}`, and `{{summary}}` substitution as direct `--custom-template <name>`.
-- A remote alias writes the verified ZIP file contents as OpenSpec Markdown; remote archive paths never influence output paths, and no remote scripts or shell commands are executed.
-- Optional `--title` and `--summary` pass through to the resolved generation behavior; built-in templates do not use those values.
+- Alias integrado gera os mesmos arquivos de `--template <name>`.
+- Alias customizado usa o mesmo diretório do template customizado, validação de
+  arquivos obrigatórios e substituição determinística `{{change_id}}`,
+  `{{title}}` e `{{summary}}` de `--custom-template <name>`.
+- Alias remoto grava o conteúdo verificado do ZIP como Markdown OpenSpec; caminhos
+  de arquivo do arquivo remoto nunca influenciam caminhos de saída, e não há scripts
+  ou comandos shell remotos executados.
+- `--title` e `--summary` opcionais passam para o comportamento resolvido; templates
+  integrados não usam esses valores.
 
-Namespaces are disjoint by flag. `--template feature`, `--custom-template feature`, and `--config-template feature` are three different lookups. There is no shadowing, fallback, or source inference.
+Namespaces são disjuntos por flag. `--template feature`, `--custom-template feature`
+e `--config-template feature` são três buscas distintas. Não existe shadowing,
+fallback ou inferência de fonte.
 
-`--config-template` is mutually exclusive with `--blank`, `--template`, `--custom-template`, `--guided`, `--agent-assisted`, `--ai-assisted`, and `--execute`. It also does not accept `--type`, `--agent`, `--from-file`, or `--overwrite`.
+`--config-template` é mutuamente exclusivo com `--blank`, `--template`,
+`--custom-template`, `--guided`, `--agent-assisted`, `--ai-assisted` e `--execute`.
+Também não aceita `--type`, `--agent`, `--from-file` ou `--overwrite`.
 
-Safety boundaries: remote config aliases have no persistent cache in this first version and do not support credentials, OAuth, auth headers, cookies, environment token expansion, git clone, marketplace discovery, provider APIs, template scripts, shell execution, production code writes, source-control automation, auto-commit, PR creation, merge automation, or archive automation. Generated files stay under `openspec/changes/<change-id>/`, use the five required OpenSpec filenames, and skip existing files without overwriting.
+Limites de segurança: aliases remotos orientadas por configuração não possuem cache
+persistente nesta primeira versão e não suportam credenciais, OAuth, cabeçalhos de
+autenticação, cookies, expansão de token de ambiente, git clone, descoberta de
+marketplace, APIs de provedor, scripts de template, execução de shell, escrita de
+código de produção, automação de controle de fonte, auto-commit, criação de PR,
+automação de merge ou archive. Arquivos gerados permanecem em
+`openspec/changes/<change-id>/`, usam os cinco nomes obrigatórios do OpenSpec e não
+sobrescrevem arquivos existentes.
 
 ### Geração híbrida
 
@@ -234,28 +322,44 @@ go run ./cmd/specharbor generate <change-id> --hybrid --custom-template <name> -
 go run ./cmd/specharbor generate <change-id> --hybrid --config-template <alias> --title "<title>" --summary "<summary>" [--type <feature|bugfix|docs|refactor>]
 ```
 
-Hybrid generation composes exactly one deterministic template source with required guided metadata, then validates the generated OpenSpec change. It is useful when a team wants a reusable template source and explicit title/summary metadata in one safe command.
+A geração híbrida combina exatamente uma fonte de template determinística com metadados
+obrigatórios guiados e depois valida a mudança OpenSpec gerada. É útil quando a equipe
+quer uma fonte de template reutilizável e metadados explícitos de título/resumo em
+um único comando seguro.
 
-Supported source selectors are exactly:
+Seletores de fonte suportados são exatamente:
 
-- `--template <name>` for built-in templates.
-- `--custom-template <name>` for `.specharbor/templates/<name>/`.
-- `--config-template <alias>` for `.specharbor/config.yml` aliases.
+- `--template <name>` para templates integrados.
+- `--custom-template <name>` para `.specharbor/templates/<name>/`.
+- `--config-template <alias>` para aliases de `.specharbor/config.yml`.
 
-Exactly one source selector is required. Missing or multiple selectors fail before writes. There is no source guessing, fallback, shadowing, or precedence ordering.
+Exatamente um seletor de fonte é obrigatório. Falta ou múltipla seleção falham antes
+de escrita. Não há tentativa de fonte, fallback, shadowing ou ordem de precedência.
 
-Hybrid requires `--title` and `--summary`; both are trimmed and must be non-empty. `--type` is optional and must be one of `feature`, `bugfix`, `docs`, or `refactor` when provided.
+Híbrido exige `--title` e `--summary`; ambos sofrem trim e precisam ser não vazios.
+`--type` é opcional e deve ser exatamente `feature`, `bugfix`, `docs` ou `refactor`
+quando informado.
 
-Type behavior is source-specific:
+Comportamento de tipo é específico por fonte:
 
-- Direct `--template feature`, `bugfix`, `docs`, or `refactor` derives omitted type from the selected built-in template.
-- A config alias resolving to a built-in template derives omitted type from the resolved built-in template.
-- A provided type must match a selected or resolved built-in template. `--hybrid --template feature --type feature` succeeds; `--hybrid --template feature --type bugfix` fails and writes nothing.
-- Custom templates, config custom aliases, and config remote aliases do not infer type. If type is omitted, `{{type}}` remains verbatim. If type is provided, it is rendered.
+- `--template feature`, `bugfix`, `docs` ou `refactor` diretas derivam tipo omitido do
+  template integrado selecionado.
+- Um alias de configuração que resolva para template integrado deriva o tipo omitido
+  a partir do template integrado resolvido.
+- O tipo informado deve corresponder a um template integrado selecionado ou resolvido.
+  `--hybrid --template feature --type feature` passa; `--hybrid --template feature --type bugfix`
+  falha e não escreve.
+- Templates customizados, aliases customizados por config e aliases remotos por config
+  não inferem tipo. Se `--type` for omitido, `{{type}}` permanece não resolvido.
+  Se informado, é renderizado.
 
-Hybrid rendering replaces `{{change_id}}`, `{{title}}`, and `{{summary}}`, and replaces `{{type}}` only when an effective type exists. Unknown and unresolved `{{...}}` tokens remain verbatim. Hybrid adds no conditionals, loops, functions, includes, hooks, scripts, shell commands, or executable template behavior.
+O render híbrido substitui `{{change_id}}`, `{{title}}` e `{{summary}}` e substitui
+`{{type}}` apenas quando existe tipo efetivo provido. Tokens desconhecidos ou não
+resolvidos permanecem sem alteração. Híbrido não adiciona condicionais, laços,
+funções, includes, hooks, scripts, comandos shell ou comportamento de template
+executável.
 
-Examples:
+Exemplos:
 
 ```bash
 go run ./cmd/specharbor generate add-login --hybrid --template feature --title "Add login" --summary "Add an OpenSpec change for login"
@@ -266,15 +370,35 @@ go run ./cmd/specharbor generate add-payment-flow --hybrid --config-template api
 go run ./cmd/specharbor generate add-service --hybrid --config-template service-feature --title "Add service" --summary "Adds a service workflow."
 ```
 
-The first example derives `type=feature`. The second example fails because `bugfix` does not match built-in template `feature`. The custom example does not infer type, so `{{type}}` remains unresolved unless `--type` is provided.
+O primeiro exemplo deriva `type=feature`.
 
-Remote hybrid generation is available only through `--config-template <alias>` resolving to `source: remote`. It reuses the existing remote-template safeguards unchanged: HTTPS only, no credentials, no query strings, no fragments, no redirects, checksum required, checksum verified before ZIP parsing, ZIP only, strict archive safety, no cache, no shell/script execution, no production code writes, and no arbitrary output paths.
+O segundo exemplo falha porque `bugfix` não combina com template integrado `feature`.
 
-Hybrid writes only `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md` under `openspec/changes/<change-id>/`. Existing files are skipped and preserved; `--overwrite` is rejected in this first version.
+O exemplo customizado não infere tipo, então `{{type}}` permanece não resolvido,
+exceto se `--type` for informado.
 
-Validation runs after successful writes or successful skip-only completion. The report includes status, required file count, error count, warning count, and findings. Warnings keep exit code `0`; validation errors make the CLI exit non-zero after the report is printed. Hybrid never auto-fixes validation findings.
+Geração híbrida remota está disponível apenas com `--config-template <alias>` que
+resolve para `source: remote`. Mantém as salvaguardas já existentes de template
+remoto: apenas HTTPS, sem credenciais, sem query strings, sem fragmentos, sem
+redirects, checksum obrigatório e validado antes do parsing do ZIP, apenas ZIP, segurança
+rígida de arquivo, sem cache, sem execução de shell/script, sem escrita de código de
+produção e sem caminhos arbitrários de saída.
 
-Out of scope for hybrid generation: `--blank`, AI overlay, `--from-file`, live runner output application, `--agent`, `--execute`, provider APIs, LLM APIs, local model APIs, source-control tools, workflow tools, shell commands, scripts, production code writes, auto-commit, auto-push, PR creation, merge automation, and archive automation.
+Híbrido grava somente `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md` e
+`risks.md` em `openspec/changes/<change-id>/`. Arquivos existentes são ignorados e
+preservados; `--overwrite` é rejeitado nesta versão inicial.
+
+A validação ocorre após escritas bem-sucedidas ou conclusão com apenas pulos. O
+relatório inclui status, quantidade de arquivos obrigatórios, quantidade de erros,
+quantidade de avisos e achados. Achados com severidade de warning mantêm código de saída `0`; erros de validação
+geram saída não-zero após exibir o relatório. Híbrido não corrige achados
+automaticamente.
+
+Fora de escopo para geração híbrida: `--blank`, overlay de IA, `--from-file`,
+aplicação de saída de runner ao vivo, `--agent`, `--execute`, APIs de provedor,
+APIs de LLM, APIs de modelo local, ferramentas de controle de fonte, ferramentas de
+workflow, comandos shell, scripts, escrita de código de produção, auto-commit,
+auto-push, criação de PR, automação de merge e archive.
 
 ### Geração guiada
 
@@ -282,16 +406,20 @@ Out of scope for hybrid generation: `--blank`, AI overlay, `--from-file`, live r
 go run ./cmd/specharbor generate <change-id> --guided --type <type> --title "<title>" --summary "<summary>"
 ```
 
-Implemented guided types are exactly:
+Os tipos guiados implementados são exatamente:
 
 - `feature`
 - `bugfix`
 - `docs`
 - `refactor`
 
-Guided generation writes deterministic, local starter content based on explicit CLI inputs. It is non-interactive and does not prompt during command execution.
+A geração guiada escreve conteúdo inicial local e determinístico baseado nas entradas
+explícitas de CLI. É não interativa e não pede input durante a execução; usa os
+valores de `--type`, `--title` e `--summary` informados.
 
-Guided generated content includes the supplied title and summary. The generated content is safe to edit and does not mean SpecHarbor inferred project-specific requirements beyond the provided inputs.
+O conteúdo gerado guiado inclui título e resumo fornecidos. O conteúdo gerado pode
+ser editado com segurança e não significa que o SpecHarbor tenha inferido requisitos
+específicos do projeto além dos inputs fornecidos.
 
 ### Geração assistida por IA a partir de arquivo
 
@@ -300,7 +428,9 @@ go run ./cmd/specharbor generate <change-id> --ai-assisted --from-file <agent-ou
 go run ./cmd/specharbor generate <change-id> --ai-assisted --from-file <agent-output-file> --overwrite
 ```
 
-AI-assisted generation imports AI-authored OpenSpec content from a local file that the user explicitly supplies. The file must use strict delimiter blocks:
+A geração assistida por IA importa conteúdo OpenSpec gerado por IA de um arquivo local
+fornecido explicitamente pelo usuário. O arquivo deve usar blocos delimitadores
+estritos:
 
 ```text
 ---FILE: proposal.md---
@@ -320,11 +450,26 @@ AI-assisted generation imports AI-authored OpenSpec content from a local file th
 ---END FILE---
 ```
 
-Allowed block filenames are exactly `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md`. All five are required. Unknown filenames, duplicates, missing blocks, empty content, absolute paths, traversal, nested paths, malformed delimiters, fenced wrapper formats, patch/diff formats, and text outside blocks are rejected before writes.
+Nomes de bloco permitidos são exatamente `proposal.md`, `design.md`, `tasks.md`,
+`acceptance-criteria.md` e `risks.md`. Todos os cinco são obrigatórios. Nomes
+desconhecidos, duplicados, blocos ausentes, conteúdo vazio, caminhos absolutos,
+traversal, caminhos aninhados, delimitadores malformados, wrappers com fence,
+formatos patch/diff e texto fora dos blocos são rejeitados antes de escrita.
 
-The command parses the complete source before any target file write, creates `openspec/changes/<change-id>/` when needed, writes only the five approved filenames under that directory, and runs validation after successful writes or skips. Existing files are skipped by default; `--overwrite` is required to replace them. Existing symlink output targets are rejected instead of followed. Validation warnings keep exit code `0`; validation errors are reported and make the command exit non-zero.
+O comando parseia a fonte completa antes de qualquer escrita-alvo, cria
+`openspec/changes/<change-id>/` quando necessário, grava somente os cinco arquivos
+aprovados sob esse diretório e executa validação após escritas ou skips. Arquivos
+existentes são ignorados por padrão; `--overwrite` é obrigatório para substituí-los.
+Targets de symlink de saída existentes são rejeitados em vez de seguidos. Warnings
+de validação mantêm exit code `0`; erros de validação são exibidos e fazem o comando
+encerrar com não-zero.
 
-AI-assisted from-file generation is not provider-backed generation and is not live runner output application. It does not call provider APIs, remote AI services, local model APIs, OAuth, credentials, shell commands, source-control automation, workflow automation, or agent runners. It does not modify production code, does not apply patches, and does not auto-commit, auto-push, create PRs, merge, or archive.
+A geração assistida por arquivo não é geração com provedor e não é aplicação de saída
+do runner ao vivo. Não chama APIs de provedor, serviços remotos de IA, APIs de
+modelo local, OAuth, credenciais, comandos shell, automação de controle de fonte,
+automatização de workflow ou runners de agente. Não modifica código de produção,
+não aplica patches, não auto-commit, não auto-push, não cria PRs, não merge e não
+arquiva.
 
 ### Autoria de especificação com agente
 
@@ -332,33 +477,36 @@ AI-assisted from-file generation is not provider-backed generation and is not li
 go run ./cmd/specharbor generate <change-id> --agent-assisted --agent <agent-name> --type <type> --title "<title>" --summary "<summary>"
 ```
 
-Implemented agent-assisted authoring types are exactly:
+Os tipos de autoria com agente implementados são exatamente:
 
 - `feature`
 - `bugfix`
 - `docs`
 - `refactor`
 
-Dry-run remains the default. Without `--execute`, agent-assisted spec authoring prints a deterministic authoring plan and a deterministic, copy-pasteable prompt to stdout.
+O dry-run continua sendo padrão. Sem `--execute`, a autoria de especificação com
+agente imprime um plano determinístico e um prompt copy-pasteable em stdout.
 
-The generated prompt is meant to help an external agent author or refine only the OpenSpec change package. Implementation remains a later step through the normal SpecHarbor workflow.
+O prompt gerado foi feito para ajudar um agente externo a autorar ou refinar apenas o
+pacote de mudança OpenSpec. A implementação permanece para etapa posterior no fluxo
+normal do SpecHarbor.
 
-Dry-run agent-assisted spec authoring:
+Dry-run de autoria com agente:
 
-- writes no files;
-- writes no prompt file;
-- does not create or modify OpenSpec files;
-- does not create or modify production code;
-- does not execute agents;
-- does not require a runner;
-- does not resolve executable command mappings;
-- does not call provider APIs;
-- does not call local models;
-- does not call network APIs;
-- does not call source-control APIs;
-- does not call workflow tools.
+- não grava arquivos;
+- não grava arquivo de prompt;
+- não cria nem modifica arquivos OpenSpec;
+- não cria nem modifica código de produção;
+- não executa agentes;
+- não requer runner;
+- não resolve mapeamentos de comando executável;
+- não chama APIs de provedor;
+- não chama modelos locais;
+- não chama APIs de rede;
+- não chama APIs de controle de fonte;
+- não chama ferramentas de workflow.
 
-Recognized agent targets are:
+Alvos de agente reconhecidos são:
 
 - `codex` - Codex
 - `claude` - Claude Code
@@ -371,17 +519,18 @@ Recognized agent targets are:
 - `aider` - Aider
 - `generic` - Generic Agent
 
-Unknown dry-run agents are rejected as an intentional validation tightening.
+Dry-run com agente desconhecido é rejeitado como endurecimento intencional de validação.
 
-Execute mode is explicit:
+O modo de execução é explícito:
 
 ```bash
 go run ./cmd/specharbor generate <change-id> --agent-assisted --agent <agent-name> --type <type> --title "<title>" --summary "<summary>" --execute
 ```
 
-Execute mode sends the same deterministic OpenSpec authoring prompt through stdin to a supported local command. The working directory is the current project root.
+Modo execução envia o mesmo prompt determinístico de autoria OpenSpec via stdin para
+um comando local suportado. O diretório de trabalho é a raiz do projeto atual.
 
-Executable local command mappings are:
+Mapeamentos de comando local executável são:
 
 - `codex -> codex`
 - `claude -> claude`
@@ -393,21 +542,28 @@ Executable local command mappings are:
 - `windsurf -> windsurf`
 - `aider -> aider`
 
-`generic` is dry-run-only until a future config-driven runner/templates feature defines a deterministic command mapping. `--execute --agent generic` fails with a clear unmapped-target error.
+`generic` é reconhecido apenas para dry-run até uma futura funcionalidade de runner/
+templates orientada por configuração definir um mapeamento determinístico. `--execute
+--agent generic` falha com erro claro de target não mapeado.
 
-Execute mode is still run-and-report only:
+Modo execução continua run-and-report apenas:
 
-- missing local commands produce startup errors with no runner result and no exit code;
-- started commands with non-zero exit codes produce a report and then SpecHarbor exits non-zero;
-- stdout, stderr, exit code, and execution status are captured and reported for started processes;
-- SpecHarbor does not parse or apply output;
-- SpecHarbor does not write files from output;
-- SpecHarbor does not modify production code from output;
-- SpecHarbor does not auto-commit, auto-push, or auto-merge.
+- comandos locais ausentes geram erros de inicialização sem resultado de runner e sem exit code;
+- comandos iniciados com código não-zero geram relatório e depois SpecHarbor sai não-zero;
+- stdout, stderr, código de saída e status de execução são capturados e reportados
+  para processos iniciados;
+- SpecHarbor não faz parse nem aplica saída;
+- SpecHarbor não grava arquivos a partir da saída;
+- SpecHarbor não modifica código de produção a partir da saída;
+- SpecHarbor não auto-commita, auto-pusha ou auto-mescla.
 
-Provider APIs, IDE automation, OAuth, credentials, marketplace integrations, remote execution, source-control automation, and workflow automation remain out of scope. Local agent command behavior is controlled by the installed local tool.
+APIs de provedor, automação de IDE, OAuth, credenciais, integrações com marketplace,
+execução remota, automação de controle de fonte e automação de workflow continuam fora
+de escopo. O comportamento local do comando de agente é controlado pela ferramenta
+instalada.
 
-Blank, built-in template, custom template, config-template, hybrid, guided, and AI-assisted generation create the required OpenSpec change files:
+Blank, template integrado, template customizado, config-template, híbrido, guiado e
+assistido por IA criam os arquivos OpenSpec obrigatórios:
 
 ```text
 openspec/changes/<change-id>/
@@ -418,13 +574,19 @@ openspec/changes/<change-id>/
   risks.md
 ```
 
-Existing files are skipped and are not overwritten for blank, built-in template, custom template, config-template, hybrid, and guided generation. AI-assisted generation also skips existing files by default, and replaces them only with explicit `--overwrite`. Partially existing change directories are recoverable because generation creates only missing required files.
+Arquivos existentes são ignorados e não sobrescritos para blank, template integrado,
+template customizado, config-template, híbrido e geração guiada. Geração assistida por
+IA também ignora arquivos existentes por padrão e substitui apenas com `--overwrite`
+explícito. Diretórios de mudança parcialmente existentes podem ser recuperados porque
+a geração cria apenas arquivos obrigatórios ausentes.
 
-## Planned
+## Planejado
 
-The following items are product direction, not implemented command behavior:
+Os itens a seguir são direção de produto, não comportamento de comando implementado:
 
-- config-driven generic runner commands;
-- interactive prompts.
+- comandos de runner genéricos orientados por configuração;
+- prompts interativos.
 
-Detailed provider setup, IDE automation, marketplace integrations, remote execution, workflow automation, and file-application behavior are not part of the current implemented generation command set.
+Configuração detalhada de provedor, automação de IDE, integrações de marketplace,
+execução remota, automação de workflow e comportamento de aplicação de arquivo
+não fazem parte do conjunto de geração implementado atualmente.

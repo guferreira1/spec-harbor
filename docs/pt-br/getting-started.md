@@ -1,8 +1,8 @@
 # Primeiro passos
 
-Use a referência de comando atual no lugar deste quickstart legado:
+Use a referência de comando atual no lugar deste início rápido legado:
 
-- [Usage](usage.md)
-- [Workflow](workflow.md)
+- [Uso](usage.md)
+- [Fluxo de trabalho](workflow.md)
 
 A sintaxe de prompt implementada usa `--role`.

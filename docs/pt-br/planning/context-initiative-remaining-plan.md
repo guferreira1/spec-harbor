@@ -1,26 +1,26 @@
-# Plano restante do Context Initiative
+# Plano restante da Context Initiative
 
 ## Objetivo
 
-This document plans the remaining Context Initiative work. It is a planning artifact only. It does not create active OpenSpec changes, does not implement product code, and does not modify production behavior.
+Este documento descreve o plano restante do Context Initiative. É apenas um artefato de planejamento. Ele não cria uma mudança OpenSpec ativa, não implementa código de produto e não altera comportamento de produção.
 
-The completed foundation already provides:
+A base já concluída já oferece:
 
-- `specharbor brief` for confirmed project context in `.specharbor/project-brief.md`.
-- `specharbor context discover` for bounded local/offline classified context.
-- context-aware `specharbor prompt <change-id> --role <role>` output for the five supported roles.
+- `specharbor brief` para contexto de projeto confirmado em `.specharbor/project-brief.md`.
+- `specharbor context discover` para descoberta local/offline com contexto classificado.
+- saída de `specharbor prompt <change-id> --role <role>` ciente de contexto para os cinco papéis suportados.
 
-The remaining features should extend that lifecycle without weakening the current distinction between user-confirmed context, detected facts, and suggested assumptions.
+Os recursos restantes devem estender esse ciclo sem enfraquecer a distinção atual entre contexto confirmado pelo usuário, fatos detectados e suposições sugeridas.
 
-## Branch Strategy
+## Estratégia de Branches
 
-Use one branch for this planning document:
+Use uma branch para este documento de planejamento:
 
 ```text
 chore/plan-remaining-context-initiative
 ```
 
-Use separate feature branches for actual implementation:
+Use branches separadas para implementações reais:
 
 ```text
 feat/implement-project-brief-merge-and-update
@@ -30,7 +30,7 @@ feat/implement-github-remote-context
 feat/implement-context-rag-provider
 ```
 
-Use separate archive branches after each merged feature:
+Use branches de arquivo (archive) separadas após cada feature mesclada:
 
 ```text
 chore/archive-implement-project-brief-merge-and-update
@@ -40,46 +40,45 @@ chore/archive-implement-github-remote-context
 chore/archive-implement-context-rag-provider
 ```
 
-A single branch is acceptable for this plan because it is one documentation artifact with no production behavior change. A single branch is not ideal for implementing all five features together because the features would compete for the same domain models, ports, use cases, CLI context commands, prompt integration points, docs, and tests. Combining them would make OpenSpec scope harder to enforce, review harder to reason about, failures harder to isolate, and archive history less useful.
+Uma única branch é aceitável para este plano porque ele é um artefato de documentação sem alteração de produção. Uma branch única não é ideal para implementar todas as cinco features juntas porque elas competiriam pelos mesmos modelos de domínio, ports, use cases, comandos de contexto do CLI, pontos de integração de prompts, documentação e testes. Combiná-las tornaria mais difícil manter escopo, revisar, isolar falhas e preservar histórico de archive.
 
-Each implementation branch should contain exactly one active OpenSpec change and one feature's product edits. After that feature merges, archive it from a fresh branch based on updated `main` so archive housekeeping is separated from implementation review.
+Cada branch de implementação deve conter exatamente uma mudança OpenSpec ativa e as edições de produto da feature. Após a integração dessa feature, deve-se arquivá-la a partir de uma branch fresca baseada no `main` atualizado, para que o housekeeping de archive fique separado da revisão de implementação.
 
 ## Estratégia de subagentes
 
-Use a main coordinator with planning subagents.
+Use um agente principal (coordenador) com subagentes de planejamento.
 
-The Main Agent / Coordinator owns:
+O Agente Principal / Coordenador tem responsabilidade de:
 
-- sequencing across the five features;
-- branch and worktree validation;
-- OpenSpec scope control;
-- architecture and dependency decisions;
-- integration of subagent recommendations;
-- final acceptance of each spec before implementation;
-- final validation before PR;
-- archive sequencing after merge.
+- sequenciamento entre as cinco features;
+- validação de branch/worktree;
+- controle de escopo OpenSpec;
+- decisões arquiteturais e de dependências;
+- integração das recomendações de subagentes;
+- aceite final de cada spec antes da implementação;
+- validação final antes do PR;
+- sequenciamento de arquivo (archive) após merge.
 
-Subagents may:
+Subagentes podem:
 
-- propose OpenSpec spec guidance;
-- identify risks and acceptance criteria;
-- propose task breakdowns;
-- inspect likely dependencies and overlap;
-- recommend focused tests and documentation changes.
+- propor orientações de spec OpenSpec;
+- identificar riscos e critérios de aceitação;
+- propor quebra de tarefas;
+- inspecionar dependências e sobreposição prováveis;
+- sugerir testes focados e mudanças de documentação.
 
-Subagents must not:
+Subagentes não devem:
 
-- implement production code simultaneously across the five features;
-- edit shared production files without coordinator sequencing;
-- create active OpenSpec changes unless the coordinator explicitly assigns one feature;
-- change release, npm, Homebrew, `install.sh`, publishing, tag, merge, or source-control automation files;
-- silently promote assumptions into facts.
+- implementar código de produção simultaneamente nas cinco features;
+- editar arquivos de produção compartilhados fora do sequenciamento do coordenador;
+- criar mudanças OpenSpec ativas sem o coordenador designar explicitamente uma feature;
+- alterar release, npm, Homebrew, `install.sh`, publicação, tag, merge ou automação de controle de fonte.
 
-Every subagent must follow OpenSpec/SDD discipline. The coordinator validates every subagent output before any implementation begins. Parallelism is for planning and review only; production edits should be sequenced by feature.
+Cada subagente deve seguir disciplina OpenSpec/SDD. O coordenador valida toda saída antes de iniciar implementação. A paralelização é para planejamento e revisão; edições de produção devem seguir a sequência por feature.
 
-## Ordem recomendada de execução
+## Ordem de execução recomendada
 
-Use this order:
+Use esta ordem:
 
 1. `implement-project-brief-merge-and-update`
 2. `implement-repository-context-index`
@@ -87,390 +86,392 @@ Use this order:
 4. `implement-github-remote-context`
 5. `implement-context-rag-provider`
 
-Dependency reasoning:
+Raciocínio de dependência:
 
-- Project brief merge/update comes first because it stabilizes the confirmed context lifecycle. Later features need a safe way to reconcile stale or incomplete `.specharbor/project-brief.md` data without overwriting user intent.
-- Repository context index comes second because retrieval and remote/RAG features need safe inventory metadata before they select, rank, or enrich context.
-- Local context retrieval comes third because it can build on the index or bounded inventory while preserving local/offline behavior.
-- GitHub remote context comes fourth because it should reuse the same context abstractions without becoming mandatory for local usage.
-- RAG provider comes last because it depends on stable context records and retrieval boundaries, and it must keep local/offline fallback intact.
+- Merge/update de brief vem primeiro porque estabiliza o ciclo de contexto confirmado. Features seguintes precisam de atualização segura de dados de `.specharbor/project-brief.md` sem sobrescrever intenção do usuário.
+- O índice de contexto de repositório vem em segundo porque retrieval e recursos remoto/RAG precisam de metadados de inventário estáveis antes de selecionar, ranquear ou enriquecer contexto.
+- Retrieval local vem em terceiro porque pode se basear no índice/inventário e preservar comportamento local/offline.
+- Contexto remoto do GitHub vem em quarto porque deve reutilizar as mesmas abstrações de contexto sem se tornar obrigatório para uso local.
+- Provedor de RAG vem por último porque depende de registros contextuais estáveis e limites de retrieval bem definidos, e precisa manter fallback local/offline intacto.
 
 ## Feature Brief: implement-project-brief-merge-and-update
 
-Change ID: `implement-project-brief-merge-and-update`
+ID da mudança: `implement-project-brief-merge-and-update`
 
-Goal: Add a safe, confirmation-first way to merge or update `.specharbor/project-brief.md` without overwriting user-owned context or treating detected signals as confirmed facts.
+Objetivo: adicionar um modo seguro, de confirmação-first, para mesclar/atualizar `.specharbor/project-brief.md` sem sobrescrever contexto pertencente ao usuário nem tratar sinais detectados como fatos confirmados.
 
-Why it comes in this order: Existing `brief` intentionally refuses to merge, update, overwrite, or append. That was correct for the foundation, but the remaining context lifecycle needs a controlled update path before indexing, retrieval, remote, or RAG features rely on confirmed context.
+Por que vem nessa ordem: o `brief` atual recusa, por design, merge, atualização, sobrescrita e append. Isso estava correto para a fundação, mas o ciclo de contexto restante precisa de um caminho controlado de atualização antes de indexação, retrieval, remoto ou RAG dependerem de contexto confirmado.
 
-Main scope:
+Escopo principal:
 
-- Define explicit update behavior for existing project briefs.
-- Preserve known project brief sections and user-confirmed values.
-- Offer detected facts and assumptions only as suggestions requiring confirmation.
-- Add conflict handling between existing confirmed values and current repository evidence.
-- Keep write behavior deterministic, reviewable, and safe.
-- Update docs only after behavior exists.
+- definir comportamento explícito de atualização para briefs existentes;
+- preservar seções conhecidas do brief e valores já confirmados;
+- oferecer fatos detectados e suposições apenas como sugestões que exigem confirmação;
+- adicionar tratamento de conflitos entre valores confirmados existentes e evidências atuais do repositório;
+- manter escrita determinística, auditável e segura;
+- atualizar documentação somente quando o comportamento existir.
 
-Explicit out-of-scope boundaries:
+Fronteiras explícitas de out-of-scope:
 
-- No repository-wide indexing.
-- No retrieval, snippet ranking, embeddings, vector stores, or RAG.
-- No GitHub or remote discovery.
-- No provider APIs, local model APIs, or agent execution.
-- No automatic command verification.
-- No release, npm, Homebrew, `install.sh`, publishing, tag, merge, or source-control automation changes.
+- sem indexação de repositório inteiro;
+- sem retrieval, ranking de trechos, embeddings, vector store ou RAG;
+- sem descoberta GitHub ou remota;
+- sem APIs de provedor, APIs de modelo local ou execução de agente;
+- sem verificação automática de comando;
+- sem mudanças em release, npm, Homebrew, `install.sh`, publicação, tag, merge ou automação de controle de fonte.
 
-Expected architectural boundaries:
+Fronteiras arquiteturais esperadas:
 
-- Domain owns brief field models, confirmed/detected/assumption categories, merge decisions, and conflict records.
-- Ports expose only the filesystem operations the update use case consumes.
-- Use cases orchestrate parsing, proposed updates, confirmation input, rendering, and write policy.
-- CLI owns prompts and user-facing formatting only.
-- Concrete filesystem behavior remains in adapters.
+- o domínio deve possuir modelos de campos do brief, categorias confirmed/detected/assumption, decisões de merge e registros de conflito;
+- ports expõem apenas operações de sistema de arquivos consumidas pelo use case de atualização;
+- use cases orquestram parsing, renderização da proposta de atualização, input de confirmação e política de escrita;
+- CLI só controla prompts e formatação para usuário;
+- comportamento concreto de filesystem permanece em adapters.
 
-Testing focus:
+Foco de testes:
 
-- Existing brief parsing and preservation.
-- Update proposal rendering.
-- Confirmation and cancellation.
-- Conflict handling.
-- Assumptions never becoming facts.
-- No partial writes on failure.
-- Regression coverage for existing `brief`, `context discover`, and `prompt`.
+- parsing e preservação do brief existente;
+- renderização da proposta de atualização;
+- confirmação e cancelamento;
+- resolução de conflitos;
+- suposições nunca virando fatos;
+- ausência de escrita parcial em falha;
+- cobertura de regressão para `brief`, `context discover` e `prompt` existentes.
 
-Documentation impact:
+Impacto em documentação:
 
-- Update `README.md`, `../usage.md`, and `../workflow.md` only if the implementation exposes a user-facing update command or flag.
-- Document that update behavior is confirmation-first and not indexing, RAG, remote discovery, or command verification.
+- atualizar `README.md`, `../usage.md` e `../workflow.md` apenas se a implementação expuser comando/flag de atualização.
+- documentar que o comportamento de atualização é confirmation-first e não envolve indexação, RAG, descoberta remota ou verificação de comando.
 
-Main risks:
+Riscos principais:
 
-- Overwriting user-maintained context.
-- Turning detected facts or assumptions into confirmed values without explicit user action.
-- Hiding stale confirmed context instead of surfacing conflicts.
-- Letting CLI code own merge rules.
+- sobrescrever contexto mantido pelo usuário;
+- transformar fatos/suposições detectadas em valores confirmados sem ação explícita;
+- mascarar contexto confirmado obsoleto em vez de expor conflitos;
+- deixar regras de merge no CLI em vez de no domínio.
 
-Subagent responsibility:
+Responsabilidade do subagente:
 
-- Produce spec guidance for update semantics, conflict cases, confirmation flow, acceptance criteria, and tests.
-- Identify how existing brief/discovery/prompt behavior should remain stable.
-- Do not write code.
+- propor orientação de spec para semântica de atualização, casos de conflito e fluxo de confirmação, critérios de aceite e testes;
+- identificar como manter comportamento existente de `brief/discovery/prompt` estável;
+- não escrever código.
 
-Coordinator validation checklist:
+Checklist de validação do coordenador:
 
-- The spec has exactly five OpenSpec files.
-- Scope is limited to brief merge/update.
-- Existing write-if-absent behavior remains available or is intentionally evolved with explicit compatibility notes.
-- No indexing, retrieval, remote context, embeddings, RAG, or release files appear in scope.
-- Tests cover confirmation, conflict handling, stale data, and no silent assumption promotion.
+- a spec possui exatamente cinco arquivos OpenSpec;
+- o escopo está limitado a merge/update de brief;
+- o comportamento de escrita condicional permanece disponível ou foi evoluído com nota explícita de compatibilidade;
+- não aparecem indexação, retrieval, contexto remoto, embeddings, RAG ou arquivos de release no escopo;
+- testes cobrem confirmação, conflitos, dados obsoletos e ausência de promoção silenciosa de suposições.
 
 ## Feature Brief: implement-repository-context-index
 
-Change ID: `implement-repository-context-index`
+ID da mudança: `implement-repository-context-index`
 
-Goal: Add a safe repository context index that records bounded inventory metadata for supported context sources without performing retrieval, embeddings, RAG, or remote discovery.
+Objetivo: adicionar um índice de contexto de repositório seguro que registre metadados de inventário delimitados para fontes de contexto suportadas sem executar retrieval, embeddings, RAG ou descoberta remota.
 
-Why it comes in this order: Once confirmed context can be updated safely, an index can provide stable local inventory metadata for later retrieval. The index should not select or rank snippets yet.
+Por que vem nessa ordem: com contexto confirmado já atualizável com segurança, um índice fornece metadados de inventário local estáveis para retrieval futura. O índice ainda não seleciona nem ranqueia trechos.
 
-Main scope:
+Escopo principal:
 
-- Define the context index model and persistence/update behavior.
-- Inventory supported local context sources, source categories, metadata, and freshness information.
-- Reuse existing skip rules for sensitive files and heavy/generated directories.
-- Keep index content bounded and deterministic.
-- Provide validation or reporting that helps users understand what is indexed.
+- definir modelo de índice de contexto e comportamento de persistência/atualização;
+- inventariar fontes locais suportadas, categorias, metadados e informações de frescor;
+- reutilizar regras já existentes de skip para arquivos sensíveis e diretórios pesados/gerados;
+- manter conteúdo de índice delimitado e determinístico;
+- validar ou reportar estado para ajudar o usuário a entender o que foi indexado.
 
-Explicit out-of-scope boundaries:
+Fronteiras explícitas de out-of-scope:
 
-- No local retrieval or snippet ranking.
-- No embeddings, vector stores, or RAG.
-- No GitHub or remote source collection.
-- No prompt behavior changes unless strictly limited to reading stable metadata.
-- No command execution or dependency graph analysis.
-- No release or publishing changes.
+- sem retrieval local nem ranking de snippets;
+- sem embeddings, vector store ou RAG;
+- sem coleta de fontes GitHub/remo­ta;
+- sem alteração de prompt exceto leitura de metadados estáveis;
+- sem análise de dependências de projeto;
+- sem mudanças de release ou publicação.
 
-Expected architectural boundaries:
+Fronteiras arquiteturais esperadas:
 
-- Domain owns index records, source categories, freshness markers, skip policy references, and deterministic ordering.
-- Ports expose bounded filesystem inventory and index persistence operations.
-- Use cases build, read, validate, and report index state.
-- Adapters implement safe filesystem traversal and persistence.
-- CLI parses commands and formats reports without owning index rules.
+- domínio controla registros de índice, categorias, marcadores de frescor, referências de política de skip e ordenação determinística;
+- ports expõem operações de inventário de filesystem e persistência/validação de índice;
+- use cases montam, leem, validam e reportam estado de índice;
+- adapters implementam travessia de filesystem segura e persistência.
 
-Testing focus:
+CLI apenas parseia comandos e formata relatórios sem possuir regras de índice.
 
-- Deterministic index generation.
-- Safe path handling and symlink behavior.
-- Sensitive/heavy folder skip policy.
-- Freshness and stale index detection.
-- Empty and ambiguous repository behavior.
-- No retrieval or embedding behavior.
+Foco de testes:
 
-Documentation impact:
+- geração determinística do índice;
+- tratamento seguro de caminhos e symlinks;
+- políticas de pasta sensível/pesada;
+- detecção de frescor e índices obsoletos;
+- comportamento com repositório vazio ou ambíguo;
+- ausência de retrieval ou embedding.
 
-- Document command shape and index file location only after the spec chooses them.
-- Explain that the index is metadata/inventory, not a semantic database, vector store, or RAG system.
+Impacto em documentação:
 
-Main risks:
+- documentar formato do comando e localização do arquivo de índice após definir a implementação;
+- explicar que o índice é metadado/inventário, não banco semântico, vector store ou sistema RAG.
 
-- Indexing too much content.
-- Storing raw secrets or large raw file bodies.
-- Creating a persistence format that retrieval cannot safely reuse.
-- Users mistaking inventory metadata for confirmed context.
+Riscos principais:
 
-Subagent responsibility:
+- indexar conteúdo excessivo;
+- armazenar segredos brutos ou arquivos grandes integrais;
+- criar formato de persistência que retrieval não consegue reutilizar.
 
-- Propose index schema options, safety constraints, acceptance criteria, and migration/staleness risks.
-- Identify overlap with existing `context discover` sources.
-- Do not write code.
+- usuários interpretarem metadados de inventário como contexto confirmado.
 
-Coordinator validation checklist:
+Responsabilidade do subagente:
 
-- The spec explicitly says indexing does not implement retrieval.
-- The index model preserves source evidence and classification boundaries.
-- Skip policies are inherited or clearly extended.
-- Persistence path and file format are justified.
-- Tests prove deterministic and bounded behavior.
+- propor opções de schema de índice, restrições de segurança, critérios de aceite e riscos de migração/obsolescência;
+- identificar sobreposição com fontes de `context discover`;
+- não escrever código.
+
+Checklist de validação do coordenador:
+
+- a spec diz explicitamente que indexação não implementa retrieval;
+- o modelo de índice preserva evidência de fonte e distinção de classificação;
+- políticas de skip herdadas ou claramente estendidas;
+- caminho e formato de persistência justificadas;
+- testes provam determinismo e limites.
 
 ## Feature Brief: implement-local-context-retrieval
 
-Change ID: `implement-local-context-retrieval`
+ID da mudança: `implement-local-context-retrieval`
 
-Goal: Add deterministic local/offline context retrieval over the bounded index or inventory so SpecHarbor can select relevant local context without embeddings, RAG, provider APIs, or remote services.
+Objetivo: adicionar retrieval local/offline determinístico sobre o índice/inventário delimitado para que SpecHarbor selecione contexto local relevante sem embeddings, RAG, APIs de provedor ou serviços remotos.
 
-Why it comes in this order: Retrieval needs a safe inventory first. It should prove the local abstraction before remote context or RAG providers add optional sources.
+Por que vem nessa ordem: retrieval precisa de inventário seguro antes. Ele deve validar a abstração local antes de incluir providers remotos.
 
-Main scope:
+Escopo principal:
 
-- Define local retrieval queries and result models.
-- Retrieve bounded snippets or structured records from local supported sources.
-- Use deterministic lexical, metadata, or rule-based ranking.
-- Preserve source evidence, classification, and confidence.
-- Make retrieval safe for future prompt/spec use without raw dumping.
+- definir queries e modelos de resultado locais;
+- recuperar trechos limitados ou registros estruturados de fontes locais suportadas;
+- usar ranking determinístico lexical/metadados/regra;
+- preservar evidência de fonte, classificação e confiança;
+- manter retrieval seguro para uso futuro em prompts/spec sem dump bruto de arquivos.
 
-Explicit out-of-scope boundaries:
+Fronteiras explícitas de out-of-scope:
 
-- No embeddings.
-- No vector databases.
-- No RAG provider.
-- No GitHub or remote context.
-- No mandatory project brief update.
-- No execution of project commands.
-- No release or publishing changes.
+- sem embeddings;
+- sem vector databases;
+- sem provedor RAG;
+- sem contexto remoto do GitHub;
+- sem atualização obrigatória de project brief;
+- sem execução de comandos do projeto;
+- sem mudanças de release ou publicação.
 
-Expected architectural boundaries:
+Fronteiras arquiteturais esperadas:
 
-- Domain owns retrieval query, result, rank, snippet, and source evidence models.
-- Ports expose local indexed source access and bounded file reads.
-- Use cases orchestrate retrieval and result limiting.
-- Adapters perform concrete safe reads.
-- CLI or prompt integration only formats returned results and must not own ranking rules.
+- domínio controla modelos de query, result, rank, snippet e evidência;
+- ports expõem acesso a fontes indexadas locais e leitura delimitada de arquivos;
+- use cases orquestram recuperação e limitação de resultados;
+- adapters fazem leitura segura.
 
-Testing focus:
+CLI ou integração com prompt apenas formata resultados retornados e não implementa regras de ranking.
 
-- Deterministic ranking and tie-breaks.
-- Result limits and truncation.
-- Safe relative paths.
-- Skip policy enforcement.
-- No assumption promotion.
-- Behavior with missing or stale index.
-- Regression coverage for discovery and prompts.
+Foco de testes:
 
-Documentation impact:
+- ranking determinístico e desempate;
+- limites e truncamento;
+- caminhos relativos válidos;
+- enforcement da política de skip;
+- ausência de promoção de suposição;
+- comportamento com índice faltante/obsoleto;
+- regressão de discovery e prompts.
 
-- Document retrieval behavior, limits, and local/offline constraints after implementation.
-- Clarify that retrieval is not RAG and does not call providers.
+Impacto em documentação:
 
-Main risks:
+- documentar comportamento de retrieval, limites e limites locais/offline;
+- deixar claro que retrieval não é RAG e não chama provedores.
 
-- Retrieval ranking becoming hidden business logic in CLI code.
-- Raw file content exposure.
-- Confusing retrieved snippets with confirmed context.
-- Premature RAG abstractions leaking into local retrieval.
+Riscos principais:
 
-Subagent responsibility:
+- ranking de retrieval virando regra de negócio escondida no CLI;
+- exposição de conteúdo bruto;
+- confundir trecho recuperado com contexto confirmado;
+- abstrações RAG prematuras vazando para retrieval local.
 
-- Propose retrieval use cases, result constraints, ranking rules, and test cases.
-- Identify which index fields are required.
-- Do not write code.
+Responsabilidade do subagente:
 
-Coordinator validation checklist:
+- propor use cases e regras de ranking, limites e casos de teste;
+- identificar campos de índice necessários;
+- não escrever código.
 
-- The spec explicitly says retrieval does not implement embeddings or RAG.
-- The retrieval model keeps confirmed, detected, and assumption classifications separate.
-- Result limits and source evidence are specified.
-- Tests cover deterministic ranking and safe truncation.
-- No remote or provider dependency is required.
+Checklist de validação do coordenador:
+
+- a spec diz explicitamente que retrieval não implementa embeddings ou RAG;
+- o modelo preserva separação entre confirmed, detected e assumption;
+- limites de resultado e evidência de fonte especificados;
+- testes cobrem ranking determinístico e truncamento seguro;
+- não exige dependência remota de provider para funcionamento básico.
 
 ## Feature Brief: implement-github-remote-context
 
-Change ID: `implement-github-remote-context`
+ID da mudança: `implement-github-remote-context`
 
-Goal: Add optional GitHub remote context collection through source-control host abstractions while preserving local/offline usage when GitHub is unavailable or unconfigured.
+Objetivo: adicionar contexto remoto GitHub opcional por meio de abstrações de controle de repositório, preservando uso local/offline quando GitHub estiver indisponível ou não configurado.
 
-Why it comes in this order: Remote context should reuse the same context source, indexing, and retrieval abstractions after they are stable. It should not define those abstractions from scratch.
+Por que vem nessa ordem: contexto remoto deve reutilizar as mesmas abstrações de contexto, indexação e retrieval após essas abstrações ficarem estáveis. Ele não deve redefini-las.
 
-Main scope:
+Escopo principal:
 
-- Define optional GitHub context sources, such as repository metadata, default branch files, issues, pull requests, discussions, or workflow metadata only as explicitly approved in the spec.
-- Add a core-owned source-control context port.
-- Implement a GitHub adapter behind that port.
-- Keep credentials optional and explicit.
-- Map remote context into existing context classifications and source evidence.
-- Preserve local/offline fallback.
+- definir fontes remotas opcionais (metadados do repositório, arquivos da branch padrão, issues, pull requests, discussões e metadados de workflow apenas quando aprovado explicitamente na spec);
+- adicionar port no domínio para leitura de contexto remoto;
+- implementar adapter GitHub para essa port;
+- manter credenciais opcionais e explícitas;
+- mapear contexto remoto nas classificações/fonte já existentes;
+- manter fallback local/offline.
 
-Explicit out-of-scope boundaries:
+Fronteiras explícitas de out-of-scope:
 
-- No requirement for GitHub credentials for local workflows.
-- No source-control automation such as commit, push, PR creation, merge, tagging, or release.
-- No mandatory remote calls from existing local commands.
-- No GitLab, Bitbucket, or generic forge implementation unless separately specified.
-- No RAG provider or embeddings.
-- No release or publishing changes.
+- sem requisito de credenciais GitHub para fluxos locais;
+- sem automação de controle de fonte (commit, push, PR, merge, tag, release);
+- sem chamadas remotas obrigatórias de comandos locais;
+- sem GitLab, Bitbucket ou forge genérica salvo especificação própria;
+- sem provedor RAG ou embeddings;
+- sem mudanças de release ou publicação.
 
-Expected architectural boundaries:
+Fronteiras arquiteturais esperadas:
 
-- Domain owns remote context source records and classification mapping.
-- Ports define small remote context read interfaces consumed by use cases.
-- Use cases orchestrate optional remote collection and fallback.
-- GitHub API details, authentication, pagination, rate limits, and response mapping stay in adapters.
-- CLI/config wiring must not leak GitHub SDK types into core.
+- domínio mantém registros e mapeamento de classificação de contexto remoto;
+- ports definem pequenas interfaces de leitura remota para use cases;
+- use cases orquestram coleta opcional e fallback local;
+- detalhes GitHub (auth, paginação, rate limit, parsing) ficam em adapters;
+- CLI/config não deve vazar tipos de SDK GitHub para o core.
 
-Testing focus:
+Foco de testes:
 
-- Fake port tests for use-case behavior.
-- Adapter tests with mocked HTTP responses or local fixtures.
-- Missing credential behavior.
-- Rate limit and API error handling.
-- Local fallback when remote is disabled or unavailable.
-- No source-control automation side effects.
+- testes de port com stubs/fakes para comportamento de use case;
+- testes de adapter com respostas HTTP mockadas ou fixtures;
+- comportamento sem credencial;
+- rate limit e erros de API;
+- fallback local quando remoto indisponível;
+- ausência de efeitos colaterais de controle de fonte.
 
-Documentation impact:
+Impacto em documentação:
 
-- Document GitHub context as optional.
-- Document credentials, failure modes, rate limits, and local fallback.
-- Make clear that no PR, merge, push, release, or workflow automation is introduced.
+- documentar contexto GitHub como opcional;
+- documentar credenciais, falhas, rate limit e fallback;
+- deixar claro que não há automação de PR/merge/release/workflow.
 
-Main risks:
+Riscos principais:
 
-- Making local context workflows depend on network or credentials.
-- Pulling in too much remote data.
-- Leaking private remote content into prompts without limits.
-- Confusing remote issue/PR statements with confirmed project facts.
+- tornar fluxos locais dependentes de rede/credencial;
+- coletar dados remotos demais;
+- vazar conteúdo remoto privado sem limites;
+- confundir declarações remotas de issues/PR com fatos confirmados.
 
-Subagent responsibility:
+Responsabilidade do subagente:
 
-- Propose remote source boundaries, credential handling, fallback behavior, and tests.
-- Identify which local abstractions should be reused.
-- Do not write code.
+- propor limites de fontes remotas, credenciais, fallback e testes;
+- identificar abstrações locais a serem reutilizadas;
+- não escrever código.
 
-Coordinator validation checklist:
+Checklist de validação do coordenador:
 
-- The spec states GitHub is optional and local/offline fallback remains.
-- Remote data is classified and sourced, not confirmed by default.
-- No source-control automation is included.
-- Adapter responsibilities keep GitHub details out of core.
-- Tests do not require live GitHub network access.
+- a spec afirma que GitHub é opcional e fallback local permanece;
+- dados remotos são classificados e rastreáveis, não confirmados por padrão;
+- não incluir automação de controle de fonte;
+- responsabilidades de adapter mantêm GitHub fora do domínio.
 
 ## Feature Brief: implement-context-rag-provider
 
-Change ID: `implement-context-rag-provider`
+ID da mudança: `implement-context-rag-provider`
 
-Goal: Add optional RAG provider support after local retrieval and remote context boundaries are stable, while preserving deterministic local/offline fallback and agent-assisted workflows without provider API keys.
+Objetivo: adicionar suporte opcional a provedor de RAG após retrieval local e contexto remoto estarem estáveis, preservando fallback determinístico local/offline e fluxos de agentes sem exigir API keys de provedor.
 
-Why it comes in this order: RAG is the most dependency-heavy feature. It should build on stable confirmed context, indexing, local retrieval, and optional remote context rather than redefining those contracts.
+Por que vem nessa ordem: RAG é o recurso mais dependente de infraestrutura. Deve depender de registros de contexto estáveis e limites de retrieval já definidos.
 
-Main scope:
+Escopo principal:
 
-- Define provider and retrieval augmentation boundaries.
-- Support optional embedding or retrieval providers only through small core-owned ports.
-- Keep local retrieval available when provider configuration is absent.
-- Preserve classification, source evidence, and assumptions.
-- Bound prompt/spec context size and raw content exposure.
-- Add provider error handling and fallback behavior.
+- definir limites de provider e augmentação de retrieval;
+- suportar embeddings ou providers de busca apenas por ports pequenos no domínio;
+- manter retrieval local disponível quando configuração de provider estiver ausente;
+- preservar classificação, evidência de fonte e suposições;
+- limitar tamanho de contexto em prompt/espec;
+- adicionar tratamento de erros e fallback do provider.
 
-Explicit out-of-scope boundaries:
+Fronteiras explícitas de out-of-scope:
 
-- No removal of local/offline context retrieval.
-- No provider API keys required for agent-assisted workflows.
-- No silent provider calls from unrelated commands.
-- No source-control automation.
-- No release or publishing changes.
-- No treating generated RAG summaries as confirmed facts.
+- não remover retrieval/local/offline;
+- sem API keys de provedor obrigatórias para fluxos agent-assisted;
+- sem chamadas silenciosas de provider de comandos não relacionados;
+- sem automação de controle de fonte;
+- sem mudanças de release/publish;
+- sem tratar sumários RAG como contexto confirmado.
 
-Expected architectural boundaries:
+Fronteiras arquiteturais esperadas:
 
-- Domain owns augmented retrieval result models, source evidence, confidence, and fallback status.
-- Ports define small provider interfaces for embedding, vector search, or retrieval augmentation as needed.
-- Use cases choose between local retrieval and optional provider-backed augmentation.
-- Provider-specific authentication, payloads, errors, rate limits, retries, and response mapping stay in adapters.
-- CLI/config only wires explicit provider configuration.
+- domínio controla resultados de retrieval aumentada, evidência de fonte, confiança e status de fallback;
+- ports definem pequenas interfaces para embedding, busca vetorial e augmentação quando necessário;
+- use cases escolhem entre retrieval local e augmentação opcional por provider;
+- autenticação, payload, erros, limites e mapping de resposta do provider ficam nos adapters;
+- CLI/config apenas conectam configuração explícita de provider.
 
-Testing focus:
+Foco de testes:
 
-- Fake provider tests for success, timeout, auth error, and rate-limit behavior.
-- Local fallback when provider is unavailable or disabled.
-- No provider calls without explicit configuration.
-- Classification preservation through augmentation.
-- Prompt/context size limits.
-- Secret handling and config safety.
+- testes com providers fake para sucesso, timeout, auth error e rate-limit;
+- fallback local quando provider indisponível ou desativado;
+- nenhuma chamada sem configuração explícita;
+- preservação de classificação;
+- limite de tamanho de prompt/contexto;
+- tratamento de segredos e segurança de configuração.
 
-Documentation impact:
+Impacto em documentação:
 
-- Document RAG as optional augmentation.
-- Document local/offline fallback and no-provider behavior.
-- Document that RAG output is not user-confirmed context.
-- Avoid claiming provider support beyond what is implemented.
+- documentar RAG como augmentação opcional;
+- documentar fallback local e comportamento sem provider;
+- documentar que saída de RAG não é contexto confirmado;
+- evitar prometer suporte além do implementado.
 
-Main risks:
+Riscos principais:
 
-- Making RAG mandatory.
-- Requiring API keys for agent-assisted workflows.
-- Letting provider output override confirmed context.
-- Leaking secrets or raw private content.
-- Adding broad placeholder abstractions before concrete behavior needs them.
+- tornar RAG obrigatório;
+- exigir chaves de provider para agentes;
+- permitir sobrescrever contexto confirmado com saída de provider;
+- vazar segredos ou conteúdo privado;
+- introduzir abstrações genéricas amplas antes de necessidade.
 
-Subagent responsibility:
+Responsabilidade do subagente:
 
-- Propose provider boundary options, fallback rules, provider error cases, and tests.
-- Confirm how local retrieval remains the baseline.
-- Do not write code.
+- propor fronteiras de provider, fallback e regras de erro;
+- confirmar como retrieval local continua base;
+- não escrever código.
 
-Coordinator validation checklist:
+Checklist de validação do coordenador:
 
-- The spec states local/offline fallback is mandatory.
-- Provider calls require explicit configuration.
-- Agent-assisted workflows do not require provider API keys.
-- RAG output is classified and sourced, not confirmed.
-- Tests cover provider failure and fallback.
+- a spec confirma que fallback local/offline é obrigatório;
+- chamadas de provider exigem configuração explícita;
+- workflows agent-assisted não exigem API key;
+- saída de RAG é classificada e com evidência, não confirmada;
+- testes cobrem falha de provider e fallback.
 
-## Conflict And Dependency Rules
+## Regras de conflito e dependência
 
-To prevent overlap:
+Para evitar sobreposição:
 
-- `implement-project-brief-merge-and-update` must not implement indexing.
-- `implement-repository-context-index` must not implement retrieval.
-- `implement-local-context-retrieval` must not implement embeddings or RAG.
-- `implement-github-remote-context` must not become mandatory for local usage.
-- `implement-context-rag-provider` must not remove local/offline fallback.
-- No feature should change release, npm, Homebrew, `install.sh`, GoReleaser, publishing, tag, merge, or source-control automation behavior without a separate release spec.
-- No feature should silently promote assumptions into facts.
-- Detected facts are not user-confirmed context unless the user explicitly confirms them through a specified flow.
-- Remote context is not user-confirmed context by default.
-- RAG summaries are not user-confirmed context by default.
-- Prompt context must remain bounded and must not dump raw files.
-- Shared files must be sequenced by the coordinator when multiple features need them.
+- `implement-project-brief-merge-and-update` não implementa indexação.
+- `implement-repository-context-index` não implementa retrieval.
+- `implement-local-context-retrieval` não implementa embeddings nem RAG.
+- `implement-github-remote-context` não deve se tornar obrigatório para uso local.
+- `implement-context-rag-provider` não pode remover fallback local/offline.
+- Nenhuma feature deve alterar release, npm, Homebrew, `install.sh`, GoReleaser, publicação, tag, merge ou automação de controle de fonte sem spec de release separado.
+- Nenhuma feature deve promover suposições silenciosamente em fatos.
+- Fatos detectados não são contexto confirmado sem confirmação explícita em fluxo.
+- Contexto remoto não é contexto confirmado por padrão.
+- Resumos de RAG não são contexto confirmado por padrão.
+- O contexto do prompt deve permanecer delimitado e não pode despejar arquivos brutos.
+- Arquivos compartilhados precisam ser sequenciados pelo coordenador quando múltiplas features dependam deles.
 
-## OpenSpec/SDD Workflow
+## Workflow OpenSpec/SDD
 
-Each actual feature should follow this workflow:
+Cada feature real deve seguir este fluxo:
 
 ```text
 Spec Author -> Architecture Reviewer -> Implementer -> Tester -> Change Reviewer -> PR -> merge -> Archive Housekeeping
 ```
 
-Each actual feature must still create exactly five OpenSpec files:
+Cada implementação real deve ainda criar exatamente cinco arquivos OpenSpec:
 
 ```text
 openspec/changes/<change-id>/
@@ -481,25 +482,25 @@ openspec/changes/<change-id>/
   risks.md
 ```
 
-Each actual implementation requires:
+Cada implementação requer:
 
-- a dedicated worktree;
-- the expected branch;
-- a clean starting tree;
-- branch and status verification before work starts;
-- explicit staging of intended files only;
-- no `git add -A`;
-- focused tests and validation before PR;
-- a PR for the implementation branch;
-- merge before archive;
-- a separate archive branch after merge;
-- archive validation after moving the change into `openspec/archive/<date>/<change-id>/`.
+- um worktree dedicado;
+- a branch esperada;
+- árvore inicial limpa;
+- verificação de branch/status antes do início;
+- staging explícito apenas dos arquivos pretendidos;
+- sem `git add -A`;
+- testes focados e validação antes do PR;
+- PR para a branch de implementação;
+- merge antes do archive;
+- branch de archive separada após merge;
+- validação de arquivo após mover a mudança para `openspec/archive/<date>/<change-id>/`.
 
-Implementation agents must read `AGENTS.md`, `.specharbor/rules/global.md`, `openspec/project.md`, `openspec/specs/architecture/spec.md`, and the active change before production edits.
+Implementação exige que os agentes leiam `AGENTS.md`, `.specharbor/rules/global.md`, `openspec/project.md`, `openspec/specs/architecture/spec.md` e a mudança ativa antes de editar produção.
 
-## Subagent Prompt Skeletons
+## Esqueletos de prompt de subagentes
 
-### Brief Merge/Update Planning Subagent
+### Subagente de planejamento de merge/atualização de brief
 
 ```text
 You are the Brief Merge/Update Planning Subagent for SpecHarbor.
@@ -509,7 +510,7 @@ Produce planning/spec guidance only. Do not write code, do not create files, and
 Read the completed brief, discovery, and context-aware prompt archives. Plan the OpenSpec scope for implement-project-brief-merge-and-update. Define goals, out-of-scope boundaries, architecture responsibilities, risks, acceptance criteria, and tests. Preserve confirmation-first behavior and never promote detected facts or assumptions into confirmed context without explicit user confirmation.
 ```
 
-### Repository Index Planning Subagent
+### Subagente de planejamento de index de repositório
 
 ```text
 You are the Repository Index Planning Subagent for SpecHarbor.
@@ -519,7 +520,7 @@ Produce planning/spec guidance only. Do not write code, do not create files, and
 Plan implement-repository-context-index. Focus on bounded inventory metadata, deterministic index behavior, safe paths, skip rules, persistence choices, stale index handling, and tests. Do not include retrieval, embeddings, RAG, GitHub remote context, provider calls, or release changes.
 ```
 
-### Local Retrieval Planning Subagent
+### Subagente de planejamento de retrieval local
 
 ```text
 You are the Local Retrieval Planning Subagent for SpecHarbor.
@@ -529,7 +530,7 @@ Produce planning/spec guidance only. Do not write code, do not create files, and
 Plan implement-local-context-retrieval. Define local/offline retrieval models, ranking constraints, result limits, source evidence, and tests. Build on the repository index or bounded inventory. Do not include embeddings, vector databases, RAG providers, GitHub remote context, or provider APIs.
 ```
 
-### GitHub Remote Context Planning Subagent
+### Subagente de planejamento de contexto remoto GitHub
 
 ```text
 You are the GitHub Remote Context Planning Subagent for SpecHarbor.
@@ -539,7 +540,7 @@ Produce planning/spec guidance only. Do not write code, do not create files, and
 Plan implement-github-remote-context. Define optional remote context sources, source-control context ports, GitHub adapter responsibilities, credential handling, API failure behavior, rate-limit behavior, classification mapping, and local/offline fallback. Do not include source-control automation, PR creation, merge, push, release, embeddings, or RAG.
 ```
 
-### RAG Provider Planning Subagent
+### Subagente de planejamento de provedor RAG
 
 ```text
 You are the RAG Provider Planning Subagent for SpecHarbor.
@@ -549,7 +550,7 @@ Produce planning/spec guidance only. Do not write code, do not create files, and
 Plan implement-context-rag-provider. Define optional provider boundaries, fallback to local retrieval, classification preservation, provider configuration, error handling, and tests. Do not require provider API keys for agent-assisted workflows. Do not remove local/offline behavior or treat RAG output as confirmed context.
 ```
 
-### Main Coordinator Review Agent
+### Subagente de revisão do coordenador principal
 
 ```text
 You are the Main Coordinator Review Agent for SpecHarbor.
@@ -559,29 +560,29 @@ Review subagent planning/spec guidance only. Do not write production code.
 Validate sequence, scope boundaries, architecture boundaries, OpenSpec file completeness, conflict rules, testing focus, documentation impact, branch/worktree requirements, and archive sequencing. Reject guidance that overlaps features, silently promotes assumptions into facts, makes remote/RAG mandatory, or touches release/publishing/source-control automation without a separate spec.
 ```
 
-## Decision Gates
+## Portões de decisão
 
-Do not begin implementation until all gates pass:
+Não comece implementação até todos os portões aprovados:
 
-- This planning document has been reviewed.
-- Feature order is accepted or deliberately changed with written rationale.
-- The first OpenSpec change is selected.
-- No overlapping active changes exist unless intentionally planned.
-- Scope boundaries are approved for the selected feature.
-- Main branch is clean before branching or creating a worktree.
-- The selected implementation worktree is on the expected branch.
-- The selected implementation worktree starts clean.
-- Archive state is clean and no stale active change exists for the selected feature.
-- The feature's five OpenSpec files are complete before implementation.
-- Architecture review has no blocking findings.
-- Test and validation commands are agreed before implementation.
+- Este documento de planejamento foi revisado.
+- A ordem de features foi aceita ou alterada com justificativa.
+- A primeira OpenSpec change foi selecionada.
+- Não existem mudanças ativas sobrepostas sem planejamento.
+- As fronteiras do escopo foram aprovadas.
+- A branch principal está limpa antes de criar branch/worktree.
+- O worktree de implementação está na branch esperada.
+- O worktree de implementação inicia limpo.
+- O estado de archive está limpo e não há mudança ativa obsoleta para a feature.
+- Os cinco arquivos OpenSpec da feature estão completos antes da implementação.
+- A revisão arquitetural não tem bloqueios.
+- Testes e validações acordados estão definidos antes da implementação.
 
-## Recommended Next Implementation
+## Próxima implementação recomendada
 
-The next concrete feature should be:
+A próxima feature concreta deve ser:
 
 ```text
 implement-project-brief-merge-and-update
 ```
 
-It should be next because the project already has confirmed context creation, local discovery, and context-aware prompts, but it still lacks a safe way to reconcile an existing brief with new or changed repository evidence. Stabilizing that confirmed-context lifecycle first prevents later index, retrieval, GitHub, and RAG work from building on stale or hard-to-update project brief data.
+Ela é indicada porque o projeto já tem criação de contexto confirmado, descoberta local e prompts contextualizados, mas ainda não tem um caminho seguro para reconciliar um brief existente com novas evidências ou evidências alteradas do repositório. Estabilizar esse ciclo de contexto confirmado primeiro impede que index, retrieval, GitHub e RAG operem sobre briefs desatualizados ou difíceis de atualizar.

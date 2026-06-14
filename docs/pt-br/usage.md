@@ -23,7 +23,7 @@ go run ./cmd/specharbor version
 specharbor version
 ```
 
-`specharbor version` prints deterministic multiline build metadata:
+`specharbor version` imprime metadados de build determinísticos em múltiplas linhas:
 
 ```text
 SpecHarbor dev
@@ -32,16 +32,16 @@ date: unknown
 dirty: unknown
 ```
 
-Fields:
+Campos:
 
-- `version`: product version metadata.
-- `commit`: source commit supplied by the build.
-- `date`: build date supplied by the build.
-- `dirty`: working tree state supplied by the build.
+- `version`: metadado da versão do produto.
+- `commit`: commit da origem fornecido pelo build.
+- `date`: data de build fornecida pelo build.
+- `dirty`: estado da árvore de trabalho fornecido pelo build.
 
-`dev` means no release version was injected. `unknown` means the build did not provide that metadata field. Git release tags use `vX.Y.Z`, for example `v0.1.0`, while release binary metadata uses plain `X.Y.Z`, for example `0.1.0`.
+`dev` significa que nenhuma versão de release foi injetada. `unknown` significa que o build não forneceu esse campo de metadado. Tags de release do Git usam `vX.Y.Z`, por exemplo `v0.1.0`, enquanto o metadado de binário de release usa `X.Y.Z`, por exemplo `0.1.0`.
 
-Plain `go install` without `-ldflags` uses the same development fallback metadata. An installed binary built that way is expected to print:
+`go install` puro sem `-ldflags` usa o mesmo metadado de fallback de desenvolvimento. Um binário instalado dessa forma deve imprimir:
 
 ```text
 SpecHarbor dev
@@ -50,9 +50,9 @@ date: unknown
 dirty: unknown
 ```
 
-This is expected behavior. To get release metadata, the binary must be built with injected `-ldflags` values.
+Esse é o comportamento esperado. Para obter metadados de release, o binário precisa ser compilado com valores `-ldflags` injetados.
 
-Release builds inject metadata through Go `-ldflags -X` variables in `github.com/guferreira1/spec-harbor/internal/platform/version`:
+Builds de release injetam metadados por meio de variáveis Go `-ldflags -X` em `github.com/guferreira1/spec-harbor/internal/platform/version`:
 
 ```bash
 go build \
@@ -65,7 +65,7 @@ go build \
   ./cmd/specharbor
 ```
 
-Runtime displays the injected version string as-is and does not normalize it. It does not inspect Git tags, read `.git`, run Git, or normalize versions. GoReleaser injects release metadata when building GitHub Release assets from tags such as `v0.1.0`, and those binaries display plain metadata such as `0.1.0`. Installation options are documented in [Install](install.md): `install.sh`, the npm wrapper package, and the Homebrew tap are available, while native Linux packages, Windows package managers, signing, SBOMs, and Docker images remain future steps.
+A execução exibe a string de versão injetada como recebida e não a normaliza. Não inspeciona tags Git, não lê `.git`, não executa Git e não normaliza versões. O GoReleaser injeta metadados de release ao construir assets do GitHub Release a partir de tags como `v0.1.0`, e esses binários exibem metadados simples como `0.1.0`. As opções de instalação estão documentadas em [Instalação](install.md): `install.sh`, o pacote wrapper npm e o tap do Homebrew estão disponíveis, enquanto pacotes Linux nativos, gerenciadores Windows, assinatura, SBOMs e imagens Docker seguem como próximos passos.
 
 ### Inicializar um projeto
 
@@ -73,7 +73,7 @@ Runtime displays the injected version string as-is and does not normalize it. It
 go run ./cmd/specharbor init
 ```
 
-`init` creates the OpenSpec and SpecHarbor project files that are missing in the current directory. Existing files are skipped.
+`init` cria os arquivos de projeto OpenSpec e SpecHarbor que faltam no diretório atual. Arquivos existentes são ignorados.
 
 ### Escanear um projeto
 
@@ -81,9 +81,9 @@ go run ./cmd/specharbor init
 go run ./cmd/specharbor scan
 ```
 
-`scan` performs an informational local project scan. It is stack-agnostic: user projects do not need to be Go projects.
+`scan` executa uma varredura informativa de projeto local. É agnóstico de stack: projetos de usuário não precisam ser projetos Go.
 
-The report can include detected ecosystems, package managers, test command hints, CI signals, container or deployment signals, SpecHarbor/OpenSpec signals, and notes. The command does not require flags or arguments.
+O relatório pode incluir ecossistemas detectados, gerenciadores de pacotes, dicas de comandos de teste, sinais de CI, sinais de container/deploy, sinais SpecHarbor/OpenSpec e observações. O comando não exige flags ou argumentos.
 
 ### Descobrir contexto do projeto
 
@@ -92,7 +92,7 @@ go run ./cmd/specharbor context discover
 specharbor context discover
 ```
 
-`context discover` performs deterministic local/offline project context discovery. It reads only a bounded set of supported repository sources and prints a structured report grouped in this order:
+`context discover` executa descoberta de contexto de projeto local/offline determinística. Lê apenas um conjunto limitado de fontes de repositório suportadas e imprime um relatório estruturado na seguinte ordem:
 
 ```text
 Detected project context:
@@ -116,38 +116,38 @@ Notes:
 - none detected
 ```
 
-Signal classifications:
+Classificações de sinal:
 
-- `user_confirmed_context`: parsed from known sections in `.specharbor/project-brief.md`.
-- `detected_fact`: explicit evidence exists in a supported repository source.
-- `suggested_assumption`: a conventional or incomplete inference; it is never treated as a fact.
+- `user_confirmed_context`: analisado a partir de seções conhecidas em `.specharbor/project-brief.md`.
+- `detected_fact`: existe evidência explícita em uma fonte de repositório suportada.
+- `suggested_assumption`: inferência convencional ou incompleta; nunca é tratada como fato.
 
-Confidence levels are `high`, `medium`, and `low`. Confidence does not change classification: a high-confidence fact is still not user-confirmed context, and an assumption is still an assumption.
+Níveis de confiança são `high`, `medium` e `low`. A confiança não muda a classificação: um fato com alta confiança ainda não é contexto confirmado pelo usuário, e uma suposição ainda é uma suposição.
 
-Supported discovery sources include:
+Fontes de descoberta suportadas incluem:
 
-- `AGENTS.md`, `.specharbor/rules/`, and `.specharbor/project-brief.md`;
-- `README.md`, `CONTRIBUTING.md`, and bounded Markdown files under `docs/`;
-- `openspec/project.md` and bounded Markdown files under `openspec/specs/`;
-- `package.json`, `go.mod`, `pom.xml`, `build.gradle`, `build.gradle.kts`, `Cargo.toml`, `pyproject.toml`, and `requirements.txt`;
-- `Dockerfile`, `docker-compose.yml`, `docker-compose.yaml`, `Makefile`, `Taskfile.yml`, `Taskfile.yaml`, and `.github/workflows/`;
-- bounded repository layout checks for CLI entrypoints under `cmd/`.
+- `AGENTS.md`, `.specharbor/rules/` e `.specharbor/project-brief.md`;
+- `README.md`, `CONTRIBUTING.md` e arquivos Markdown sob limite em `docs/`;
+- `openspec/project.md` e arquivos Markdown sob limite em `openspec/specs/`;
+- `package.json`, `go.mod`, `pom.xml`, `build.gradle`, `build.gradle.kts`, `Cargo.toml`, `pyproject.toml` e `requirements.txt`;
+- `Dockerfile`, `docker-compose.yml`, `docker-compose.yaml`, `Makefile`, `Taskfile.yml`, `Taskfile.yaml` e `.github/workflows/`;
+- validação de layout de repositório com limite para pontos de entrada de CLI em `cmd/`.
 
-The command can report project type, purpose summary, stack, languages, frameworks, architecture hints, package managers, test/build/run commands, documentation sources, agent instruction sources, OpenSpec sources, container signals, workflow signals, and notes. It does not dump raw file contents.
+O comando pode reportar tipo de projeto, resumo de propósito, stack, linguagens, frameworks, dicas de arquitetura, gerenciadores de pacotes, comandos de teste/build/run, fontes de documentação, fontes de instrução de agente, fontes OpenSpec, sinais de container e de workflow, e observações. Não despeja o conteúdo bruto de arquivos.
 
-Safety boundaries:
+Limites de segurança:
 
-- no project commands, package managers, tests, builds, scripts, agents, shells, provider APIs, local model APIs, network APIs, source-control APIs, or workflow tools are executed;
-- no repository-wide indexing, embeddings, vector databases, RAG, retrieval, snippet ranking, remote discovery, prompt injection, merge/update behavior, or brief overwrite behavior is performed;
-- sensitive files such as `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `secrets.*`, and `credentials.*` are skipped;
-- heavy/generated folders such as `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/`, and `obj/` are skipped;
-- symlinks are not traversed.
+- nenhum comando de projeto, gerenciador de pacotes, testes, builds, scripts, agentes, shells, APIs de provedor, APIs de modelo local, APIs de rede, APIs de controle de fonte ou ferramentas de workflow são executados;
+- não há indexação de repositório, embeddings, bancos de dados vetoriais, RAG, recuperação, ranqueamento de snippet, descoberta remota, injeção de prompt, comportamento de merge/update ou sobrescrita de brief;
+- arquivos sensíveis como `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `secrets.*` e `credentials.*` são ignorados;
+- pastas pesadas/geradas como `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/` e `obj/` são ignoradas;
+- links simbólicos não são atravessados.
 
-`specharbor context` without `discover`, `index`, `retrieve`, `github`, or `rag`, unsupported subcommands such as `context update`, positional arguments after `discover`, and flags such as `--json`, `--path`, `--deep`, `--github`, or `--rag` are rejected.
+`specharbor context` sem `discover`, `index`, `retrieve`, `github` ou `rag`, subcomandos não suportados como `context update`, argumentos posicionais após `discover` e flags como `--json`, `--path`, `--deep`, `--github` ou `--rag` são rejeitados.
 
-When `specharbor brief` runs, discovery can provide menu suggestions and detected context records only. The user must still select or enter every answer, confirmation is still required before writing, and an existing `.specharbor/project-brief.md` is still refused rather than merged, updated, overwritten, or appended.
+Quando `specharbor brief` é executado, a descoberta pode fornecer apenas sugestões de menu e registros de contexto detectado. O usuário ainda deve selecionar ou informar todas as respostas, a confirmação ainda é obrigatória antes da escrita e um arquivo `.specharbor/project-brief.md` existente ainda é recusado em vez de ser mesclado, atualizado, sobrescrito ou anexado.
 
-### Index Repository Context
+### Indexar contexto do repositório
 
 ```bash
 go run ./cmd/specharbor context index
@@ -158,96 +158,96 @@ specharbor context index --write
 specharbor context index --check
 ```
 
-`context index` builds a deterministic local/offline repository context index for supported context sources. The index is bounded inventory metadata for future local retrieval work. It is not retrieval, snippet ranking, RAG, a semantic database, a vector store, or confirmed project context.
+`context index` cria um índice de contexto de repositório local/offline determinístico para fontes de contexto suportadas. O índice é metadado de inventário limitado para trabalho futuro de recuperação local. Ele não é retrieval, ranqueamento de snippets, RAG, banco semântico, vector store, nem contexto de projeto confirmado.
 
-Command modes:
+Modos do comando:
 
-- no flag: build the current index in memory and print a concise report without writing files;
-- `--write`: build the current index and safely write `.specharbor/context-index.json`;
-- `--check`: read `.specharbor/context-index.json`, rebuild current metadata, and report whether the stored index is current, stale, missing, or invalid.
+- sem flag: gera o índice atual em memória e imprime um relatório conciso sem gravar arquivos;
+- `--write`: gera o índice atual e grava com segurança `.specharbor/context-index.json`;
+- `--check`: lê `.specharbor/context-index.json`, reconstrói os metadados atuais e informa se o índice armazenado está atual, obsoleto, ausente ou inválido.
 
-`--write` and `--check` are mutually exclusive. Unsupported flags, unsupported positional arguments, `--json`, `--path`, `--deep`, `--github`, and `--rag` are rejected.
+`--write` e `--check` são mutuamente exclusivos. Flags não suportadas, argumentos posicionais não suportados, `--json`, `--path`, `--deep`, `--github` e `--rag` são rejeitados.
 
-The generated index path is:
+O caminho do índice gerado é:
 
 ```text
 .specharbor/context-index.json
 ```
 
-The file is generated local state and is ignored by source control. It is not intended to be committed. The generated index file is not included as an index entry.
+O arquivo é estado local gerado e é ignorado pelo controle de fonte. Não é para ser commitado. O arquivo de índice gerado não é incluído como entrada de índice.
 
-The stored JSON uses schema version `1` and deterministic generation metadata. It records:
+O JSON armazenado usa a schema version `1` e metadados de geração determinísticos. Ele registra:
 
-- selected limits;
-- a safe project root marker such as `openspec/project.md` when present;
-- entries with relative path, source category, file type, language or ecosystem hint, file size, SHA-256 content hash, modified-time metadata, retrieval support flag, classification hints, and source evidence category;
-- bounded skip records with relative path and reason code only;
-- truncation state.
+- limites selecionados;
+- um marcador seguro da raiz do projeto, como `openspec/project.md`, quando presente;
+- entradas com caminho relativo, categoria de fonte, tipo de arquivo, pista de linguagem/ecossistema, tamanho de arquivo, hash de conteúdo SHA-256, metadados de horário de modificação, flag de suporte a recuperação, pistas de classificação e categoria de evidência da fonte;
+- registros de skip com caminho relativo e código de motivo apenas;
+- estado de truncamento.
 
-The index stores no raw file contents, snippets, secrets, command output, provider output, embeddings, vectors, remote API data, absolute local paths, or confirmed project context.
+O índice não armazena conteúdo bruto de arquivos, snippets, segredos, saída de comandos, saída de provedor, embeddings, vetores, dados de API remota, caminhos locais absolutos ou contexto de projeto confirmado.
 
-Supported indexed sources include:
+Fontes indexadas suportadas incluem:
 
-- `AGENTS.md`, `.specharbor/rules/`, and `.specharbor/project-brief.md`;
-- `README.md`, `CONTRIBUTING.md`, and bounded Markdown files under `docs/`;
-- `openspec/project.md` and bounded Markdown files under `openspec/specs/`;
-- `package.json`, `go.mod`, `pom.xml`, `build.gradle`, `build.gradle.kts`, `Cargo.toml`, `pyproject.toml`, and `requirements.txt`;
-- `Dockerfile`, `docker-compose.yml`, `docker-compose.yaml`, `Makefile`, `Taskfile.yml`, `Taskfile.yaml`, and `.github/workflows/`.
+- `AGENTS.md`, `.specharbor/rules/` e `.specharbor/project-brief.md`;
+- `README.md`, `CONTRIBUTING.md` e arquivos Markdown sob limite em `docs/`;
+- `openspec/project.md` e arquivos Markdown sob limite em `openspec/specs/`;
+- `package.json`, `go.mod`, `pom.xml`, `build.gradle`, `build.gradle.kts`, `Cargo.toml`, `pyproject.toml` e `requirements.txt`;
+- `Dockerfile`, `docker-compose.yml`, `docker-compose.yaml`, `Makefile`, `Taskfile.yml`, `Taskfile.yaml` e `.github/workflows/`.
 
-Safety boundaries:
+Limites de segurança:
 
-- no project commands, package managers, tests, builds, scripts, shells, agents, prompts, provider APIs, local model APIs, network APIs, source-control APIs, or workflow tools are executed;
-- no retrieval, snippet ranking, embeddings, vector databases, RAG, remote context, provider integration, prompt execution, agent execution, command verification, source-control automation, release automation, npm changes, Homebrew changes, `install.sh` changes, GoReleaser changes, or publishing behavior is introduced;
-- sensitive files such as `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `secrets.*`, and `credentials.*` are skipped;
-- heavy/generated folders such as `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/`, and `obj/` are skipped;
-- symlinks are not traversed;
-- path traversal, absolute paths, Windows drive paths, null-byte paths, and paths outside the project root are rejected.
+- nenhum comando de projeto, gerenciador de pacotes, testes, builds, scripts, shells, agentes, prompts, APIs de provedor, APIs de modelo local, APIs de rede, APIs de controle de fonte ou ferramentas de workflow são executados;
+- não há recuperação de snippets por ranking, embeddings, bancos de dados vetoriais, RAG, contexto remoto, integração com provedor, execução de prompt, execução de agente, verificação de comando, automação de controle de fonte, automação de release, mudanças de npm, mudanças de Homebrew, mudanças de `install.sh`, mudanças de GoReleaser ou comportamento de publicação;
+- arquivos sensíveis como `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `secrets.*` e `credentials.*` são ignorados;
+- pastas pesadas/geradas como `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/` e `obj/` são ignoradas;
+- links simbólicos não são atravessados;
+- traversal de caminho, caminhos absolutos, caminhos de unidades Windows, caminhos com byte nulo e caminhos fora da raiz do projeto são rejeitados.
 
-Default limits are 500 indexed files, 256 KiB per indexed file, 5 MiB total indexed bytes, 200 persisted skip records, and bounded depth for supported context directories. When limits are hit, the report marks the index as truncated and records stable skip reasons without dumping contents.
+Os limites padrão são 500 arquivos indexados, 256 KiB por arquivo indexado, 5 MiB no total de bytes indexados, 200 registros de skip persistidos e profundidade limitada para diretórios de contexto suportados. Quando os limites são atingidos, o relatório marca o índice como truncado e registra motivos de skip estáveis sem despejar conteúdos.
 
-### Retrieve Local Context
+### Recuperar contexto local
 
 ```bash
 go run ./cmd/specharbor context retrieve --query "architecture"
 specharbor context retrieve --query "architecture"
 ```
 
-`context retrieve` performs deterministic local/offline retrieval over supported sources represented by `.specharbor/context-index.json`. The command requires an existing valid, current, non-truncated index written by:
+`context retrieve` executa recuperação local/offline determinística sobre fontes suportadas representadas por `.specharbor/context-index.json`. O comando exige um índice existente válido, atual e não truncado gerado por:
 
 ```bash
 go run ./cmd/specharbor context index --write
 ```
 
-Missing, invalid, stale, unreadable, unsupported-schema, or truncated indexes fail safely and tell the user to run `specharbor context index --write`. Retrieval never silently creates, updates, or persists the index, and it writes no retrieval cache or output file.
+Índices faltantes, inválidos, obsoletos, ilegíveis, com esquema não suportado ou truncados falham de forma segura e orientam o usuário a rodar `specharbor context index --write`. A recuperação local nunca cria, atualiza ou persiste o índice em silêncio, e não grava cache de recuperação nem arquivo de saída.
 
-The query must be explicit through `--query`. Empty queries are rejected, queries longer than 512 characters are rejected, and normalized query terms are bounded. Positional queries and unsupported flags such as `--json`, `--github`, `--remote`, `--rag`, `--embed`, `--provider`, `--execute`, `--agent`, and `--deep` are rejected.
+A consulta deve ser explícita via `--query`. Consultas vazias são rejeitadas, consultas com mais de 512 caracteres são rejeitadas e os termos normalizados são limitados. Consultas posicionais e flags não suportadas como `--json`, `--github`, `--remote`, `--rag`, `--embed`, `--provider`, `--execute`, `--agent` e `--deep` são rejeitadas.
 
-Retrieval reads only supported indexed local sources marked for retrieval, including `AGENTS.md`, `README.md`, `CONTRIBUTING.md`, Markdown files under `docs/`, `openspec/project.md`, Markdown files under `openspec/specs/`, Markdown files under `.specharbor/rules/`, `.specharbor/project-brief.md`, package/build/dependency manifests, Docker and compose files, Makefile/Taskfile sources, and YAML workflow files under `.github/workflows/`.
+A recuperação lê apenas fontes locais indexadas com marcação de recuperação suportadas, incluindo `AGENTS.md`, `README.md`, `CONTRIBUTING.md`, arquivos Markdown em `docs/`, `openspec/project.md`, arquivos Markdown em `openspec/specs/`, arquivos Markdown em `.specharbor/rules/`, `.specharbor/project-brief.md`, manifests de pacote/build/dependência, arquivos Docker e compose, fontes Makefile/Taskfile e arquivos YAML de workflow em `.github/workflows/`.
 
-Default retrieval limits are 128 KiB per source file, 1 MiB total source reads, 10 total results, 2 snippets per file, 600 characters per snippet, 2 context lines before and after a match, and 8,000 rendered snippet/summary characters. Results include rank, path, category or evidence, score, classification hints when present, line ranges when practical, and a bounded snippet or metadata summary.
+Os limites padrão de retrieval são 128 KiB por arquivo de fonte, 1 MiB de leituras totais, 10 resultados totais, 2 snippets por arquivo, 600 caracteres por snippet, 2 linhas de contexto antes e depois do termo e 8.000 caracteres de snippet/resumo renderizados. Os resultados incluem ranking, caminho, categoria ou evidência, score, pistas de classificação quando presentes, intervalo de linhas quando aplicável e snippet/resumo limitado.
 
-Retrieval uses deterministic lexical scoring with path, filename, phrase, category, and classification-hint boosts. It does not use embeddings, vector databases, semantic providers, LLM reranking, provider APIs, remote search, command output, or RAG answer generation.
+A retrieval usa pontuação lexical determinística com reforços por caminho, nome de arquivo, frase, categoria e pista de classificação. Não usa embeddings, vector databases, provedores semânticos, reranking de LLM, APIs de provedor, busca remota, saída de comandos ou geração de resposta via RAG.
 
-Safety boundaries:
+Limites de segurança:
 
-- no project commands, package managers, tests, builds, scripts, shells, agents, prompts, provider APIs, local model APIs, network APIs, source-control APIs, or workflow tools are executed;
-- no embeddings, vector databases, RAG answer generation, remote context, provider integration, prompt execution, agent execution, command verification, source-control automation, release automation, npm changes, Homebrew changes, `install.sh` changes, GoReleaser changes, or publishing behavior is introduced;
-- sensitive files such as `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `secrets.*`, and `credentials.*` are skipped;
-- heavy/generated folders such as `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/`, and `obj/` are skipped;
-- symlinks are not traversed;
-- path traversal, absolute paths, Windows drive paths, null-byte paths, and paths outside the project root are rejected;
-- raw full-file dumps are not printed.
+- nenhum comando de projeto, gerenciador de pacotes, teste, build, script, shell, agente, prompt, API de provedor, API de modelo local, API de rede, API de controle de fonte ou ferramenta de workflow é executado;
+- não há embeddings, bancos de dados vetoriais, geração de resposta por RAG, contexto remoto, integração com provedor, execução de prompt, execução de agente, verificação de comando, automação de controle de fonte, automação de release, mudanças em npm, mudanças em Homebrew, mudanças em `install.sh`, mudanças em GoReleaser ou comportamento de publicação;
+- arquivos sensíveis como `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `secrets.*` e `credentials.*` são ignorados;
+- pastas pesadas/geradas como `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/` e `obj/` são ignoradas;
+- links simbólicos não são atravessados;
+- traversal de caminho, caminhos absolutos, caminhos de unidades Windows, caminhos com byte nulo e caminhos fora da raiz do projeto são rejeitados;
+- não é imprimido o dump bruto completo de arquivo.
 
-### Retrieve GitHub Remote Context
+### Recuperar contexto remoto no GitHub
 
 ```bash
 go run ./cmd/specharbor context github --repo owner/name --query "architecture"
 specharbor context github --repo owner/name --query "architecture"
 ```
 
-`context github` performs explicit, bounded, read-only remote context retrieval from GitHub. It is separate from local retrieval and does not read or write `.specharbor/context-index.json`.
+`context github` executa recuperação de contexto remota explícita, limitada e somente leitura no GitHub. É separado da recuperação local e não lê nem escreve `.specharbor/context-index.json`.
 
-Supported forms:
+Formas suportadas:
 
 ```bash
 specharbor context github --repo owner/name --query "architecture"
@@ -257,49 +257,49 @@ specharbor context github --repo owner/name --query "architecture" --path docs
 specharbor context github --repo owner/name --query "architecture" --path docs/usage.md --path README.md
 ```
 
-Repository input supports `owner/name` and `https://github.com/<owner>/<repo>`, which is normalized to `owner/name`. Unsupported hosts, GitHub Enterprise URLs, credentials, query strings, fragments, filesystem paths, path traversal, whitespace, and control characters are rejected.
+Entrada de repositório aceita `owner/name` e `https://github.com/<owner>/<repo>`, normalizada para `owner/name`. Hosts não suportados, URLs do GitHub Enterprise, credenciais, query strings, fragments, caminhos de sistema de arquivos, traversal, espaços e caracteres de controle são rejeitados.
 
-`--query` is required. Empty queries are rejected, queries longer than 512 characters are rejected, and normalized query terms are bounded. Positional queries and unsupported flags such as `--json`, `--rag`, `--embed`, `--provider`, `--execute`, `--agent`, and `--deep` are rejected.
+`--query` é obrigatório. Consultas vazias são rejeitadas, consultas com mais de 512 caracteres são rejeitadas e os termos normalizados de consulta têm limites. Consultas posicionais e flags não suportadas como `--json`, `--rag`, `--embed`, `--provider`, `--execute`, `--agent` e `--deep` são rejeitadas.
 
-`--ref` is optional. When omitted, SpecHarbor resolves the repository default branch through GitHub. Ref input is bounded and rejects traversal, null bytes, URLs, credentials, query strings, fragments, and suspicious slash forms.
+`--ref` é opcional. Quando omitido, o SpecHarbor resolve a branch padrão do repositório pelo GitHub. A entrada de `ref` é limitada e rejeita traversal, bytes nulos, URLs, credenciais, query strings, fragments e formas suspeitas de barra.
 
-`--path` is optional and repeatable. Path filters narrow the approved source set only; they cannot expand retrieval to arbitrary files. Path filters must be safe repository-relative paths and reject traversal, absolute paths, Windows drive paths, null bytes, query strings, fragments, and wildcard expansion.
+`--path` é opcional e repetível. Filtros de caminho estreitam apenas o conjunto de fontes aprovado; eles não expandem recuperação para arquivos arbitrários. Filtros devem ser caminhos relativos ao repositório e rejeitam traversal, caminhos absolutos, unidades Windows, bytes nulos, query strings, fragments e expansão de wildcard.
 
-Supported remote sources are bounded to `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, Markdown files under `docs/`, `openspec/project.md`, Markdown files under `openspec/specs/`, Markdown files under `.specharbor/rules/`, `.specharbor/project-brief.md`, supported manifest/config files such as `go.mod`, `package.json`, `Cargo.toml`, `pyproject.toml`, `Dockerfile`, `Makefile`, `Taskfile.yml`, compose files, and YAML workflow files under `.github/workflows/`.
+Fontes remotas suportadas são limitadas a `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, arquivos Markdown sob `docs/`, `openspec/project.md`, arquivos Markdown sob `openspec/specs/`, arquivos Markdown sob `.specharbor/rules/`, `.specharbor/project-brief.md`, manifestos/configurações suportados como `go.mod`, `package.json`, `Cargo.toml`, `pyproject.toml`, `Dockerfile`, `Makefile`, `Taskfile.yml`, arquivos compose e arquivos YAML de workflow em `.github/workflows/`.
 
-Default limits are 50 fetched files, 128 KiB per file, 1 MiB total file content, 10 total results, 2 snippets per file, 600 characters per snippet, 8,000 rendered snippet/summary characters, 500 scanned tree or directory entries, bounded directory depth, and 10 second HTTP timeouts. Results include repository, default/requested/resolved ref details when available, resolved SHA when available, rank, path, category or evidence, score, line range when practical, bounded snippet or summary, and `Remote: yes`.
+Limites padrão: 50 arquivos buscados, 128 KiB por arquivo, 1 MiB de conteúdo total, 10 resultados totais, 2 snippets por arquivo, 600 caracteres por snippet, 8.000 caracteres de snippet/resumo renderizado, 500 entradas de árvore ou diretório escaneadas, profundidade de diretório limitada e timeout de HTTP de 10 segundos. Os resultados incluem repositório, detalhes de `ref` padrão/solicitada/resolvida quando disponíveis, SHA resolvido quando disponível, ranking, caminho, categoria ou evidência, score, intervalo de linhas quando aplicável, snippet ou resumo limitado e `Remote: yes`.
 
-Authentication is optional. Public repository access works without a token when GitHub allows it. If `SPECHARBOR_GITHUB_TOKEN` is set, SpecHarbor sends it as a GitHub bearer token for this command only. The token is never printed, persisted, included in reports, or included in error messages.
+Autenticação é opcional. Acesso a repositório público funciona sem token quando o GitHub permite. Se `SPECHARBOR_GITHUB_TOKEN` estiver definido, o SpecHarbor envia como token Bearer do GitHub somente para este comando. O token não é impresso, persistido, incluído em relatórios ou mensagens de erro.
 
-Safe errors are returned for invalid input, unsupported hosts, network failures, timeouts, rate limits, unauthorized or forbidden responses, not found responses, invalid tokens, oversized files, oversized responses, unsupported content, and too many candidates.
+Erros seguros são retornados para entrada inválida, hosts não suportados, falhas de rede, timeouts, rate limits, respostas não autorizadas ou proibidas, respostas de not found, tokens inválidos, arquivos muito grandes, respostas muito grandes, conteúdo não suportado e muitos candidatos.
 
-Safety boundaries:
+Limites de segurança:
 
-- network access is used only when `context github` is explicitly invoked;
-- GitHub requests are HTTPS read-only requests to `api.github.com`;
-- no GitHub write APIs, commits, branches, PRs, issues, comments, labels, releases, tags, workflow runs, or repository mutations are performed;
-- no local `git`, `gh`, shell commands, package managers, scripts, project commands, prompts, or agents are executed;
-- no remote context is cached or persisted by default;
-- `.specharbor/context-index.json` is not written or modified;
-- remote results are not user-confirmed context and are not automatically injected into prompts;
-- sensitive files such as `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `secrets.*`, `credentials.*`, `.npmrc`, `.pypirc`, and `.netrc` are skipped;
-- heavy/generated folders such as `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/`, and `obj/` are skipped;
-- binary and unsupported files are skipped;
-- ranking is deterministic lexical matching with path, filename, phrase, category, and heading boosts;
-- no embeddings, vector databases, RAG answer generation, provider APIs, LLM reranking, prompt execution, agent execution, or source-control automation are introduced.
+- o acesso à rede é usado apenas quando `context github` é chamado explicitamente;
+- solicitações ao GitHub são HTTPS somente leitura para `api.github.com`;
+- não há APIs de escrita do GitHub, commits, branches, PRs, issues, comentários, labels, releases, tags, execução de workflow ou mutação de repositório;
+- nenhum `git`, `gh`, comando de shell, gerenciador de pacotes, script, comando de projeto, prompt ou agente local é executado;
+- por padrão, contexto remoto não é cacheado nem persistido;
+- `.specharbor/context-index.json` não é gravado nem modificado;
+- resultados remotos não são contexto confirmado pelo usuário e não são injetados automaticamente em prompts;
+- arquivos sensíveis como `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `secrets.*`, `credentials.*`, `.npmrc`, `.pypirc` e `.netrc` são ignorados;
+- pastas pesadas/geradas como `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/` e `obj/` são ignoradas;
+- arquivos binários e não suportados são ignorados;
+- o ranking é lexical determinístico com reforços por caminho, nome de arquivo, frase, categoria e cabeçalho;
+- não são introduzidos embeddings, bancos vetoriais, geração de resposta RAG, APIs de provedor, reranking por LLM, execução de prompt, execução de agente ou automação de controle de fonte.
 
-### Generate Provider Context Answer
+### Gerar resposta de contexto do provedor
 
 ```bash
 SPECHARBOR_OPENAI_API_KEY=... go run ./cmd/specharbor context rag --query "architecture" --provider openai
 SPECHARBOR_OPENAI_API_KEY=... specharbor context rag --query "architecture" --provider openai
 ```
 
-`context rag` is the explicit provider-backed context answer path. It does not run from `context discover`, `context index`, `context retrieve`, `context github`, `brief`, `prompt`, `validate`, `review`, or `scan`.
+`context rag` é o caminho explícito de resposta de contexto com provedor. Ele não é executado a partir de `context discover`, `context index`, `context retrieve`, `context github`, `brief`, `prompt`, `validate`, `review` ou `scan`.
 
-The first supported provider is `openai`. The command reads `SPECHARBOR_OPENAI_API_KEY` only when `context rag` is invoked. If the variable is missing or empty, SpecHarbor prints a safe `missing_credentials` report and exits nonzero. The token is never printed, persisted, included in provider context, or included in error details. `SPECHARBOR_OPENAI_MODEL` can override the default OpenAI model; when unset, SpecHarbor uses `gpt-5.4-mini`.
+O primeiro provedor suportado é `openai`. O comando lê `SPECHARBOR_OPENAI_API_KEY` apenas quando `context rag` é invocado. Se a variável estiver ausente ou vazia, SpecHarbor emite um relatório seguro `missing_credentials` e sai com código não zero. O token nunca é exibido, persistido, incluído no contexto do provedor ou nos detalhes de erro. `SPECHARBOR_OPENAI_MODEL` pode sobrescrever o modelo padrão OpenAI; quando não definido, SpecHarbor usa `gpt-5.4-mini`.
 
-Supported forms:
+Formas suportadas:
 
 ```bash
 specharbor context rag --query "architecture" --provider openai
@@ -310,82 +310,82 @@ specharbor context rag --query "architecture" --provider openai --from github --
 specharbor context rag --query "architecture" --provider openai --max-sources 4 --max-answer-chars 2000
 ```
 
-Source behavior:
+Comportamento de fonte:
 
-- without `--from`, only local retrieval is used;
-- `--from local` uses deterministic local retrieval over the current `.specharbor/context-index.json`;
-- `--from github` is used only when explicitly passed and requires `--repo owner/name`;
-- `--path` and `--ref` apply only to the explicit GitHub source;
-- selected local and remote snippets are bounded, source-attributed, and passed to the provider with path, source type, remote marker, and line range when available.
+- sem `--from`, somente recuperação local é usada;
+- `--from local` usa recuperação local determinística sobre o `.specharbor/context-index.json` atual;
+- `--from github` só é usado quando passado explicitamente e exige `--repo owner/name`;
+- `--path` e `--ref` se aplicam apenas à fonte GitHub explícita;
+- snippets locais e remotos selecionados são limitados, têm fonte atribuída e são enviados ao provedor com caminho, tipo da fonte, marcador remoto e intervalo de linhas quando disponíveis.
 
-Output includes the generated answer, provider name, model, status, source count, source list, local/remote marker, repository/ref details for GitHub sources, line range when available, and truncation markers when applicable. Provider output is treated as generated answer text, not confirmed project context.
+A saída inclui resposta gerada, nome do provedor, modelo, status, quantidade de fontes, lista de fontes, marcador local/remoto, detalhes de repositório/ref para fontes GitHub, intervalo de linhas quando disponível e marcadores de truncamento quando aplicável. A saída do provedor é tratada como texto de resposta gerada, não como contexto de projeto confirmado.
 
-Safety boundaries:
+Limites de segurança:
 
-- no provider call happens unless `context rag` is explicitly invoked;
-- no provider token is read by local/offline commands;
-- no raw provider request or raw provider response dump is printed;
-- no provider prompt, provider answer, embeddings, vectors, cache, or retrieval output is persisted;
-- `.specharbor/context-index.json` is read for local retrieval but never written or modified;
-- GitHub is read only when `--from github --repo owner/name` is explicit, and GitHub mutations are not performed;
-- no source-control automation, shell execution, prompt execution, agent execution, project command execution, release automation, npm changes, Homebrew changes, `install.sh` changes, GoReleaser changes, or publishing behavior is introduced;
-- generated answers are not automatically injected into role prompts, project briefs, specs, or source files.
+- nenhuma chamada a provedor acontece, exceto quando `context rag` for explicitamente invocado;
+- nenhum token de provedor é lido por comandos locais/offline;
+- não é impresso dump bruto de requisição/resposta do provedor;
+- nenhum prompt de provedor, resposta de provedor, embeddings, vetores, cache ou saída de retrieval é persistido;
+- `.specharbor/context-index.json` é lido para recuperação local, mas nunca gravado ou modificado;
+- GitHub é somente leitura quando `--from github --repo owner/name` é explícito, e mutações no GitHub não são executadas;
+- não é introduzida automação de controle de fonte, execução de shell, execução de prompt, execução de agente, execução de comando de projeto, automação de release, mudanças de npm, mudanças de Homebrew, mudanças em `install.sh`, mudanças em GoReleaser ou comportamento de publicação;
+- respostas geradas não são injetadas automaticamente em prompts de papel, briefs de projeto, specs ou arquivos fonte.
 
-### Brief a Project
+### Briefing de projeto
 
 ```bash
 go run ./cmd/specharbor brief
 specharbor brief
 ```
 
-`brief` starts an interactive project briefing workflow for cases where repository context is missing, incomplete, or ambiguous. Without flags it accepts no positional arguments and writes only when `.specharbor/project-brief.md` is absent. Unsupported flags such as `--force`, `--overwrite`, `--json`, `--from-scan`, `--github`, or `--rag` are rejected.
+`brief` inicia um fluxo interativo de briefing de projeto para casos em que o contexto do repositório está faltando, incompleto ou ambíguo. Sem flags, não aceita argumentos posicionais e só escreve quando `.specharbor/project-brief.md` está ausente. Flags não suportadas como `--force`, `--overwrite`, `--json`, `--from-scan`, `--github` ou `--rag` são rejeitadas.
 
-The command requires an interactive TTY. In CI, piped input, or other non-TTY contexts it fails before prompting or writing:
+O comando exige um TTY interativo. Em CI, entrada por pipe ou outros contextos sem TTY ele falha antes de pedir entrada ou escrever:
 
 ```text
 brief requires an interactive TTY
 ```
 
-Prompted context includes:
+O contexto solicitado no briefing inclui:
 
-- project type;
-- project purpose;
-- target users;
+- tipo de projeto;
+- propósito do projeto;
+- usuários-alvo;
 - stack;
-- architecture;
-- install command;
-- test command;
-- build command;
-- run command;
-- preferred agent behavior when context is missing.
+- arquitetura;
+- comando de instalação;
+- comando de testes;
+- comando de build;
+- comando de execução;
+- comportamento de agente preferido quando contexto está faltante.
 
-Each question is multiple choice with three to five options. The final option is always `Other / custom`; choosing it prompts for a non-empty custom answer. Invalid menu choices and empty custom answers retry up to three attempts, then fail without writing.
+Cada pergunta é de múltipla escolha com três a cinco opções. A última opção é sempre `Other / custom`; escolhê-la solicita uma resposta customizada não vazia. Escolhas de menu inválidas e respostas customizadas vazias são repetidas até três tentativas e, se falharem, termina sem escrever.
 
-Before writing, `brief` prints the target file and safety boundaries:
+Antes de gravar, `brief` imprime o arquivo alvo e limites de segurança:
 
 ```text
 SpecHarbor will create:
 
 .specharbor/project-brief.md
 
-Safety:
-- Stack, architecture, and commands come from confirmed answers only.
-- Detected context remains separate from user answers.
-- Assumptions are not confirmed facts.
-- No repository indexing, RAG, provider API, agent execution, source-control automation, release, or publishing behavior will run.
+Segurança:
+- Stack, arquitetura e comandos vêm apenas de respostas confirmadas.
+- Contexto detectado permanece separado das respostas do usuário.
+- Suposições não são fatos confirmados.
+- Nenhuma indexação de repositório, RAG, API de provedor, execução de agente, automação de controle de fonte, release ou publicação será executada.
 
 Confirm? [y/N]:
 ```
 
-Confirmation accepts trimmed `y` and `yes` in any casing. `n`, `no`, empty confirmation, and EOF cancel with `operation cancelled` and write no file. Unsupported confirmation answers retry up to three attempts; retry exhaustion writes no file.
+A confirmação aceita `y` e `yes` normalizados, independente de maiúsculas/minúsculas. `n`, `no`, confirmação vazia e EOF cancelam com `operation cancelled` e não gravam nenhum arquivo. Respostas de confirmação não suportadas são repetidas até três tentativas; esgotar tentativas não grava nada.
 
-After confirmation, `brief` creates `.specharbor/` when needed and writes:
+Após confirmação, `brief` cria `.specharbor/` quando necessário e grava:
 
 ```text
 .specharbor/project-brief.md
 ```
 
-The file is deterministic, human-readable Markdown with these sections:
+O arquivo é determinístico e em Markdown legível com estas seções:
 
 ```text
 # Project Brief
@@ -405,40 +405,40 @@ The file is deterministic, human-readable Markdown with these sections:
 ## Assumptions
 ```
 
-User-provided answers, detected context, and assumptions are labeled separately. Discovery suggestions and detected context may be recorded separately in generated project briefs, but user-provided answers remain separate from detected context and assumptions. It never silently converts missing or ambiguous stack, architecture, command, or project decisions into facts.
+Respostas fornecidas pelo usuário, contexto detectado e suposições são rotulados separadamente. Sugestões de descoberta e contexto detectado podem ser registrados separadamente nos briefs gerados, mas as respostas fornecidas permanecem separadas do contexto detectado e das suposições. O comando nunca converte silenciosamente stack, arquitetura, comando ou decisões de projeto faltantes ou ambíguas em fatos.
 
-If `.specharbor/project-brief.md` already exists, `brief` without `--update` refuses to overwrite or append to it. Context-aware role prompt generation can read the existing brief through the local discovery boundary, but it does not merge, update, overwrite, or append to the brief.
+Se `.specharbor/project-brief.md` já existir, `brief` sem `--update` se recusa a sobrescrever ou anexar. A geração de prompt contextualizado por papel pode ler o brief existente pelo limite de descoberta local, mas não mescla, atualiza, sobrescreve ou anexa no brief.
 
-Update an existing project brief explicitly with:
+Atualize explicitamente um brief de projeto existente com:
 
 ```bash
 go run ./cmd/specharbor brief --update
 specharbor brief --update
 ```
 
-`brief --update` requires an interactive TTY and an existing `.specharbor/project-brief.md`. It reads the current brief, reuses the existing local `context discover` use case for detected facts and suggested assumptions, and builds an update proposal. It does not duplicate discovery logic and does not execute commands.
+`brief --update` exige um TTY interativo e um `.specharbor/project-brief.md` existente. Ele lê o brief atual, reutiliza o caso de uso local `context discover` para fatos detectados e suposições sugeridas, e monta uma proposta de atualização. Não duplica a lógica de descoberta e não executa comandos.
 
-The update flow is confirmation-first:
+O fluxo de atualização é confirmação primeiro:
 
-- existing user-confirmed values are kept by default;
-- detected facts are evidence only until explicitly accepted;
-- suggested assumptions remain assumptions unless explicitly accepted;
-- conflicts prefer existing confirmed context by default;
-- stale confirmed values and stale assumptions are surfaced but not deleted automatically;
-- the user can keep an existing value, enter a custom replacement, accept a detected fact, accept a suggested assumption, ignore detected facts for a field, keep stale assumptions, remove stale assumptions, or cancel;
-- a reviewable preview is printed before writing;
-- final confirmation is required before writing;
-- cancellation or EOF leaves the existing brief unchanged.
+- valores confirmados existentes pelo usuário são mantidos por padrão;
+- fatos detectados são apenas evidência até aceitação explícita;
+- suposições sugeridas permanecem suposições até aceitação explícita;
+- conflitos preferem contexto confirmado existente por padrão;
+- valores confirmados antigos e suposições antigas são expostos, mas não removidos automaticamente;
+- o usuário pode manter um valor existente, inserir substituição customizada, aceitar um fato detectado, aceitar uma suposição sugerida, ignorar fatos detectados para um campo, manter suposições antigas, remover suposições antigas ou cancelar;
+- uma prévia revisável é impressa antes da gravação;
+- confirmação final é obrigatória antes de gravar;
+- cancelamento ou EOF mantém o brief existente inalterado.
 
-Updated Markdown remains deterministic and keeps user-confirmed context, detected facts, and suggested assumptions separate. Safe write behavior avoids partial updates. The command does not perform repository-wide indexing, retrieval, snippet ranking, embeddings, vector databases, RAG, GitHub remote context, provider APIs, command verification, project command execution, agent execution, prompt execution, source-control automation, release automation, npm changes, Homebrew changes, `install.sh` changes, GoReleaser changes, or publishing flows.
+O Markdown atualizado permanece determinístico e mantém contexto confirmado pelo usuário, fatos detectados e suposições sugeridas separados. O comportamento seguro de gravação evita atualizações parciais. O comando não executa indexação de repositório inteiro, retrieval, ranqueamento de snippets, embeddings, bancos de dados vetoriais, RAG, contexto remoto GitHub, APIs de provedor, verificação de comando, execução de comando de projeto, execução de agente, execução de prompt, automação de controle de fonte, automação de release, mudanças de npm, mudanças de Homebrew, mudanças de `install.sh`, mudanças de GoReleaser ou fluxos de publicação.
 
-### Show the Recommended Workflow
+### Mostrar o fluxo de trabalho recomendado
 
 ```bash
 go run ./cmd/specharbor workflow
 ```
 
-The installed command form is `specharbor workflow`. It prints the recommended OpenSpec/SDD workflow as read-only advisory text:
+O formato de comando instalado é `specharbor workflow`. Ele imprime o fluxo de trabalho OpenSpec/SDD recomendado como texto de orientação apenas leitura:
 
 ```text
 SpecHarbor recommended workflow.
@@ -456,41 +456,41 @@ Steps:
 9. archive - Archive
 ```
 
-The full output includes each step id, display name, purpose, mode, supported/advisory indicators, predecessor step ids, command suggestions, and safety notes. The suggestions connect the workflow to existing commands:
+A saída completa inclui cada `step id`, nome de exibição, propósito, modo, indicadores de suportado/aconselhável, IDs dos passos predecessores, sugestões de comandos e notas de segurança. As sugestões conectam o fluxo às rotinas existentes:
 
-- `generate` creates or starts an OpenSpec change package.
-- `validate` checks required OpenSpec change files and their content quality.
-- `prompt --role ...` prints prompts for Spec Author Agent, Architecture Reviewer Agent, Implementer Agent, Test Engineer Agent, and Change Reviewer Agent.
-- `review` checks the local change package and task checkbox completion.
-- `archive` explicitly moves an accepted change to the archive.
+- `generate` cria ou inicia um pacote de mudança OpenSpec.
+- `validate` valida os arquivos OpenSpec obrigatórios e a qualidade do conteúdo.
+- `prompt --role ...` imprime prompts para `spec-author`, `architecture-reviewer`, `implementer`, `test-engineer` e `change-reviewer`.
+- `review` valida o pacote de mudança local e a conclusão das tasks por checkbox.
+- `archive` move explicitamente uma mudança aceita para o `archive`.
 
-Command suggestions are advisory and `specharbor workflow` does not execute them. Commit, Pull Request, and Merge remain manual steps; SpecHarbor does not commit, does not create PRs, and does not merge. This command is read-only and does not call GitHub, GitLab, CI, provider APIs, agent CLIs, source-control automation, workflow execution, external commands, or remote automation.
+As sugestões de comando são somente de consulta e `specharbor workflow` não as executa. Commit, Pull Request e Merge permanecem etapas manuais; SpecHarbor não faz commit, não cria PRs e não faz merge. Este comando é somente leitura e não chama GitHub, GitLab, CI, APIs de provedor, CLIs de agente, automação de controle de fonte, execução de workflow, comandos externos ou automação remota.
 
-### Generate a Change
+### Gerar uma mudança
 
 ```bash
 go run ./cmd/specharbor generate add-example-feature --blank
 ```
 
-`generate <change-id> --blank` creates the expected OpenSpec change structure with blank/manual starter content.
+`generate <change-id> --blank` cria a estrutura esperada de mudança OpenSpec com conteúdo inicial em branco/manual.
 
-Interactive generation is a prompt layer over existing deterministic generation paths:
+A geração interativa é uma camada de prompt sobre os caminhos de geração determinísticos existentes:
 
 ```bash
 go run ./cmd/specharbor generate <change-id> --interactive
 ```
 
-`<change-id>` remains required on the command line; interactive mode does not prompt for it. `--interactive` cannot be combined with direct generation or input flags such as `--blank`, `--template`, `--custom-template`, `--config-template`, `--guided`, `--hybrid`, `--ai-assisted`, `--agent-assisted`, `--from-file`, `--overwrite`, `--agent`, `--execute`, `--type`, `--title`, or `--summary`.
+`<change-id>` continua obrigatório na linha de comando; o modo interativo não solicita esse valor. `--interactive` não pode ser combinado com geração direta ou flags de entrada como `--blank`, `--template`, `--custom-template`, `--config-template`, `--guided`, `--hybrid`, `--ai-assisted`, `--agent-assisted`, `--from-file`, `--overwrite`, `--agent`, `--execute`, `--type`, `--title` ou `--summary`.
 
-Interactive mode requires an interactive terminal. In CI, piped input, or other non-TTY contexts it fails immediately with:
+O modo interativo exige um terminal interativo. Em CI, entrada por pipe ou outros contextos sem TTY, falha imediatamente com:
 
 ```text
 interactive mode requires a TTY
 ```
 
-It does not prompt, hang, or write files in that case.
+Nesse caso, não faz perguntas, não trava e não grava arquivos.
 
-Supported interactive paths in this version are exactly:
+Os caminhos interativos suportados nesta versão são exatamente:
 
 - `blank`
 - built-in template
@@ -498,19 +498,19 @@ Supported interactive paths in this version are exactly:
 - config template
 - hybrid
 
-The first menu accepts the numbered choices `1` through `5` and stable keywords such as `blank`, `template`, `custom`, `config`, and `hybrid`. Direct guided generation remains available only through non-interactive flags. AI-assisted generation, agent-assisted generation, local agent runner execution, live runner output application, and raw remote URL entry are not offered by interactive prompts.
+O primeiro menu aceita as escolhas numeradas de `1` a `5` e palavras-chave estáveis como `blank`, `template`, `custom`, `config` e `hybrid`. A geração guiada direta permanece disponível apenas por flags não interativas. Geração assistida por IA, geração com agente, execução local de runner de agente, aplicação de saída de runner ao vivo e entrada de URL remota bruta não estão disponíveis nos prompts interativos.
 
-Prompt sequence:
+Sequência de prompt:
 
-- Blank asks only for the generation path.
-- Built-in template asks for the built-in template name (`feature`, `bugfix`, `docs`, or `refactor`).
-- Custom template asks for a custom template name, optional title, and optional summary.
-- Config template asks for a config alias, optional title, and optional summary.
-- Hybrid asks for exactly one source namespace (built-in template, custom template, or config template), the source value, required title, required summary, and optional type.
+- Blank solicita apenas o caminho de geração.
+- Template built-in solicita o nome do template integrado (`feature`, `bugfix`, `docs` ou `refactor`).
+- Template custom solicita nome do template custom, título opcional e resumo opcional.
+- Template config solicita um alias de configuração, título opcional e resumo opcional.
+- Hybrid solicita exatamente um namespace de fonte (template built-in, template custom ou config template), o valor da fonte, título obrigatório, resumo obrigatório e tipo opcional.
 
-Invalid required answers retry up to three attempts. Empty required answers are invalid. Invalid non-empty hybrid type answers retry up to three attempts. Empty optional title, summary, and hybrid type answers are treated as omitted. Retry exhaustion exits non-zero and writes nothing.
+Respostas obrigatórias inválidas repetem até três tentativas. Respostas obrigatórias vazias são inválidas. Tipos de híbrido não vazios inválidos repetem até três tentativas. Título, resumo e tipo de híbrido opcionais vazios são tratados como omitidos. Ao esgotar tentativas, termina com código não-zero e não escreve nada.
 
-Before any generation use case runs, interactive mode prints a deterministic summary:
+Antes de executar qualquer caso de uso de geração, o modo interativo imprime um resumo determinístico:
 
 ```text
 Interactive generation summary:
@@ -534,11 +534,11 @@ Safety:
 Proceed? [y/N]:
 ```
 
-Blank, built-in template, custom template, and config template summaries show `Validation: automatic no`. Hybrid summaries show `Validation: automatic yes`, preserving hybrid's existing automatic validation after generation. Interactive mode does not add a validation prompt and never auto-fixes validation findings.
+Resumos de blank, template built-in, template custom e config template mostram `Validation: automatic no`. Resumos de hybrid mostram `Validation: automatic yes`, preservando a validação automática existente do hybrid após geração. O modo interativo não adiciona prompt de validação e nunca corrige automaticamente achados de validação.
 
-Confirmation is trimmed and case-insensitive. `y` and `yes` proceed in any casing, including `Y`, `YES`, and `Yes`. `n` and `no` cancel in any casing, including `N`, `NO`, and `No`. Empty confirmation and EOF also cancel. Cancellation exits non-zero with `operation cancelled` and writes nothing. Unsupported confirmation answers retry up to three attempts; confirmation retry exhaustion writes nothing.
+A confirmação é normalizada e insensível a maiúsculas/minúsculas. `y` e `yes` confirmam em qualquer caixa, incluindo `Y`, `YES` e `Yes`. `n` e `no` cancelam em qualquer caixa, incluindo `N`, `NO` e `No`. Confirmação vazia e EOF também cancelam. Cancelamento sai com código não-zero e não grava nada. Respostas de confirmação não suportadas repetem até três tentativas; esgotar tentativas não grava nada.
 
-On confirmation, interactive mode delegates to the same behavior as the equivalent direct command:
+Com confirmação, o modo interativo delega ao mesmo comportamento do comando direto equivalente:
 
 ```bash
 go run ./cmd/specharbor generate add-blank --interactive
@@ -548,40 +548,40 @@ go run ./cmd/specharbor generate add-configured-feature --interactive
 go run ./cmd/specharbor generate add-login --interactive
 ```
 
-Write behavior, existing-file preservation, template rendering, config alias lookup, remote-template safeguards, and validation behavior remain owned by the selected generation mode. Remote templates are reachable only through existing config aliases after confirmation; interactive mode does not ask for URLs or checksums and does not print credentials, query strings, fragments, auth headers, cookies, OAuth material, or environment-derived secrets.
+Comportamento de gravação, preservação de arquivos existentes, renderização de templates, busca de aliases de configuração, proteções de template remoto e validação permanecem sob o modo de geração selecionado. Templates remotos são acessados apenas por aliases de configuração existentes após confirmação; o modo interativo não pede URLs ou checksums e não imprime credenciais, query strings, fragments, headers de autenticação, cookies, material OAuth ou segredos derivados do ambiente.
 
-Built-in template generation uses the same command with `--template <template-name>` and deterministic built-in starter content:
+A geração com template built-in usa o mesmo comando com `--template <template-name>` e conteúdo inicial integrado determinístico:
 
 ```bash
 go run ./cmd/specharbor generate <change-id> --template <template-name>
 ```
 
-For example:
+Por exemplo:
 
 ```bash
 go run ./cmd/specharbor generate add-example-feature --template feature
 ```
 
-Supported built-in templates are exactly:
+Os templates integrados suportados são exatamente:
 
 - `feature`
 - `bugfix`
 - `docs`
 - `refactor`
 
-Custom template generation uses project-local templates with `--custom-template <template-name>`:
+A geração com template customizado usa templates locais de projeto com `--custom-template <template-name>`:
 
 ```bash
 go run ./cmd/specharbor generate <change-id> --custom-template <template-name>
 ```
 
-For example:
+Por exemplo:
 
 ```bash
 go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature
 ```
 
-A custom template is a plain directory under the fixed project-local root `.specharbor/templates/<template-name>/` containing all five required OpenSpec change files:
+Um template customizado é um diretório simples sob a raiz local de projeto fixa `.specharbor/templates/<template-name>/` com os cinco arquivos obrigatórios de mudança OpenSpec:
 
 ```text
 .specharbor/templates/<template-name>/
@@ -592,27 +592,27 @@ A custom template is a plain directory under the fixed project-local root `.spec
   risks.md
 ```
 
-Custom template behavior:
+Comportamento do template customizado:
 
-- All five files are required and must be non-empty; a missing template directory, missing required files, or an empty file fails with a clear error before anything is written.
-- Unknown extra files and subdirectories in the template directory are ignored and never copied.
-- Template content supports minimal deterministic variable substitution: `{{change_id}}` is always replaced; `{{title}}` and `{{summary}}` are replaced only when the optional `--title` and `--summary` flags are provided. Unresolved and unknown `{{...}}` tokens remain in the output verbatim.
-- There are no conditionals, loops, includes, or any other templating language features, and templates are never executed.
-- `--custom-template` is mutually exclusive with `--blank`, `--template`, `--guided`, and `--agent-assisted`.
-- Custom template names must be safe single path segments (characters `[A-Za-z0-9._-]`, no `/` or `\`, no `..` sequences, no leading `.` or `-`, at most 128 characters); invalid names are rejected before any filesystem access.
-- Built-in, custom, and config-driven templates are disjoint: `--template` resolves only the built-in set, `--custom-template` resolves only `.specharbor/templates/`, and `--config-template` resolves only `.specharbor/config.yml` aliases.
-- Files are written only under `openspec/changes/<change-id>/`; existing files are skipped, never overwritten, and any template validation failure produces zero writes.
-- Direct custom templates are project-local only: no marketplace, no arbitrary local paths, no template script execution, no shell execution, no network/provider behavior, and no production code writes.
+Todos os cinco arquivos são obrigatórios e devem não ficar vazios; a ausência de diretório de template, de arquivos obrigatórios ou de um arquivo vazio falha com erro claro antes de qualquer escrita.
+Arquivos extra desconhecidos e subdiretórios no diretório de template são ignorados e nunca copiados.
+O conteúdo do template suporta substituição determinística mínima de variáveis: `{{change_id}}` é sempre substituído; `{{title}}` e `{{summary}}` são substituídos apenas quando as flags opcionais `--title` e `--summary` forem informadas. Tokens `{{...}}` desconhecidos ou não resolvidos permanecem na saída literalmente.
+Não há condicionais, loops, `includes` ou qualquer outro recurso de linguagem de template; templates nunca são executados.
+`--custom-template` é mutuamente exclusivo com `--blank`, `--template`, `--guided` e `--agent-assisted`.
+Nomes de template customizado devem ser segmentos únicos de caminho seguros (caracteres `[A-Za-z0-9._-]`, sem `/` ou `\`, sem sequências `..`, sem início `.` ou `-`, no máximo 128 caracteres); nomes inválidos são rejeitados antes de qualquer acesso ao sistema de arquivos.
+Templates integrados, customizados e orientados por configuração são disjuntos: `--template` resolve apenas os templates integrados, `--custom-template` resolve apenas `.specharbor/templates/`, e `--config-template` resolve apenas aliases em `.specharbor/config.yml`.
+Os arquivos são gravados apenas em `openspec/changes/<change-id>/`; arquivos existentes são ignorados, nunca sobrescritos, e qualquer falha de validação de template gera escrita zero.
+Templates customizados diretos são locais ao projeto: sem marketplace, sem caminhos locais arbitrários, sem execução de script de template, sem execução de shell, sem comportamento de rede/provedor e sem escrita de código de produção.
 
-After generation, run `go run ./cmd/specharbor validate <change-id>` to check the generated change; validation findings depend on the template's content quality, exactly as for hand-authored changes.
+Após geração, execute `go run ./cmd/specharbor validate <change-id>` para validar a mudança gerada; os achados de validação dependem da qualidade do conteúdo do template, exatamente como nas mudanças escritas manualmente.
 
-Custom template title/summary example:
+Exemplo de título/resumo de template customizado:
 
 ```bash
 go run ./cmd/specharbor generate add-payment-flow --custom-template api-feature --title "Add payments" --summary "Adds a payment flow."
 ```
 
-Config-driven template generation uses aliases declared in `.specharbor/config.yml`:
+A geração orientada por configuração via template usa aliases declarados em `.specharbor/config.yml`:
 
 ```bash
 go run ./cmd/specharbor generate <change-id> --config-template <alias>
@@ -641,24 +641,24 @@ templates:
       format: zip
 ```
 
-Rules:
+Regras:
 
-- `version: 1` is required when `--config-template` is used; missing config, missing version, unsupported versions, invalid YAML, invalid alias entries, and missing aliases fail clearly.
-- Supported source kinds are exactly `builtin`, `custom`, and `remote`.
-- `builtin` resolves only supported built-in templates: `feature`, `bugfix`, `docs`, and `refactor`.
-- `custom` resolves only `.specharbor/templates/<template-name>/` and uses the same required-file validation and `{{change_id}}`, `{{title}}`, and `{{summary}}` substitution as direct `--custom-template`.
-- `remote` fetches one explicitly configured HTTPS ZIP URL, verifies the configured `sha256:<64-hex>` checksum before archive parsing, and writes the decoded OpenSpec files without rendering or executing template scripts.
-- Remote aliases require `url`, `checksum`, and `format`; only `format: zip` is supported. `template` is invalid for remote aliases, and `url`, `checksum`, and `format` are invalid for `builtin` and `custom` aliases.
-- Remote URLs must use HTTPS and include a host and path. HTTP, file, SSH, git, git+ssh, FTP, SCP-style targets, credentials/userinfo, query strings, fragments, whitespace/control characters, over-length URLs, and redirects are rejected.
-- Remote ZIP bundles must contain exactly five non-empty root-level regular files: `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md`. Nested paths, absolute paths, traversal, Windows drive paths, symlinks, executable entries, duplicate files, extra files, missing files, empty files, malformed ZIPs, oversized downloads, and oversized uncompressed content are rejected.
-- Alias names must be safe single path segments: non-empty, at most 128 characters, characters `[A-Za-z0-9._-]`, no `/` or `\`, no absolute paths, no traversal or `..` sequence, no leading `.` or `-`.
-- `--title` and `--summary` are optional with `--config-template`; they are passed through to the resolved custom template path and do not change built-in template output.
-- `--config-template` is mutually exclusive with `--blank`, `--template`, `--custom-template`, `--guided`, `--agent-assisted`, `--ai-assisted`, and `--execute`.
-- `--template`, `--custom-template`, and `--config-template` use separate namespaces. A built-in template, custom template, and config alias may share the same name without shadowing, fallback, or guessing.
-- Remote templates have no persistent cache in this first version and do not support credentials, OAuth, auth headers, cookies, environment token expansion, git clone, marketplace search, provider APIs, script execution, shell execution, production code writes, source-control automation, auto-commit, PR, merge, or archive automation.
-- Generated files are still limited to `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md` under `openspec/changes/<change-id>/`; existing files are skipped.
+- `version: 1` é obrigatória quando `--config-template` é usado; config faltante, versão faltante, versões sem suporte, YAML inválido, entradas de alias inválidas e aliases faltantes falham com erro claro.
+- Os tipos de fonte suportados são exatamente `builtin`, `custom` e `remote`.
+- `builtin` resolve apenas templates integrados suportados: `feature`, `bugfix`, `docs` e `refactor`.
+- `custom` resolve apenas `.specharbor/templates/<template-name>/` e usa a mesma validação de arquivos obrigatórios e substituição de `{{change_id}}`, `{{title}}` e `{{summary}}` do `--custom-template` direto.
+- `remote` busca uma URL HTTPS ZIP explicitamente configurada, verifica o checksum `sha256:<64-hex>` antes de parsear o arquivo e grava os arquivos OpenSpec decodificados sem renderizar ou executar scripts de template.
+- Aliases remotos exigem `url`, `checksum` e `format`; apenas `format: zip` é suportado. `template` é inválido para aliases remotos, e `url`, `checksum` e `format` são inválidos para aliases `builtin` e `custom`.
+- URLs remotas devem usar HTTPS e incluir host e caminho. São rejeitados HTTP, file, SSH, git, git+ssh, FTP, alvos estilo SCP, `credentials/userinfo`, query strings, fragments, caracteres em branco/controle, URLs muito longas e redirects.
+- Pacotes ZIP remotos devem conter exatamente cinco arquivos regulares não vazios no nível raiz: `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md` e `risks.md`. Caminhos aninhados, absolutos, traversal, unidades Windows, symlinks, entradas executáveis, arquivos duplicados, arquivos extras, arquivos faltantes, arquivos vazios, ZIP malformados, downloads muito grandes e conteúdo descompactado muito grande são rejeitados.
+- Nomes de alias devem ser segmentos de caminho seguros: não vazios, no máximo 128 caracteres, caracteres `[A-Za-z0-9._-]`, sem `/` ou `\`, sem caminhos absolutos, sem traversal ou `..`, sem início `.` ou `-`.
+- `--title` e `--summary` são opcionais com `--config-template`; são repassados para o caminho do template customizado resolvido e não mudam o resultado do template integrado.
+- `--config-template` é mutuamente exclusivo com `--blank`, `--template`, `--custom-template`, `--guided`, `--agent-assisted`, `--ai-assisted` e `--execute`.
+- `--template`, `--custom-template` e `--config-template` usam namespaces separados. Um template integrado, template customizado e alias de configuração podem ter o mesmo nome sem sombreamento, fallback ou adivinhação.
+- Templates remotos não têm cache persistente nesta primeira versão e não suportam credenciais, OAuth, cabeçalhos de auth, cookies, expansão de token de ambiente, git clone, busca de marketplace, APIs de provedor, execução de script, execução de shell, escrita de código de produção, automação de controle de fonte, auto-commit, PR, merge ou automação de archive.
+- Arquivos gerados permanecem limitados a `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md` e `risks.md` sob `openspec/changes/<change-id>/`; arquivos existentes são ignorados.
 
-Hybrid generation combines one deterministic template source with required title and summary metadata:
+A geração híbrida combina uma fonte de template determinística com metadados obrigatórios de título e resumo:
 
 ```bash
 go run ./cmd/specharbor generate <change-id> --hybrid --template <name> --title "<title>" --summary "<summary>" [--type <feature|bugfix|docs|refactor>]
@@ -666,27 +666,27 @@ go run ./cmd/specharbor generate <change-id> --hybrid --custom-template <name> -
 go run ./cmd/specharbor generate <change-id> --hybrid --config-template <alias> --title "<title>" --summary "<summary>" [--type <feature|bugfix|docs|refactor>]
 ```
 
-Hybrid source selection is explicit:
+Seleção de fonte híbrida é explícita:
 
-- `--template <name>` resolves only built-in templates.
-- `--custom-template <name>` resolves only `.specharbor/templates/<name>/`.
-- `--config-template <alias>` resolves only `.specharbor/config.yml` aliases.
-- Exactly one source selector is required. Missing or multiple selectors fail before writes.
-- There is no source guessing, fallback, or namespace shadowing. The same name may exist in all three namespaces because the flag selects the namespace.
+- `--template <name>` resolve apenas templates integrados.
+- `--custom-template <name>` resolve apenas `.specharbor/templates/<name>/`.
+- `--config-template <alias>` resolve apenas aliases de `.specharbor/config.yml`.
+- É necessário exatamente um seletor de fonte. A ausência ou múltiplos seletores falham antes da escrita.
+- Não há adivinhação de fonte, fallback ou `namespace shadowing`. O mesmo nome pode existir nos três namespaces porque a flag seleciona o namespace.
 
-Hybrid metadata rules:
+Regras de metadados do híbrido:
 
-- `--title` is required and must be non-empty after trimming.
-- `--summary` is required and must be non-empty after trimming.
-- `--type` is optional, but when provided must be exactly `feature`, `bugfix`, `docs`, or `refactor`.
-- Direct built-in sources derive omitted type from the selected template. For example, `--hybrid --template feature` derives `type=feature`.
-- Config aliases resolving to built-in templates derive omitted type from the resolved built-in template.
-- A provided type must match a direct or resolved built-in template. `--hybrid --template feature --type feature` succeeds; `--hybrid --template feature --type bugfix` fails clearly and writes nothing.
-- Custom sources, config custom aliases, and config remote aliases do not infer omitted type. If `--type` is omitted, `{{type}}` remains unresolved in those template contents. If `--type` is provided, `{{type}}` is replaced with that value.
+- `--title` é obrigatório e não pode ficar vazio após `trim`.
+- `--summary` é obrigatório e não pode ficar vazio após `trim`.
+- `--type` é opcional, mas quando informado deve ser exatamente `feature`, `bugfix`, `docs` ou `refactor`.
+- Fontes integradas diretas derivam o tipo omitido do template selecionado. Por exemplo, `--hybrid --template feature` deriva `type=feature`.
+- Aliases de configuração que resolvem para templates integrados derivam o tipo omitido do template integrado resolvido.
+- O tipo informado deve corresponder ao template integrado direto ou resolvido. `--hybrid --template feature --type feature` tem sucesso; `--hybrid --template feature --type bugfix` falha claramente e não grava nada.
+- Fontes customizadas, aliases custom de configuração e aliases remotos de configuração não inferem o tipo omitido. Se `--type` for omitido, `{{type}}` permanece não resolvido nesse conteúdo de template. Se `--type` for informado, `{{type}}` é substituído por esse valor.
 
-Hybrid rendering replaces `{{change_id}}`, `{{title}}`, and `{{summary}}`. It replaces `{{type}}` only when a provided or built-in-derived effective type exists. Unknown or unresolved `{{...}}` tokens remain verbatim. Hybrid does not add conditionals, loops, functions, includes, hooks, shell commands, scripts, or executable template behavior.
+A renderização `hybrid` substitui `{{change_id}}`, `{{title}}` e `{{summary}}`. Ele substitui `{{type}}` apenas quando existe um tipo efetivo informado ou derivado de template integrado. Tokens desconhecidos ou não resolvidos `{{...}}` permanecem literais. `hybrid` não adiciona condicionais, loops, funções, `includes`, hooks, comandos de shell, scripts ou comportamento executável de template.
 
-Hybrid examples:
+Exemplos de híbrido:
 
 ```bash
 go run ./cmd/specharbor generate add-login \
@@ -696,7 +696,7 @@ go run ./cmd/specharbor generate add-login \
   --summary "Add an OpenSpec change for login"
 ```
 
-The built-in example derives `type=feature`.
+O exemplo integrado deriva `type=feature`.
 
 ```bash
 go run ./cmd/specharbor generate add-login \
@@ -707,7 +707,7 @@ go run ./cmd/specharbor generate add-login \
   --summary "Add an OpenSpec change for login"
 ```
 
-The mismatch example fails because `bugfix` does not match built-in template `feature`.
+O exemplo de incompatibilidade falha porque `bugfix` não combina com o template integrado `feature`.
 
 ```bash
 go run ./cmd/specharbor generate add-payment-flow \
@@ -717,9 +717,9 @@ go run ./cmd/specharbor generate add-payment-flow \
   --summary "Adds a payment flow."
 ```
 
-The custom example does not infer type, so `{{type}}` remains unresolved unless `--type` is provided.
+O exemplo customizado não infere tipo, então `{{type}}` permanece não resolvido a menos que `--type` seja informado.
 
-Config built-in example:
+Exemplo de template integrado por configuração:
 
 ```bash
 go run ./cmd/specharbor generate add-login \
@@ -729,7 +729,7 @@ go run ./cmd/specharbor generate add-login \
   --summary "Add login support"
 ```
 
-Config custom example:
+Exemplo de template customizado por configuração:
 
 ```bash
 go run ./cmd/specharbor generate add-payment-flow \
@@ -740,7 +740,7 @@ go run ./cmd/specharbor generate add-payment-flow \
   --type feature
 ```
 
-Config remote example:
+Exemplo de configuração remota:
 
 ```bash
 go run ./cmd/specharbor generate add-service \
@@ -750,37 +750,37 @@ go run ./cmd/specharbor generate add-service \
   --summary "Adds a service workflow."
 ```
 
-Remote templates are available to hybrid only through `--config-template <alias>`. The alias must resolve to `source: remote` and keeps the existing remote safeguards unchanged: HTTPS only, no credentials, no query strings, no fragments, no redirects, checksum required, checksum verified before ZIP parsing, ZIP only, strict archive safety, no cache, no shell or script execution, no production code writes, and only the five OpenSpec change files are written.
+Templates remotos ficam disponíveis para `hybrid` apenas por `--config-template <alias>`. O alias deve resolver para `source: remote` e mantém as mesmas salvaguardas remotas existentes: apenas HTTPS, sem credenciais, sem query strings, sem fragments, sem redirects, checksum obrigatório, checksum verificado antes do parse do ZIP, apenas ZIP, segurança estrita de arquivo, sem cache, sem execução de shell ou script, sem escrita de código de produção, e apenas os cinco arquivos OpenSpec são escritos.
 
-After successful hybrid writes or a skip-only rerun, SpecHarbor runs the existing validation logic. The hybrid report includes validation status, required file count, error count, warning count, and findings. Validation warnings keep exit code `0`; validation errors are printed after the generation report and then the command exits non-zero. Validation never auto-fixes files.
+Após gravações híbridas com sucesso ou rerun apenas de `skip`, o SpecHarbor executa a lógica de validação existente. O relatório de `hybrid` inclui status de validação, total de arquivos obrigatórios, quantidade de erros, quantidade de avisos e achados. Avisos de validação mantêm código de saída `0`; erros de validação são impressos após o relatório de geração e então o comando sai com código não-zero. A validação não corrige arquivos automaticamente.
 
-Hybrid rejects `--blank`, `--guided`, `--ai-assisted`, `--agent-assisted`, `--from-file`, `--overwrite`, `--agent`, and `--execute`. AI overlay and live runner output application are intentionally out of scope for this first version. Hybrid does not call provider APIs, LLM APIs, local model APIs, agents, source-control tools, workflow tools, shell commands, or scripts. It writes no production code and performs no auto-commit, auto-push, pull request, merge, or archive automation.
+`hybrid` rejeita `--blank`, `--guided`, `--ai-assisted`, `--agent-assisted`, `--from-file`, `--overwrite`, `--agent` e `--execute`. A sobreposição de IA e a aplicação de saída de runner ao vivo estão intencionalmente fora do escopo desta versão inicial. `hybrid` não chama APIs de provedor, APIs de LLM, APIs de modelo local, agentes, ferramentas de controle de fonte, ferramentas de workflow, comandos de shell ou scripts. Não grava código de produção e não executa auto-commit, auto-push, pull request, merge ou automação de archive.
 
-Guided generation uses explicit CLI flags:
+A geração guiada usa flags explícitas de CLI:
 
 ```bash
 go run ./cmd/specharbor generate <change-id> --guided --type <type> --title "<title>" --summary "<summary>"
 ```
 
-Guided generation is deterministic, local, and non-interactive. It does not prompt during command execution; it uses the supplied `--type`, `--title`, and `--summary` values.
+A geração guiada é determinística, local e não interativa. Não solicita prompt durante a execução do comando; usa os valores informados de `--type`, `--title` e `--summary`.
 
-Supported guided types are exactly:
+Os tipos de geração guiada suportados são exatamente:
 
 - `feature`
 - `bugfix`
 - `docs`
 - `refactor`
 
-AI-assisted generation imports a local file containing AI-authored OpenSpec Markdown in a strict delimiter format:
+A geração assistida por IA importa um arquivo local contendo OpenSpec Markdown criado por IA em formato de delimitador estrito:
 
 ```bash
 go run ./cmd/specharbor generate <change-id> --ai-assisted --from-file <agent-output-file>
 go run ./cmd/specharbor generate <change-id> --ai-assisted --from-file <agent-output-file> --overwrite
 ```
 
-The source file is local text only. It may be output that a user saved from an AI or agent tool, but SpecHarbor only reads the file from disk. It does not call provider APIs, remote AI services, local model APIs, OAuth, credentials, agents, shell commands, source-control tools, workflow tools, or network services.
+O arquivo de origem é somente texto local. Ele pode ser uma saída salva por um usuário de uma ferramenta de IA ou de agente, mas o SpecHarbor só lê o arquivo do disco. Não chama APIs de provedor, serviços de IA remotos, APIs de modelo local, OAuth, credenciais, agentes, comandos de shell, ferramentas de controle de fonte, ferramentas de workflow ou serviços de rede.
 
-The file must contain exactly these five file blocks, using exact delimiter lines:
+O arquivo deve conter exatamente estes cinco blocos de arquivo, com linhas de delimitador exatas:
 
 ```text
 ---FILE: proposal.md---
@@ -818,57 +818,57 @@ The file must contain exactly these five file blocks, using exact delimiter line
 ---END FILE---
 ```
 
-Allowed filenames are exactly `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md`, and `risks.md`. Unknown filenames, duplicate blocks, missing blocks, empty content, absolute paths, `..` traversal, nested paths, malformed block syntax, fenced wrapper formats, patch/diff formats, orphan end markers, unclosed blocks, and non-whitespace text outside file blocks are rejected before any writes.
+São permitidos exatamente os nomes de arquivo `proposal.md`, `design.md`, `tasks.md`, `acceptance-criteria.md` e `risks.md`. Nomes desconhecidos, blocos duplicados, blocos ausentes, conteúdo vazio, caminhos absolutos, `..` traversal, caminhos aninhados, sintaxe de bloco malformada, formatos de wrapper com fence, formatos de patch/diff, marcadores de fim órfãos, blocos não fechados e texto não em branco fora dos blocos de arquivo são rejeitados antes de qualquer gravação.
 
-AI-assisted generation writes only these files under:
+A geração assistida por IA grava apenas estes arquivos em:
 
 ```text
 openspec/changes/<change-id>/
 ```
 
-Existing files are skipped by default and reported as skipped. `--overwrite` is explicit and replaces existing required files only; symlink output targets are rejected instead of followed. All parsing and target preflight checks happen before file writes; malformed AI output writes nothing. After successful writes or skips, SpecHarbor runs the existing `validate <change-id>` logic and prints the validation status, error count, warning count, and findings. Validation warnings keep exit code `0`; validation errors are printed and then the command exits non-zero. Validation never auto-fixes files and AI-assisted generation never modifies production code.
+Arquivos existentes são ignorados por padrão e reportados como ignorados. `--overwrite` é explícito e substitui apenas os arquivos obrigatórios existentes; alvos de saída symlink são rejeitados em vez de seguidos. Todo parsing e verificações prévias de destino ocorrem antes da escrita de arquivos; saída de IA malformada não grava nada. Após gravações ou skips bem sucedidos, o SpecHarbor executa a lógica existente de `validate <change-id>` e imprime o status de validação, quantidade de erros, quantidade de avisos e os achados. Avisos de validação mantêm código de saída `0`; erros de validação são exibidos e então o comando sai com código não-zero. A validação nunca corrige automaticamente os arquivos e a geração assistida por IA nunca modifica código de produção.
 
-Safety boundaries printed by the command are part of the contract: provider APIs called `no`, remote AI services called `no`, agent commands executed `no`, production code modified `no`, source-control commands run `no`, and auto-commit, auto-push, PR, merge, or archive `no`. Direct live runner application such as `--agent-assisted --execute --apply` is not implemented.
+As fronteiras de segurança exibidas pelo comando fazem parte do contrato: chamadas de APIs de provedor `no`, serviços de IA remotos `no`, comandos de agente executados `no`, código de produção modificado `no`, comandos de controle de fonte executados `no`, e auto-commit, auto-push, PR, merge ou archive `no`. Aplicação direta de runner ao vivo, como `--agent-assisted --execute --apply`, não está implementada.
 
-Agent-assisted spec authoring uses explicit CLI flags:
+A autoria assistida por agente usa flags explícitas de CLI:
 
 ```bash
 go run ./cmd/specharbor generate <change-id> --agent-assisted --agent <agent-name> --type <type> --title "<title>" --summary "<summary>"
 ```
 
-For example:
+Por exemplo:
 
 ```bash
 go run ./cmd/specharbor generate add-reports --agent-assisted --agent codex --type feature --title "Add reports" --summary "Create report generation support"
 ```
 
-Supported agent-assisted authoring types are exactly:
+Os tipos de autoria assistida por agente suportados são exatamente:
 
 - `feature`
 - `bugfix`
 - `docs`
 - `refactor`
 
-Dry-run remains the default. Without `--execute`, agent-assisted spec authoring prints a deterministic authoring plan to stdout and prints a deterministic, copy-pasteable prompt to stdout.
+Dry-run permanece como padrão. Sem `--execute`, a autoria assistida por agente imprime no stdout um plano de autoria determinístico e imprime um prompt determinístico e copiável no stdout.
 
-The generated prompt is meant to help an external agent author or refine only the OpenSpec change package. Implementation remains a later step through the normal SpecHarbor workflow.
+O prompt gerado tem o objetivo de ajudar um agente externo a escrever ou refinar apenas o pacote de mudança OpenSpec. A implementação continua sendo uma etapa posterior pelo fluxo normal do SpecHarbor.
 
-Dry-run agent-assisted spec authoring:
+Autoria assistida por agente em dry-run:
 
-- writes no files;
-- writes no prompt file;
-- does not create or modify OpenSpec files;
-- does not create or modify production code;
-- does not execute agents or local agent commands;
-- does not require a runner;
-- does not resolve executable command mappings;
-- does not call provider APIs;
-- does not call local models;
-- does not call network APIs;
-- does not call source-control APIs;
-- does not call workflow tools.
+- não grava arquivos;
+- não grava arquivo de prompt;
+- não cria ou modifica arquivos OpenSpec;
+- não cria ou modifica código de produção;
+- não executa agentes ou comandos locais de agente;
+- não exige runner;
+- não resolve mapeamentos de comando executável;
+- não chama APIs de provedor;
+- não chama modelos locais;
+- não chama APIs de rede;
+- não chama APIs de controle de fonte;
+- não chama ferramentas de workflow.
 
-Recognized agent targets for dry-run are:
+Os alvos de agente reconhecidos para dry-run são:
 
 - `codex` - Codex
 - `claude` - Claude Code
@@ -881,17 +881,17 @@ Recognized agent targets for dry-run are:
 - `aider` - Aider
 - `generic` - Generic Agent
 
-Unknown dry-run agents are rejected as an intentional validation tightening.
+Agentes de dry-run desconhecidos são rejeitados como um endurecimento intencional de validação.
 
-`--execute` is explicit and is supported only with `--agent-assisted`:
+`--execute` é explícito e é suportado apenas com `--agent-assisted`:
 
 ```bash
 go run ./cmd/specharbor generate <change-id> --agent-assisted --agent <agent-name> --type <type> --title "<title>" --summary "<summary>" --execute
 ```
 
-Execute mode sends the same deterministic OpenSpec authoring prompt through stdin to a supported local command. The runner working directory is the current project root.
+O modo execute envia o mesmo prompt de autoria OpenSpec determinístico via stdin para um comando local suportado. O diretório de trabalho do runner é a raiz do projeto atual.
 
-Supported executable local command mappings are:
+Mapeamentos de comandos locais executáveis suportados são:
 
 - `codex -> codex`
 - `claude -> claude`
@@ -903,22 +903,22 @@ Supported executable local command mappings are:
 - `windsurf -> windsurf`
 - `aider -> aider`
 
-`generic` is recognized for dry-run only. `--execute --agent generic` fails because generic execution requires a future config-driven command mapping.
+`generic` é reconhecido apenas para dry-run. `--execute --agent generic` falha porque a execução genérica exige, no futuro, um mapeamento de comando orientado por configuração.
 
-Execute mode is run-and-report only:
+O modo execute é apenas executar e reportar:
 
-- missing local commands produce startup errors with no runner result and no exit code;
-- started commands with non-zero exit codes produce a full report, then SpecHarbor exits non-zero;
-- stdout, stderr, exit code, and execution status are captured for started processes;
-- SpecHarbor does not parse or apply output;
-- stdout and stderr are displayed only, not parsed or applied;
-- SpecHarbor does not write OpenSpec files from runner output;
-- SpecHarbor does not modify production code from runner output;
-- SpecHarbor does not auto-commit, auto-push, or auto-merge.
+- comandos locais ausentes produzem erros de inicialização sem resultado de runner e sem código de saída;
+- comandos iniciados com código de saída não-zero produzem relatório completo, então o SpecHarbor termina com código não-zero;
+- stdout, stderr, código de saída e status de execução são capturados para processos iniciados;
+- o SpecHarbor não faz parse nem aplica saída;
+- stdout e stderr são exibidos apenas, sem parse ou aplicação;
+- o SpecHarbor não grava arquivos OpenSpec a partir da saída do runner;
+- o SpecHarbor não modifica código de produção com a saída do runner;
+- o SpecHarbor não faz auto-commit, auto-push ou auto-merge.
 
-Provider APIs, IDE automation, OAuth, credentials, marketplace integrations, remote execution, source-control automation, and workflow automation remain out of scope. Local agent command behavior is controlled by the installed local tool.
+APIs de provedor, automação de IDE, OAuth, credenciais, integrações de marketplace, execução remota, automação de controle de fonte e automação de workflow permanecem fora do escopo. O comportamento de comando do agente local é controlado pela ferramenta local instalada.
 
-Blank, built-in template, custom template, config-template, hybrid, guided, and AI-assisted generation create the same required OpenSpec change files:
+As gerações blank, template integrado, template customizado, config-template, híbrido, guiado e assistido por IA criam os mesmos arquivos obrigatórios de mudança OpenSpec:
 
 ```text
 openspec/changes/<change-id>/
@@ -929,13 +929,13 @@ openspec/changes/<change-id>/
   risks.md
 ```
 
-Built-in template content is deterministic, local, and generic starter content. Hybrid content starts from exactly one deterministic template source and applies explicit metadata substitution before validation. Guided content is deterministic, local starter content that includes the supplied title and summary. AI-assisted content comes only from the explicit local `--from-file` source after strict parsing.
+O conteúdo de template integrado é determinístico, local e de conteúdo inicial genérico. O conteúdo híbrido parte de exatamente uma fonte de template determinística e aplica substituição explícita de metadados antes da validação. O conteúdo guiado é determinístico e local com conteúdo inicial que inclui o título e resumo fornecidos. O conteúdo assistido por IA vem apenas da fonte local explícita de `--from-file` após parsing estrito.
 
-Generated content is safe to edit after generation. Guided output does not mean SpecHarbor inferred project-specific requirements beyond the provided type, title, and summary.
+O conteúdo gerado pode ser editado com segurança após a geração. A saída guiada não significa que o SpecHarbor inferiu requisitos específicos do projeto além do tipo, título e resumo fornecidos.
 
-Blank, built-in template, custom template, config-template, hybrid, and guided generation skip existing files and do not overwrite them. AI-assisted generation also skips existing files by default, and overwrites only with explicit `--overwrite`. If a change directory partially exists, running generation again recovers it by creating only the missing required files.
+As gerações blank, template integrado, template customizado, config-template, híbrido e guiado ignoram arquivos existentes e não os sobrescrevem. A geração assistida por IA também ignora arquivos existentes por padrão e sobrescreve apenas com `--overwrite` explícito. Se o diretório da change existir parcialmente, executar geração novamente o recupera criando apenas os arquivos obrigatórios ausentes.
 
-Copy-pasteable examples from the repository root:
+Exemplos copiáveis da raiz do repositório:
 
 ```bash
 go run ./cmd/specharbor generate add-interactive-change --interactive
@@ -961,15 +961,15 @@ go run ./cmd/specharbor generate add-reports --agent-assisted --agent codex --ty
 go run ./cmd/specharbor generate add-reports --agent-assisted --agent codex --type feature --title "Add reports" --summary "Create report generation support" --execute
 ```
 
-### Validate a Change
+### Validar uma Mudança
 
 ```bash
 go run ./cmd/specharbor validate add-example-feature
 ```
 
-`validate <change-id>` runs deterministic, local, read-only validation over the change package under `openspec/changes/<change-id>/`. It never writes files, never modifies the change, and never calls the network, AI providers, agents, or source-control tooling.
+`validate <change-id>` executa validação determinística, local e somente leitura sobre o pacote de mudança em `openspec/changes/<change-id>/`. Ele nunca grava arquivos, nunca modifica a change e nunca chama rede, provedores de IA, agentes ou ferramentas de controle de fonte.
 
-It checks the five required OpenSpec files:
+Verifica os cinco arquivos OpenSpec obrigatórios:
 
 - `proposal.md`
 - `design.md`
@@ -977,39 +977,39 @@ It checks the five required OpenSpec files:
 - `acceptance-criteria.md`
 - `risks.md`
 
-Every finding carries a severity, a stable snake_case rule code, a message (with line numbers where relevant), and the file path.
+Cada achado contém severidade, um código de regra estável em `snake_case`, uma mensagem (com números de linha quando relevante) e o caminho do arquivo.
 
-Error findings (the change package is not usable downstream):
+Achados de erro (o pacote de mudança não é utilizável a jusante):
 
-- `project_root_unavailable` - the OpenSpec project structure is missing.
-- `change_directory_missing` - the change id is well formed but unknown.
-- `required_file_missing` - one of the five required files is missing.
-- `file_empty` - a required file is empty or whitespace-only. Other content findings for that file are suppressed.
-- `file_missing_heading` - a required file has no markdown heading.
-- `file_missing_body` - a required file contains only headings.
-- `tasks_checkbox_missing` - `tasks.md` has no valid checkbox task.
-- `tasks_checkbox_malformed` - a checkbox-like line (for example `- []`, `-[ ]`, `- [y]`, or `- [x]` without text) breaks the `- [ ] text` grammar; reported with line numbers.
-- `acceptance_criteria_item_missing` - `acceptance-criteria.md` has no list or checkbox item with meaningful text; placeholder-only items (`N/A`, `...`, `?`, `TBD`, `TODO`, `FIXME`) do not count.
+- `project_root_unavailable` - a estrutura de projeto OpenSpec está ausente.
+- `change_directory_missing` - o ID da change está bem formado, mas é desconhecido.
+- `required_file_missing` - um dos cinco arquivos obrigatórios está ausente.
+- `file_empty` - um arquivo obrigatório está vazio ou contém apenas espaços. Outros achados de conteúdo desse arquivo são suprimidos.
+- `file_missing_heading` - um arquivo obrigatório não tem cabeçalho markdown.
+- `file_missing_body` - um arquivo obrigatório contém apenas cabeçalhos.
+- `tasks_checkbox_missing` - `tasks.md` não possui uma tarefa de checkbox válida.
+- `tasks_checkbox_malformed` - uma linha com aparência de checkbox (por exemplo, `- []`, `-[ ]`, `- [y]` ou `- [x]` sem texto) quebra a gramática `- [ ] text`; reportada com número de linha.
+- `acceptance_criteria_item_missing` - `acceptance-criteria.md` não possui lista ou item de checkbox com texto significativo; itens somente placeholder (`N/A`, `...`, `?`, `TBD`, `TODO`, `FIXME`) não contam.
 
-Warning findings (quality gaps that never fail the command):
+Achados de aviso (lacunas de qualidade que nunca fazem o comando falhar):
 
-- `placeholder_content` - standalone `TBD`/`TODO`/`FIXME`, placeholder-only list items (`N/A`, `...`, `?`), or `lorem ipsum`.
-- `boilerplate_only_content` - the file still contains only known starter/boilerplate guidance lines and was never meaningfully edited.
-- `proposal_section_missing` - no Problem, Goal, or Summary section.
-- `design_section_missing` - no Overview, Approach, Design, Architecture, Technical Decisions, or Decisions section.
-- `tasks_phase_heading_missing` - checkbox tasks exist but no level-2 phase heading.
-- `tasks_all_completed` - every checkbox task is checked; confirm implementation evidence before review.
-- `risks_mitigation_missing` - risks are listed without mitigation notes.
-- `design_architecture_section_missing` - change files mention `internal/core`, `internal/adapters`, or `internal/platform` but `design.md` has no Architecture section.
-- `tasks_documentation_task_missing` - `proposal.md` or `design.md` references the `specharbor` CLI but `tasks.md` has no documentation task.
+- `placeholder_content` - `TBD`/`TODO`/`FIXME` isolados, itens de lista que são apenas placeholder (`N/A`, `...`, `?`) ou `lorem ipsum`.
+- `boilerplate_only_content` - o arquivo ainda contém apenas linhas de orientação de início conhecidas e nunca foi editado de forma significativa.
+- `proposal_section_missing` - falta seção Problem, Goal ou Summary.
+- `design_section_missing` - falta seção Overview, Approach, Design, Architecture, Technical Decisions ou Decisions.
+- `tasks_phase_heading_missing` - existem tarefas de checkbox, mas não há cabeçalho de fase nível 2.
+- `tasks_all_completed` - todas as tasks de checkbox estão marcadas; confirme evidências de implementação antes da revisão.
+- `risks_mitigation_missing` - os riscos são listados sem notas de mitigação.
+- `design_architecture_section_missing` - os arquivos de mudança mencionam `internal/core`, `internal/adapters` ou `internal/platform`, mas `design.md` não tem seção Architecture.
+- `tasks_documentation_task_missing` - `proposal.md` ou `design.md` referenciam o CLI `specharbor`, mas `tasks.md` não tem tarefa de documentação.
 
-Severity drives status and exit codes:
+A severidade determina status e códigos de saída:
 
-- Zero error findings: status `valid`, exit code `0`. Warnings alone never fail the command.
-- One or more error findings: status `invalid`, exit code `1`.
-- Missing or unsafe change ids (`..`, separators, absolute paths, leading `.` or `-`, characters outside `[A-Za-z0-9._-]`, more than 128 characters) are rejected with a clear command error before any filesystem access. Internal single dots such as `change.v1` are accepted.
+- Sem achados de erro: status `valid`, código de saída `0`. Apenas avisos nunca fazem o comando falhar.
+- Um ou mais achados de erro: status `invalid`, código de saída `1`.
+- IDs de change ausentes ou inseguros (`..`, separadores, caminhos absolutos, início com `.` ou `-`, caracteres fora de `[A-Za-z0-9._-]`, mais de 128 caracteres) são rejeitados com erro de comando claro antes de qualquer acesso ao sistema de arquivos. Pontos internos únicos como `change.v1` são aceitos.
 
-Example valid output:
+Exemplo de saída válida:
 
 ```text
 SpecHarbor change is valid.
@@ -1020,7 +1020,7 @@ Errors: 0
 Warnings: 0
 ```
 
-Example valid output with warnings (exit code `0`):
+Exemplo de saída válida com avisos (código de saída `0`):
 
 ```text
 SpecHarbor change is valid.
@@ -1035,7 +1035,7 @@ Warnings:
 - [warning] risks_mitigation_missing: Risks are listed without mitigation notes. (openspec/changes/add-example-feature/risks.md)
 ```
 
-Example invalid output (exit code `1`):
+Exemplo de saída inválida (código de saída `1`):
 
 ```text
 SpecHarbor change is invalid.
@@ -1050,24 +1050,24 @@ Warnings:
 - [warning] proposal_section_missing: No Problem, Goal, or Summary section found. (openspec/changes/add-example-feature/proposal.md)
 ```
 
-Run validation before implementation (to confirm the change package is structurally ready), before review (to catch content gaps cheaply), and before opening a PR (to keep low-quality packages out of the shared workflow).
+Execute validação antes da implementação (para confirmar que o pacote de mudança está estruturalmente pronto), antes da revisão (para detectar lacunas de conteúdo com baixo custo) e antes de abrir PR (para manter pacotes de baixa qualidade fora do workflow compartilhado).
 
-Intentional behavior changes from the earlier presence-only validation:
+Alterações de comportamento intencionais em relação à validação anterior baseada apenas em presença:
 
-- Unusable change packages now fail: empty required files, files without a heading or body, tasks files without valid checkboxes, malformed checkbox lines, and acceptance-criteria files without a meaningful item produce errors and a non-zero exit.
-- A freshly generated `--blank` or template change now validates as valid with `boilerplate_only_content` (and applicable `placeholder_content`) warnings instead of zero findings; the exit code stays `0`, so the documented `generate -> validate` flow keeps working.
-- Change ids are validated more strictly and rejected before any filesystem access.
-- The report replaces the single `Findings:` count with `Errors:` and `Warnings:` counts and groups findings by severity with file paths appended.
+- Mudanças de change não utilizáveis agora falham: arquivos obrigatórios vazios, arquivos sem cabeçalho ou sem corpo, arquivos de tasks sem checkboxes válidas, linhas de checkbox malformadas e arquivos acceptance-criteria sem item significativo produzem erros e saída não-zero.
+- Uma change recém-gerada com `--blank` ou template agora valida como válida com avisos `boilerplate_only_content` (e `placeholder_content` aplicável) em vez de zero achados; o código de saída permanece `0`, portanto o fluxo documentado `generate -> validate` continua funcionando.
+- IDs de change são validados com mais rigor e rejeitados antes de qualquer acesso ao sistema de arquivos.
+- O relatório substitui a única contagem `Findings:` por contagens `Errors:` e `Warnings:` e agrupa os achados por severidade com caminhos de arquivo anexados.
 
-### Generate a Role Prompt
+### Gerar um Prompt por Papel
 
 ```bash
 go run ./cmd/specharbor prompt add-example-feature --role implementer
 ```
 
-`prompt <change-id> --role <role>` prints an agent prompt for an existing OpenSpec change. For supported roles, prompt generation is context-aware: it may include a dedicated `## Project Context` section after the read-first guidance and before the task.
+`prompt <change-id> --role <role>` imprime um prompt de agente para uma mudança OpenSpec existente. Para os papéis suportados, a geração do prompt é ciente de contexto: ela pode incluir uma seção dedicada `## Project Context` após as orientações iniciais de leitura e antes da tarefa.
 
-Supported roles:
+Papéis suportados:
 
 - `spec-author`
 - `architecture-reviewer`
@@ -1075,62 +1075,62 @@ Supported roles:
 - `test-engineer`
 - `change-reviewer`
 
-Use `--role` for prompt roles. Agent-target flags are not implemented.
+Use `--role` para papéis de prompt. Flags de `agent-target` não são implementadas.
 
-Project Context can include:
+O contexto do projeto pode incluir:
 
-- `User-confirmed context` from known `.specharbor/project-brief.md` sections.
-- `Detected facts` from bounded local context discovery, with source path and confidence.
-- `Suggested assumptions` from bounded local context discovery, always labeled as assumptions with source path and confidence.
+- `User-confirmed context` de seções conhecidas de `.specharbor/project-brief.md`.
+- `Detected facts` da descoberta local de contexto delimitada, com caminho de origem e confiança.
+- `Suggested assumptions` da descoberta local de contexto delimitada, sempre rotuladas como suposições com caminho de origem e confiança.
 
-Precedence is conservative: user-confirmed context wins over detected facts, detected facts win over suggested assumptions, and assumptions are never rendered as facts. If confirmed context conflicts with detected facts, the prompt prefers the confirmed value and may include a concise conflict note. If context is missing or ambiguous, the generated prompt tells the receiving agent to ask or explicitly label assumptions instead of inventing stack, architecture, commands, persistence decisions, workflow decisions, or project direction.
+A precedência é conservadora: contexto confirmado pelo usuário vence fatos detectados, fatos detectados vencem suposições sugeridas e suposições nunca são renderizadas como fatos. Se o contexto confirmado conflitar com fatos detectados, o prompt prefere o valor confirmado e pode incluir uma nota curta de conflito. Se o contexto estiver ausente ou ambíguo, o prompt gerado orienta o agente receptor a perguntar ou rotular explicitamente suposições em vez de inventar stack, arquitetura, comandos, decisões de persistência, decisões de workflow ou direção do projeto.
 
-Prompt generation reads only the classified discovery result and renders bounded summaries. It does not dump raw file contents, execute commands, run tests or builds, call provider APIs, execute agents, perform RAG, build embeddings or vector databases, index the repository, perform remote discovery, or automate source control.
+A geração de prompt lê apenas o resultado de descoberta classificado e renderiza resumos delimitados. Não despeja conteúdo bruto de arquivos, não executa comandos, não roda testes ou builds, não chama APIs de provedor, não executa agentes, não realiza RAG, não cria embeddings ou vector databases, não indexa o repositório, não faz descoberta remota e não automatiza controle de fonte.
 
-### Review a Change
+### Revisar uma Mudança
 
 ```bash
 go run ./cmd/specharbor review add-example-feature
 ```
 
-`review <change-id>` reviews the change package and task completion state. It exits non-zero when the review status is not approved.
+`review <change-id>` revisa o pacote de mudança e o estado de conclusão de tarefas. Ele sai com código não-zero quando o status de revisão não está aprovado.
 
-### Archive a Change
+### Arquivar uma Mudança
 
 ```bash
 go run ./cmd/specharbor archive add-example-feature
 ```
 
-`archive <change-id>` moves a completed change from `openspec/changes/<change-id>/` to a dated archive path under `openspec/archive/<date>/<change-id>/`.
+`archive <change-id>` move uma change concluída de `openspec/changes/<change-id>/` para o caminho de archive datado em `openspec/archive/<date>/<change-id>/`.
 
-### Show Local Config
+### Mostrar configuração local
 
 ```bash
 go run ./cmd/specharbor config show
 go run ./cmd/specharbor config
 ```
 
-`config show` and `config` are read-only. They read `.specharbor/config.yml` from the current project, support config version `1`, and print the local config report.
+`config show` e `config` são somente leitura. Eles leem `.specharbor/config.yml` do projeto atual, suportam `version: 1` e imprimem o relatório de configuração local.
 
-Current config behavior does not write config files and does not implement:
+O comportamento atual de configuração não grava arquivos de config e não implementa:
 
 - `config get`
 - `config set`
 - `config unset`
 
-## Normal Flow
+## Fluxo normal
 
 ```text
 Idea -> OpenSpec change -> Tasks -> Agent prompt -> Implementation -> Review -> Archive
 ```
 
-For the detailed recommended nine-step workflow, run:
+Para executar o fluxo recomendado de nove etapas em detalhes, rode:
 
 ```bash
 go run ./cmd/specharbor workflow
 ```
 
-A typical local sequence is:
+Uma sequência local típica é:
 
 ```bash
 go run ./cmd/specharbor generate add-example-feature --blank
@@ -1140,14 +1140,14 @@ go run ./cmd/specharbor review add-example-feature
 go run ./cmd/specharbor archive add-example-feature
 ```
 
-Do not archive a change until the implementation is complete and reviewed.
+Não archive uma change até que a implementação esteja concluída e revisada.
 
-## Planned Behavior
+## Comportamento planejado
 
-The following items are product direction, not implemented command behavior:
+Os itens seguintes são direção de produto, não comportamento implementado de comando:
 
-- config-driven generic runner commands;
-- AI provider setup;
-- provider API key management;
-- config mutation commands;
-- external workflow connectors.
+- comandos de runner genéricos orientados por configuração;
+- configuração de provedor de IA;
+- gerenciamento de API key de provedor;
+- comandos de mutação de configuração;
+- conectores de fluxo de trabalho externos.
