@@ -141,7 +141,7 @@ Testing focus:
 
 Documentation impact:
 
-- Update `README.md`, `docs/usage.md`, and `docs/workflow.md` only if the implementation exposes a user-facing update command or flag.
+- Update `README.md`, `../usage.md`, and `../workflow.md` only if the implementation exposes a user-facing update command or flag.
 - Document that update behavior is confirmation-first and not indexing, RAG, remote discovery, or command verification.
 
 Main risks:
