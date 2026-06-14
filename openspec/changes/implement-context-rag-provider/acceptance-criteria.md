@@ -1,0 +1,168 @@
+# Acceptance Criteria: Implement Context RAG Provider
+
+- `specharbor context rag --query "<query>" --provider openai` is implemented.
+- The command is explicit and separate from local/offline context commands.
+- Omitting `--from` defaults to local sources only.
+- `--from local` is supported.
+- `--from github` is supported only with explicit `--repo owner/name`.
+- Repeating `--from local --from github` combines bounded local and GitHub sources.
+- `--ref` is supported only for GitHub sources.
+- Repeatable `--path` is supported only for GitHub sources.
+- `--max-sources` is supported and bounded.
+- `--max-answer-chars` is supported and bounded.
+- Missing query input is rejected.
+- Empty query input is rejected.
+- Queries longer than 512 characters are rejected.
+- Missing provider input is rejected.
+- Unsupported provider input is rejected.
+- Only `openai` is supported in this change.
+- Unsupported source values are rejected.
+- Positional arguments are rejected.
+- Duplicate scalar flags are rejected.
+- Unsupported flags are rejected.
+- `--repo`, `--ref`, and `--path` are rejected unless GitHub sources are selected.
+- Local retrieval source collection requires the existing current `.specharbor/context-index.json`.
+- Missing, invalid, stale, unreadable, or truncated local indexes fail safely.
+- Local retrieval dependency failures tell the user to run `specharbor context index --write` when appropriate.
+- RAG does not write `.specharbor/context-index.json`.
+- RAG does not write retrieval caches.
+- RAG does not write answer files.
+- RAG does not write project files.
+- GitHub remote sources are fetched only when `--from github` is explicit.
+- GitHub remote source collection remains read-only.
+- GitHub remote source collection does not persist remote context.
+- GitHub remote source collection does not mutate GitHub.
+- Provider calls happen only from `context rag`.
+- `context discover` does not call providers.
+- `context index` does not call providers.
+- `context retrieve` does not call providers.
+- `context github` does not call OpenAI providers.
+- `brief` does not call providers.
+- `prompt` does not call providers.
+- `validate` does not call providers.
+- `review` does not call providers.
+- `scan` does not call providers.
+- `SPECHARBOR_OPENAI_API_KEY` is read only for explicit `context rag --provider openai`.
+- Missing `SPECHARBOR_OPENAI_API_KEY` fails safely before provider HTTP requests.
+- The OpenAI API key is never printed.
+- The OpenAI API key is never persisted.
+- The OpenAI API key is never included in reports.
+- The OpenAI API key is never included in errors.
+- The OpenAI API key is never included in provider source context.
+- `SPECHARBOR_OPENAI_MODEL` is optional.
+- The default OpenAI model is `gpt-5.4-mini`.
+- The model name may be shown in output.
+- Provider request construction is bounded.
+- Provider request construction includes the user query.
+- Provider request construction includes source-attributed snippets or summaries.
+- Provider request construction includes path metadata.
+- Provider request construction includes source type.
+- Provider request construction includes local/remote markers.
+- Provider request construction includes line ranges when available.
+- Provider request construction includes repository/ref metadata for GitHub sources when available.
+- Provider request construction instructs the model to answer only from supplied sources.
+- Provider request construction instructs the model to say when sources are insufficient.
+- Provider request construction does not request hidden chain of thought.
+- Provider request construction excludes secrets.
+- Provider request construction excludes raw full repositories.
+- Provider request construction excludes unbounded files.
+- Provider request construction excludes generated or sensitive skipped files.
+- Provider request construction excludes raw provider responses from previous runs.
+- Max sources are enforced.
+- Max snippet chars are enforced.
+- Max total context chars are enforced.
+- Max answer chars are enforced.
+- Max provider response bytes are enforced.
+- Provider timeout is enforced.
+- Rendered output bounds are enforced.
+- Missing sources return a safe status and do not call the provider.
+- Insufficient-source behavior is surfaced safely.
+- Provider success returns a structured answer report.
+- Provider timeout returns a safe status.
+- Provider network failure returns a safe status.
+- Provider rate limit returns a safe status.
+- Provider auth failure returns a safe status.
+- Provider oversized response returns a safe status.
+- Provider malformed response returns a safe status.
+- Provider output is treated as generated answer text.
+- Provider output is not treated as user-confirmed context.
+- Provider output is not written to `.specharbor/project-brief.md`.
+- Provider output is not injected into role prompts by default.
+- Provider output is not persisted.
+- CLI output includes answer text when available.
+- CLI output includes provider name.
+- CLI output includes model name.
+- CLI output includes status.
+- CLI output includes source count.
+- CLI output includes source list.
+- CLI output includes path and source category or evidence.
+- CLI output includes local/remote marker.
+- CLI output includes line range when available.
+- CLI output includes source truncation markers when applicable.
+- CLI output includes answer truncation marker when applicable.
+- CLI output does not include raw provider request dumps.
+- CLI output does not include unsafe raw provider response dumps.
+- CLI output does not include tokens or credentials.
+- Domain code owns RAG query, source, limit, request, response, status, and report models.
+- Core/usecase orchestrates source collection, bounded context construction, provider calls, and report assembly.
+- Provider-specific authentication, payloads, HTTP status mapping, timeouts, retries if any, and response parsing stay in adapters.
+- CLI parses flags and formats reports only.
+- Core does not import adapters.
+- Use cases depend on interfaces.
+- Core does not import `net/http`.
+- Core does not import provider SDKs.
+- Core does not import `os/exec`.
+- The OpenAI adapter lives outside core.
+- The OpenAI adapter uses no heavy provider SDK dependency.
+- The OpenAI adapter uses bounded HTTP requests.
+- The OpenAI adapter does not use OpenAI hosted tools.
+- The OpenAI adapter does not upload files.
+- The OpenAI adapter does not create vector stores.
+- The OpenAI adapter does not create conversations.
+- Embeddings are not introduced.
+- Vector databases are not introduced.
+- Embedding storage is not introduced.
+- Persistent RAG indexes are not introduced.
+- Provider reranking is not introduced.
+- Local model APIs are not introduced.
+- Shell execution is not introduced.
+- Agent execution is not introduced.
+- Prompt execution is not introduced.
+- Source-control automation is not introduced.
+- GitHub mutation is not introduced.
+- Automatic commits are not introduced.
+- Automatic pushes are not introduced.
+- Pull request creation is not introduced.
+- Merge automation is not introduced.
+- Release automation is not introduced.
+- npm files are not changed.
+- Homebrew files are not changed.
+- `install.sh` is not changed.
+- GoReleaser files are not changed.
+- Publishing flows are not changed.
+- Tests use fake providers or fake transports and do not require real OpenAI network.
+- Tests do not require real provider tokens.
+- Tests cover command parsing.
+- Tests cover missing provider.
+- Tests cover unsupported provider.
+- Tests cover missing API key.
+- Tests cover token redaction.
+- Tests cover local retrieval source selection.
+- Tests cover GitHub source selection.
+- Tests cover bounded prompt/context construction.
+- Tests cover insufficient sources.
+- Tests cover provider success with fake adapter.
+- Tests cover provider timeout, network failure, rate limit, auth failure, oversized response, and malformed response.
+- Tests cover answer output with source attribution.
+- Tests prove no provider call from local/offline commands.
+- Tests prove no writes to `.specharbor/context-index.json`.
+- Tests prove no prompt injection by default.
+- Tests prove no source-control automation.
+- Tests prove no shell or exec behavior.
+- Architecture tests prove no provider imports in core.
+- Architecture tests prove no `net/http` in core.
+- Architecture tests or diff review prove no release/npm/Homebrew/install.sh/GoReleaser changes.
+- Documentation explains RAG is optional, explicit, provider-backed, bounded, source-attributed, and not confirmed context.
+- OpenSpec validation passes with zero errors.
+- `go test ./...` passes after implementation.
+- `go test -count=1 ./...` passes after implementation.

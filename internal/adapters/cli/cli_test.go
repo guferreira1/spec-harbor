@@ -2990,7 +2990,7 @@ func TestExecuteContextRejectsInvalidArguments(t *testing.T) {
 		args []string
 		want string
 	}{
-		{name: "missing subcommand", args: []string{"context"}, want: "context subcommand is required: discover, index, retrieve, or github"},
+		{name: "missing subcommand", args: []string{"context"}, want: "context subcommand is required: discover, index, retrieve, github, or rag"},
 		{name: "unsupported flag before subcommand", args: []string{"context", "--json"}, want: "unsupported flag: --json"},
 		{name: "unsupported subcommand", args: []string{"context", "update"}, want: "unsupported context subcommand: update"},
 		{name: "extra argument", args: []string{"context", "discover", "extra"}, want: "unexpected argument: extra"},

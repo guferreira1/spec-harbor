@@ -77,6 +77,10 @@ specharbor generate <change-id> ... -> specharbor validate <change-id> -> specha
   `specharbor context github --repo owner/name --query "<query>"` explicitly retrieves bounded, read-only, source-attributed context from GitHub.
   It is optional, networked only for that command, and does not change local/offline defaults.
 
+- **context RAG provider**
+  `specharbor context rag --query "<query>" --provider openai` explicitly asks a provider to answer from bounded retrieved context.
+  It is optional, requires `SPECHARBOR_OPENAI_API_KEY`, prints source attribution, and does not persist provider prompts or answers.
+
 - **validation**
   `specharbor validate <change-id>` enforces required files, readable structure, and content quality signals.
   Errors fail the command; warnings do not fail by default.
@@ -107,6 +111,7 @@ specharbor context discover
 specharbor context index --write
 specharbor context index --check
 specharbor context github --repo guferreira1/spec-harbor --query "architecture"
+SPECHARBOR_OPENAI_API_KEY=... specharbor context rag --query "architecture" --provider openai
 ```
 
 `context index` builds a deterministic metadata-only inventory for supported local context sources. Without flags it prints a concise report and writes nothing. `--write` safely persists generated local state at `.specharbor/context-index.json`, which is ignored by source control. `--check` rebuilds current metadata and reports whether the stored index is current, stale, missing, or invalid. The index stores relative paths, source categories, file types, size, hash, modified-time metadata, retrieval support flags, and classification hints. It never stores raw file contents, snippets, secrets, embeddings, vectors, command output, remote context, provider output, or confirmed project context, and it does not implement retrieval, ranking, RAG, command execution, prompt execution, agent execution, or source-control automation.
@@ -126,6 +131,14 @@ specharbor context github --repo owner/name --query "architecture"
 ```
 
 `context github` uses network access only when explicitly invoked, reads from GitHub through bounded read-only API calls, and can optionally use `SPECHARBOR_GITHUB_TOKEN` for authenticated requests. It never prints or persists the token, never writes `.specharbor/context-index.json`, never mutates GitHub, and does not implement RAG, embeddings, provider APIs, prompt execution, agent execution, or source-control automation.
+
+Explicit provider-backed context answers are available as:
+
+```bash
+SPECHARBOR_OPENAI_API_KEY=... specharbor context rag --query "architecture" --provider openai
+```
+
+`context rag` first selects bounded source-attributed context from the current local index by default. GitHub remote context is included only when `--from github --repo owner/name` is passed. The command sends bounded snippets and the query to the selected provider, prints a generated answer with source list, and never writes `.specharbor/context-index.json`, provider prompts, provider answers, embeddings, vectors, or confirmed project context. Existing local/offline commands do not read the OpenAI token and do not call providers.
 
 Interactive project briefing is available as:
 
@@ -226,8 +239,8 @@ It does not call GitHub, GitLab, CI, provider APIs, agent CLIs, source-control a
 - explicit confirmation where applicable (for example, `brief` and `brief --update`);
 - no auto-commit, auto-push, automatic PR creation, merge, or archive automation;
 - no production code is modified during generation, discovery, validation, prompting, reviewing, or indexing;
-- no provider API calls or local model calls in current workflows;
-- network access for context is explicit and limited to `specharbor context github`;
+- no provider API calls except the explicit `specharbor context rag --provider openai` command;
+- network access for context is explicit and limited to `specharbor context github` and the explicit provider call in `specharbor context rag`;
 - deterministic path and symlink safety; unsafe and generated paths are rejected;
 - no command execution from user prompts and no shell string construction in npm forwarding;
 - context is separated into user-confirmed context, detected facts, and assumptions;
@@ -270,7 +283,7 @@ GitHub Releases, npm, and the Homebrew tap are published automatically on each `
 Current release behavior is documented as implemented in this repository, including:
 
 - OpenSpec initialization and structured change workflow
-- context discovery and repository context indexing
+- context discovery, repository context indexing, local context retrieval, GitHub remote context, and explicit context RAG provider answers
 - multiple generation modes
 - validation and review
 - npm wrapper and install channels

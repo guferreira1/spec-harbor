@@ -143,7 +143,7 @@ Safety boundaries:
 - heavy/generated folders such as `.git/`, `node_modules/`, `dist/`, `build/`, `target/`, `vendor/`, `coverage/`, `.tmp/`, `.cache/`, `.next/`, `.nuxt/`, `out/`, `bin/`, and `obj/` are skipped;
 - symlinks are not traversed.
 
-`specharbor context` without `discover`, `index`, `retrieve`, or `github`, unsupported subcommands such as `context update`, positional arguments after `discover`, and flags such as `--json`, `--path`, `--deep`, `--github`, or `--rag` are rejected.
+`specharbor context` without `discover`, `index`, `retrieve`, `github`, or `rag`, unsupported subcommands such as `context update`, positional arguments after `discover`, and flags such as `--json`, `--path`, `--deep`, `--github`, or `--rag` are rejected.
 
 When `specharbor brief` runs, discovery can provide menu suggestions and detected context records only. The user must still select or enter every answer, confirmation is still required before writing, and an existing `.specharbor/project-brief.md` is still refused rather than merged, updated, overwritten, or appended.
 
@@ -287,6 +287,49 @@ Safety boundaries:
 - binary and unsupported files are skipped;
 - ranking is deterministic lexical matching with path, filename, phrase, category, and heading boosts;
 - no embeddings, vector databases, RAG answer generation, provider APIs, LLM reranking, prompt execution, agent execution, or source-control automation are introduced.
+
+### Generate Provider Context Answer
+
+```bash
+SPECHARBOR_OPENAI_API_KEY=... go run ./cmd/specharbor context rag --query "architecture" --provider openai
+SPECHARBOR_OPENAI_API_KEY=... specharbor context rag --query "architecture" --provider openai
+```
+
+`context rag` is the explicit provider-backed context answer path. It does not run from `context discover`, `context index`, `context retrieve`, `context github`, `brief`, `prompt`, `validate`, `review`, or `scan`.
+
+The first supported provider is `openai`. The command reads `SPECHARBOR_OPENAI_API_KEY` only when `context rag` is invoked. If the variable is missing or empty, SpecHarbor prints a safe `missing_credentials` report and exits nonzero. The token is never printed, persisted, included in provider context, or included in error details. `SPECHARBOR_OPENAI_MODEL` can override the default OpenAI model; when unset, SpecHarbor uses `gpt-5.4-mini`.
+
+Supported forms:
+
+```bash
+specharbor context rag --query "architecture" --provider openai
+specharbor context rag --query "architecture" --provider openai --from local
+specharbor context rag --query "architecture" --provider openai --from github --repo owner/name
+specharbor context rag --query "architecture" --provider openai --from local --from github --repo owner/name
+specharbor context rag --query "architecture" --provider openai --from github --repo owner/name --ref main --path README.md
+specharbor context rag --query "architecture" --provider openai --max-sources 4 --max-answer-chars 2000
+```
+
+Source behavior:
+
+- without `--from`, only local retrieval is used;
+- `--from local` uses deterministic local retrieval over the current `.specharbor/context-index.json`;
+- `--from github` is used only when explicitly passed and requires `--repo owner/name`;
+- `--path` and `--ref` apply only to the explicit GitHub source;
+- selected local and remote snippets are bounded, source-attributed, and passed to the provider with path, source type, remote marker, and line range when available.
+
+Output includes the generated answer, provider name, model, status, source count, source list, local/remote marker, repository/ref details for GitHub sources, line range when available, and truncation markers when applicable. Provider output is treated as generated answer text, not confirmed project context.
+
+Safety boundaries:
+
+- no provider call happens unless `context rag` is explicitly invoked;
+- no provider token is read by local/offline commands;
+- no raw provider request or raw provider response dump is printed;
+- no provider prompt, provider answer, embeddings, vectors, cache, or retrieval output is persisted;
+- `.specharbor/context-index.json` is read for local retrieval but never written or modified;
+- GitHub is read only when `--from github --repo owner/name` is explicit, and GitHub mutations are not performed;
+- no source-control automation, shell execution, prompt execution, agent execution, project command execution, release automation, npm changes, Homebrew changes, `install.sh` changes, GoReleaser changes, or publishing behavior is introduced;
+- generated answers are not automatically injected into role prompts, project briefs, specs, or source files.
 
 ### Brief a Project
 

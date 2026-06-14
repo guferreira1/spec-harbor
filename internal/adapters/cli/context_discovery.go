@@ -82,6 +82,9 @@ func contextCommand(ctx CommandContext) error {
 		}
 		return nil
 	}
+	if arguments.subcommand == "rag" {
+		return contextRagCommand(ctx, root, arguments)
+	}
 
 	fileSystem := filesystem.NewContextDiscoveryFileSystem()
 	discoverContext := usecase.NewDiscoverProjectContext(fileSystem)
@@ -95,18 +98,26 @@ func contextCommand(ctx CommandContext) error {
 }
 
 type contextArguments struct {
-	subcommand    string
-	indexMode     domain.RepositoryContextIndexMode
-	retrieveQuery string
-	githubRepo    string
-	githubRef     string
-	githubQuery   string
-	githubPaths   []string
+	subcommand        string
+	indexMode         domain.RepositoryContextIndexMode
+	retrieveQuery     string
+	githubRepo        string
+	githubRef         string
+	githubQuery       string
+	githubPaths       []string
+	ragProvider       string
+	ragQuery          string
+	ragSources        []string
+	ragRepo           string
+	ragRef            string
+	ragPaths          []string
+	ragMaxSources     int
+	ragMaxAnswerChars int
 }
 
 func parseContextArguments(args []string) (contextArguments, error) {
 	if len(args) == 0 {
-		return contextArguments{}, fmt.Errorf("context subcommand is required: discover, index, retrieve, or github")
+		return contextArguments{}, fmt.Errorf("context subcommand is required: discover, index, retrieve, github, or rag")
 	}
 	if strings.HasPrefix(args[0], "-") {
 		return contextArguments{}, fmt.Errorf("unsupported flag: %s", args[0])
@@ -128,6 +139,9 @@ func parseContextArguments(args []string) (contextArguments, error) {
 	}
 	if args[0] == "github" {
 		return parseContextGitHubArguments(args[1:])
+	}
+	if args[0] == "rag" {
+		return parseContextRagArguments(args[1:])
 	}
 	return contextArguments{}, fmt.Errorf("unsupported context subcommand: %s", args[0])
 }
