@@ -53,7 +53,7 @@ Command flow for the same sequence:
 
 
 ```text
-specharbor generate <change-id> ... -> specharbor validate <change-id> -> specharbor prompt <change-id> --role <role> -> specharbor review <change-id> -> specharbor archive <change-id>
+specharbor generate <change-id> ... -> specharbor validate <change-id> -> specharbor prompt <change-id> --role <role> [--agent <agent>] -> specharbor review <change-id> -> specharbor archive <change-id>
 ```
 
 `specharbor workflow` prints the advisory nine-step workflow used by SpecHarbor and clarifies where each role fits.
@@ -69,6 +69,9 @@ specharbor generate <change-id> ... -> specharbor validate <change-id> -> specha
 
 - **agent roles**
   Role prompts are generated for `spec-author`, `architecture-reviewer`, `implementer`, `test-engineer`, and `change-reviewer`.
+  `--role` selects the SpecHarbor workflow responsibility. Optional `--agent` selects only the external tool style, only adapts generated prompt text, and defaults to `generic`.
+  Supported prompt target agents are `generic`, `codex`, `claude-code`, `devin`, `cursor`, `copilot`, `gemini`, `roo`, `windsurf`, and `aider`.
+  The prompt command does not execute, configure, authenticate, or automate the selected tool.
 
 - **project brief**
   `specharbor brief` stores user-confirmed context in `.specharbor/project-brief.md` with explicit confirmation.
@@ -181,7 +184,7 @@ See [docs/en/install.md](docs/en/install.md) for platform support, checksum step
 - context collection and update (`brief`, `brief --update`)
 - change generation (blank, guided, templates, custom templates, config templates, hybrid, AI-assisted from-file, agent-assisted spec authoring)
 - change validation (`validate`)
-- role prompt generation (`prompt --role`)
+- role prompt generation with optional external-tool style adaptation (`prompt --role`, `prompt --role --agent`)
 - change review (`review`)
 - change archive (`archive`)
 - advisory workflow guidance (`workflow`)

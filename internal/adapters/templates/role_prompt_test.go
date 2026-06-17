@@ -21,11 +21,13 @@ func TestRolePromptTemplatesLoadAndRenderRequiredRoles(t *testing.T) {
 				t.Fatalf("TemplateForRole() returned empty template")
 			}
 
-			prompt, err := renderer.Render(templateSource, map[string]string{
-				"change_id":                "implement-prompt-command",
-				"task":                     "Follow the active OpenSpec change.",
-				"project_context":          "## Project Context\n\nContext block.",
-				"project_brief_read_first": "- `.specharbor/project-brief.md`\n",
+			prompt, err := renderer.Render(templateSource, domain.PromptRenderRequest{
+				ChangeID:              "implement-prompt-command",
+				Role:                  role,
+				TargetAgent:           domain.PromptTargetAgentGeneric,
+				Task:                  "Follow the active OpenSpec change.",
+				ProjectContext:        "## Project Context\n\nContext block.",
+				ProjectBriefReadFirst: "- `.specharbor/project-brief.md`\n",
 			})
 			if err != nil {
 				t.Fatalf("Render() error = %v", err)
@@ -42,6 +44,11 @@ func TestRolePromptTemplatesLoadAndRenderRequiredRoles(t *testing.T) {
 				"`openspec/project.md`",
 				"`openspec/specs/architecture/spec.md`",
 				"## Project Context",
+				"## Prompt Target",
+				"Workflow role: `" + string(role) + "`",
+				"Target agent: `generic`",
+				"Paste or use this prompt in the selected external tool.",
+				"SpecHarbor only generated this prompt text; it does not execute",
 			} {
 				if !strings.Contains(prompt, want) {
 					t.Fatalf("prompt = %q, want to contain %q", prompt, want)
@@ -59,6 +66,9 @@ func TestRolePromptTemplatesLoadAndRenderRequiredRoles(t *testing.T) {
 			if strings.Contains(prompt, "{{project_brief_read_first}}") {
 				t.Fatalf("prompt = %q, want no raw project_brief_read_first placeholder", prompt)
 			}
+			if strings.Contains(prompt, "{{target_agent_section}}") {
+				t.Fatalf("prompt = %q, want no raw target_agent_section placeholder", prompt)
+			}
 		})
 	}
 }
@@ -74,11 +84,13 @@ func TestRolePromptTemplatesRenderFinalDecisionLabelsForSupportedRoles(t *testin
 				t.Fatalf("TemplateForRole() error = %v", err)
 			}
 
-			prompt, err := renderer.Render(templateSource, map[string]string{
-				"change_id":                "implement-context-aware-agent-prompts",
-				"task":                     "Follow the active OpenSpec change.",
-				"project_context":          "## Project Context\n\nContext block.",
-				"project_brief_read_first": "",
+			prompt, err := renderer.Render(templateSource, domain.PromptRenderRequest{
+				ChangeID:              "implement-context-aware-agent-prompts",
+				Role:                  role,
+				TargetAgent:           domain.PromptTargetAgentGeneric,
+				Task:                  "Follow the active OpenSpec change.",
+				ProjectContext:        "## Project Context\n\nContext block.",
+				ProjectBriefReadFirst: "",
 			})
 			if err != nil {
 				t.Fatalf("Render() error = %v", err)
@@ -121,6 +133,100 @@ func TestRolePromptTemplatesDoNotDependOnProjectRoot(t *testing.T) {
 	}
 	if !strings.Contains(templateSource, "# Implementer Agent") {
 		t.Fatalf("TemplateForRole() = %q, want embedded implementer template", templateSource)
+	}
+}
+
+func TestPromptTemplateRendererIncludesTargetAgentGuidanceForSupportedAgents(t *testing.T) {
+	renderer := NewPromptTemplateRenderer()
+	templateSource := "# Implementer Agent\n\n{{target_agent_section}}Task: {{task}}\n"
+	tests := []struct {
+		agent domain.PromptTargetAgent
+		want  string
+	}{
+		{agent: domain.PromptTargetAgentGeneric, want: "neutral instructions suitable for any coding assistant"},
+		{agent: domain.PromptTargetAgentCodex, want: "Codex-style repository work"},
+		{agent: domain.PromptTargetAgentClaudeCode, want: "careful repository edits"},
+		{agent: domain.PromptTargetAgentDevin, want: "autonomous-task boundaries"},
+		{agent: domain.PromptTargetAgentCursor, want: "editor-assisted implementation"},
+		{agent: domain.PromptTargetAgentCopilot, want: "inside the coding environment"},
+		{agent: domain.PromptTargetAgentGemini, want: "repository context carefully"},
+		{agent: domain.PromptTargetAgentRoo, want: "role-based task"},
+		{agent: domain.PromptTargetAgentWindsurf, want: "IDE agent workflow"},
+		{agent: domain.PromptTargetAgentAider, want: "patch-oriented changes"},
+	}
+
+	for _, test := range tests {
+		t.Run(string(test.agent), func(t *testing.T) {
+			request := domain.PromptRenderRequest{
+				ChangeID:    "implement-agent-aware-prompts",
+				Role:        domain.PromptRoleImplementer,
+				TargetAgent: test.agent,
+				Task:        "Follow the active OpenSpec change.",
+			}
+
+			first, err := renderer.Render(templateSource, request)
+			if err != nil {
+				t.Fatalf("Render() error = %v", err)
+			}
+			second, err := renderer.Render(templateSource, request)
+			if err != nil {
+				t.Fatalf("second Render() error = %v", err)
+			}
+			if first != second {
+				t.Fatalf("Render() returned nondeterministic prompt:\nfirst: %q\nsecond: %q", first, second)
+			}
+
+			for _, want := range []string{
+				"## Prompt Target",
+				"Workflow role: `implementer`",
+				"Target agent: `" + string(test.agent) + "`",
+				"Paste or use this prompt in the selected external tool.",
+				"SpecHarbor only generated this prompt text; it does not execute",
+				test.want,
+				"Task: Follow the active OpenSpec change.",
+			} {
+				if !strings.Contains(first, want) {
+					t.Fatalf("prompt = %q, want to contain %q", first, want)
+				}
+			}
+			for _, forbidden := range []string{
+				"SpecHarbor executes",
+				"SpecHarbor runs",
+				"SpecHarbor starts",
+				"provider setup",
+				"provider API",
+				"provider SDK",
+				"SDK",
+				"API key",
+				"API keys",
+				"credential",
+				"network",
+				"source-control automation",
+				"workflow automation",
+				"git commit",
+				"git push",
+				"git merge",
+				"gh pr",
+				"auto-commit",
+				"auto-push",
+				"auto-merge",
+				"{{",
+				"}}",
+			} {
+				if strings.Contains(first, forbidden) {
+					t.Fatalf("prompt = %q, want no forbidden text %q", first, forbidden)
+				}
+			}
+			for _, forbidden := range []string{
+				"SpecHarbor executes " + domain.PromptTargetAgentDisplayName(test.agent),
+				"SpecHarbor runs " + domain.PromptTargetAgentDisplayName(test.agent),
+				"SpecHarbor starts " + domain.PromptTargetAgentDisplayName(test.agent),
+			} {
+				if strings.Contains(first, forbidden) {
+					t.Fatalf("prompt = %q, want no external tool execution claim %q", first, forbidden)
+				}
+			}
+		})
 	}
 }
 
@@ -181,20 +287,20 @@ func TestRolePromptTemplatesReturnMissingTemplateError(t *testing.T) {
 func TestPromptTemplateRendererReturnsRenderErrors(t *testing.T) {
 	renderer := NewPromptTemplateRenderer()
 
-	if _, err := renderer.Render("{{unknown}}", map[string]string{
-		"change_id":                "change",
-		"task":                     "Follow the active OpenSpec change.",
-		"project_context":          "## Project Context",
-		"project_brief_read_first": "",
+	if _, err := renderer.Render("{{unknown}}", domain.PromptRenderRequest{
+		ChangeID:    "change",
+		Role:        domain.PromptRoleImplementer,
+		TargetAgent: domain.PromptTargetAgentGeneric,
+		Task:        "Follow the active OpenSpec change.",
 	}); err == nil {
 		t.Fatalf("Render() error = nil, want unknown placeholder error")
 	}
 
-	if _, err := renderer.Render("{{change_id", map[string]string{
-		"change_id":                "change",
-		"task":                     "Follow the active OpenSpec change.",
-		"project_context":          "## Project Context",
-		"project_brief_read_first": "",
+	if _, err := renderer.Render("{{change_id", domain.PromptRenderRequest{
+		ChangeID:    "change",
+		Role:        domain.PromptRoleImplementer,
+		TargetAgent: domain.PromptTargetAgentGeneric,
+		Task:        "Follow the active OpenSpec change.",
 	}); err == nil {
 		t.Fatalf("Render() error = nil, want parse error")
 	}

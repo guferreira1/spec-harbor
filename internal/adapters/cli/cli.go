@@ -1525,6 +1525,7 @@ func yesNo(value bool) string {
 type promptArguments struct {
 	changeID string
 	role     string
+	agent    string
 }
 
 func promptCommand(ctx CommandContext) error {
@@ -1548,6 +1549,7 @@ func promptCommand(ctx CommandContext) error {
 		ProjectRoot: root,
 		ChangeID:    arguments.changeID,
 		Role:        arguments.role,
+		Agent:       arguments.agent,
 	})
 	if err != nil {
 		return err
@@ -1560,7 +1562,9 @@ func promptCommand(ctx CommandContext) error {
 func parsePromptArguments(args []string) (promptArguments, error) {
 	var positionals []string
 	var role string
+	agent := string(domain.DefaultPromptTargetAgent())
 	roleProvided := false
+	agentProvided := false
 
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
@@ -1577,6 +1581,30 @@ func parsePromptArguments(args []string) (promptArguments, error) {
 
 			role = args[index+1]
 			roleProvided = true
+			index++
+			continue
+		}
+
+		if arg == "--agent" {
+			if agentProvided {
+				return promptArguments{}, fmt.Errorf("prompt target agent flag specified more than once")
+			}
+			if index+1 >= len(args) {
+				return promptArguments{}, fmt.Errorf("prompt target agent value is required")
+			}
+			if strings.HasPrefix(args[index+1], "-") {
+				return promptArguments{}, fmt.Errorf("prompt target agent value is required")
+			}
+			if strings.TrimSpace(args[index+1]) == "" {
+				return promptArguments{}, fmt.Errorf("prompt target agent value is required")
+			}
+
+			targetAgent, err := domain.ParsePromptTargetAgent(args[index+1])
+			if err != nil {
+				return promptArguments{}, err
+			}
+			agent = string(targetAgent)
+			agentProvided = true
 			index++
 			continue
 		}
@@ -1601,6 +1629,7 @@ func parsePromptArguments(args []string) (promptArguments, error) {
 	return promptArguments{
 		changeID: positionals[0],
 		role:     role,
+		agent:    agent,
 	}, nil
 }
 
@@ -2046,7 +2075,7 @@ Commands:
   context     Discover, index, retrieve, and answer bounded project context
   brief       Collect confirmed project context
   generate    Generate a new OpenSpec change
-  prompt      Generate an agent-specific implementation prompt
+  prompt      Generate a workflow role prompt for an external tool
   validate    Validate an OpenSpec change
   review      Review implementation against a spec
   archive     Archive a completed OpenSpec change

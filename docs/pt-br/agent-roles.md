@@ -6,6 +6,7 @@ Gere o prompt de papel na raiz do repositório:
 
 ```bash
 go run ./cmd/specharbor prompt implement-config-foundation --role implementer
+go run ./cmd/specharbor prompt implement-config-foundation --role implementer --agent claude-code
 ```
 
 Papéis suportados:
@@ -17,6 +18,16 @@ Papéis suportados:
 - `change-reviewer`
 
 Esses cinco IDs também aparecem como etapas de `agent-assisted` no `specharbor workflow`.
+
+Papel e agente alvo de prompt são conceitos separados:
+
+- `--role` controla a responsabilidade no processo SpecHarbor/OpenSpec.
+- `--agent` controla o estilo da ferramenta externa alvo para o texto do prompt gerado.
+- `--agent` usa `generic` por padrão.
+- `--agent` não executa a ferramenta e não a configura ou autentica.
+- O SpecHarbor imprime texto para o usuário colar ou usar na ferramenta externa selecionada.
+
+Os agentes alvo de prompt suportados são `generic`, `codex`, `claude-code`, `devin`, `cursor`, `copilot`, `gemini`, `roo`, `windsurf` e `aider`.
 
 Os prompts de papel podem incluir uma seção `## Project Context` quando houver contexto local confirmado ou descoberto. A seção separa contexto confirmado pelo usuário, fatos detectados e suposições sugeridas. O contexto confirmado em `.specharbor/project-brief.md` tem precedência sobre fatos detectados; suposições continuam suposições e não viram fatos. A seção é limitada, inclui evidências de fonte/confiança e não executa comandos, não roda agentes, não chama APIs de provedor, não faz RAG, não gera índice do repositório e não usa descoberta remota.
 
@@ -58,4 +69,4 @@ Spec Author -> Implementer -> Change Reviewer
 
 Regras globais e por papel estão em `.specharbor/rules/`. A documentação deve linkar para essas regras em vez de copiar todas as instruções nesta página.
 
-Workflows com `agent-assisted` não exigem chaves de API de provedor. O SpecHarbor apenas gera prompts para serem colados em uma ferramenta de agente externa.
+Workflows com `agent-assisted` não exigem chaves de API de provedor. O SpecHarbor apenas gera prompts para serem colados em uma ferramenta de agente externa; o alvo do prompt só adapta texto e não executa a ferramenta externa.

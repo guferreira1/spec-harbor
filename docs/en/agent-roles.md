@@ -6,6 +6,7 @@ Generate a role prompt from the repository root:
 
 ```bash
 go run ./cmd/specharbor prompt implement-config-foundation --role implementer
+go run ./cmd/specharbor prompt implement-config-foundation --role implementer --agent claude-code
 ```
 
 Supported role names:
@@ -17,6 +18,16 @@ Supported role names:
 - `change-reviewer`
 
 These five ids are also the agent-assisted step ids shown by `specharbor workflow`.
+
+Role and prompt target agent are separate concepts:
+
+- `--role` controls the workflow responsibility in the SpecHarbor/OpenSpec process.
+- `--agent` controls the target external tool style for the generated prompt text.
+- `--agent` defaults to `generic`.
+- `--agent` does not execute the tool and does not configure or authenticate it.
+- SpecHarbor prints text for the user to paste or use in the selected external tool.
+
+Supported prompt target agents are `generic`, `codex`, `claude-code`, `devin`, `cursor`, `copilot`, `gemini`, `roo`, `windsurf`, and `aider`.
 
 Generated role prompts may include a `## Project Context` section when confirmed or discovered local context is available. The section separates user-confirmed context, detected facts, and suggested assumptions. Confirmed context from `.specharbor/project-brief.md` takes precedence over detected facts; assumptions are labeled as assumptions and are not facts. The context section is bounded, includes source/confidence evidence for detected facts and assumptions, and does not execute commands, run agents, call provider APIs, perform RAG, index the repository, or use remote discovery.
 
@@ -58,4 +69,4 @@ Spec Author -> Implementer -> Change Reviewer
 
 Detailed global and role-specific rules live in `.specharbor/rules/`. The docs should link to those rules instead of copying every instruction into this page.
 
-Agent-assisted workflows do not require provider API keys. SpecHarbor generates prompts that can be pasted into an external coding-agent tool.
+Agent-assisted workflows do not require provider API keys. SpecHarbor generates prompts that can be pasted into an external coding-agent tool; the prompt target only adapts text and does not execute the external tool.

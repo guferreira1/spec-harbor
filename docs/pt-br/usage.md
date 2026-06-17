@@ -460,7 +460,7 @@ A saída completa inclui cada `step id`, nome de exibição, propósito, modo, i
 
 - `generate` cria ou inicia um pacote de mudança OpenSpec.
 - `validate` valida os arquivos OpenSpec obrigatórios e a qualidade do conteúdo.
-- `prompt --role ...` imprime prompts para `spec-author`, `architecture-reviewer`, `implementer`, `test-engineer` e `change-reviewer`.
+- `prompt --role ... [--agent ...]` imprime prompts para `spec-author`, `architecture-reviewer`, `implementer`, `test-engineer` e `change-reviewer`. `--agent` apenas adapta o texto gerado para uma ferramenta externa alvo e usa `generic` por padrão.
 - `review` valida o pacote de mudança local e a conclusão das tasks por checkbox.
 - `archive` move explicitamente uma mudança aceita para o `archive`.
 
@@ -1063,9 +1063,18 @@ Alterações de comportamento intencionais em relação à validação anterior 
 
 ```bash
 go run ./cmd/specharbor prompt add-example-feature --role implementer
+go run ./cmd/specharbor prompt add-example-feature --role implementer --agent codex
 ```
 
-`prompt <change-id> --role <role>` imprime um prompt de agente para uma mudança OpenSpec existente. Para os papéis suportados, a geração do prompt é ciente de contexto: ela pode incluir uma seção dedicada `## Project Context` após as orientações iniciais de leitura e antes da tarefa.
+`prompt <change-id> --role <role> [--agent <agent>]` imprime um prompt de agente para uma mudança OpenSpec existente. Para os papéis suportados, a geração do prompt é ciente de contexto: ela pode incluir uma seção dedicada `## Project Context` após as orientações iniciais de leitura e antes da tarefa.
+
+`--role` e `--agent` significam coisas diferentes:
+
+- `--role` seleciona a responsabilidade no workflow SpecHarbor/OpenSpec.
+- `--agent` seleciona o estilo da ferramenta externa alvo para o texto do prompt gerado.
+- `--agent` não executa a ferramenta alvo.
+- `--agent` apenas adapta o texto do prompt gerado para que o usuário cole ou use na ferramenta externa selecionada.
+- Quando `--agent` é omitido, o agente alvo padrão do prompt é `generic`.
 
 Papéis suportados:
 
@@ -1075,7 +1084,20 @@ Papéis suportados:
 - `test-engineer`
 - `change-reviewer`
 
-Use `--role` para papéis de prompt. Flags de `agent-target` não são implementadas.
+Agentes alvo de prompt suportados:
+
+- `generic`
+- `codex`
+- `claude-code`
+- `devin`
+- `cursor`
+- `copilot`
+- `gemini`
+- `roo`
+- `windsurf`
+- `aider`
+
+Agentes alvo desconhecidos, `--agent` sem valor, `--agent` duplicado, flags não suportadas e argumentos posicionais extras falham antes da renderização.
 
 O contexto do projeto pode incluir:
 

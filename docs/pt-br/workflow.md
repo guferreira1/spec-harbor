@@ -73,8 +73,10 @@ O fluxo de trabalho se relaciona com comandos existentes da seguinte forma:
   contexto local está ausente ou ambíguo.
 - `generate` cria ou inicia o pacote de mudança OpenSpec para o Spec Author Agent.
 - `validate` verifica arquivos OpenSpec obrigatórios antes de revisão ou implementação.
-- `prompt --role ...` imprime prompts para `spec-author`, `architecture-reviewer`,
-  `implementer`, `test-engineer` e `change-reviewer`.
+- `prompt --role ... [--agent ...]` imprime prompts para `spec-author`, `architecture-reviewer`,
+  `implementer`, `test-engineer` e `change-reviewer`. `--role` controla a
+  responsabilidade no workflow; `--agent` apenas adapta o texto do prompt para
+  uma ferramenta externa alvo e usa `generic` por padrão.
 - `review` verifica lista de tarefas e arquivos da mudança.
 - `archive` arquiva uma mudança aceita.
 
@@ -182,12 +184,16 @@ estrutura. Não prova que o design está correto.
 
 ```bash
 go run ./cmd/specharbor prompt add-example-feature --role implementer
+go run ./cmd/specharbor prompt add-example-feature --role implementer --agent codex
 ```
 
 Os prompts de papel orientam o agente para regras do repositório, arquitetura,
 mudança ativa e contexto classificado disponível. A seção de contexto mantém
 contexto confirmado, fatos detectados e suposições separadas; suposições continuam
-suposições.
+suposições. Os agentes alvo de prompt suportados são `generic`, `codex`,
+`claude-code`, `devin`, `cursor`, `copilot`, `gemini`, `roo`, `windsurf` e
+`aider`; o alvo muda apenas a redação do prompt gerado e não executa a ferramenta
+selecionada.
 
 Workflows de agent-assisted não exigem chaves de API de provedor, pois o SpecHarbor
 apenas gera prompts para agentes externos consumirem, sem executar comandos ou

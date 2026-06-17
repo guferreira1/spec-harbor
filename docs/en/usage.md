@@ -460,7 +460,7 @@ The full output includes each step id, display name, purpose, mode, supported/ad
 
 - `generate` creates or starts an OpenSpec change package.
 - `validate` checks required OpenSpec change files and their content quality.
-- `prompt --role ...` prints prompts for Spec Author Agent, Architecture Reviewer Agent, Implementer Agent, Test Engineer Agent, and Change Reviewer Agent.
+- `prompt --role ... [--agent ...]` prints prompts for Spec Author Agent, Architecture Reviewer Agent, Implementer Agent, Test Engineer Agent, and Change Reviewer Agent. `--agent` only adapts generated prompt text for a target external tool and defaults to `generic`.
 - `review` checks the local change package and task checkbox completion.
 - `archive` explicitly moves an accepted change to the archive.
 
@@ -1063,9 +1063,18 @@ Intentional behavior changes from the earlier presence-only validation:
 
 ```bash
 go run ./cmd/specharbor prompt add-example-feature --role implementer
+go run ./cmd/specharbor prompt add-example-feature --role implementer --agent codex
 ```
 
-`prompt <change-id> --role <role>` prints an agent prompt for an existing OpenSpec change. For supported roles, prompt generation is context-aware: it may include a dedicated `## Project Context` section after the read-first guidance and before the task.
+`prompt <change-id> --role <role> [--agent <agent>]` prints an agent prompt for an existing OpenSpec change. For supported roles, prompt generation is context-aware: it may include a dedicated `## Project Context` section after the read-first guidance and before the task.
+
+`--role` and `--agent` mean different things:
+
+- `--role` selects the SpecHarbor/OpenSpec workflow responsibility.
+- `--agent` selects the target external tool style for the generated prompt text.
+- `--agent` does not execute the target tool.
+- `--agent` only adapts the generated prompt text so the user can paste or use it in the selected external tool.
+- When `--agent` is omitted, the default prompt target agent is `generic`.
 
 Supported roles:
 
@@ -1075,7 +1084,20 @@ Supported roles:
 - `test-engineer`
 - `change-reviewer`
 
-Use `--role` for prompt roles. Agent-target flags are not implemented.
+Supported prompt target agents:
+
+- `generic`
+- `codex`
+- `claude-code`
+- `devin`
+- `cursor`
+- `copilot`
+- `gemini`
+- `roo`
+- `windsurf`
+- `aider`
+
+Unknown prompt target agents, `--agent` without a value, duplicate `--agent`, unsupported flags, and extra positional arguments fail before rendering.
 
 Project Context can include:
 
