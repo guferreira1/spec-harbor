@@ -15,6 +15,7 @@ type RenderPromptInput struct {
 	ProjectRoot string
 	ChangeID    string
 	Role        string
+	Agent       string
 }
 
 type RenderPromptResult struct {
@@ -76,6 +77,16 @@ func (useCase *RenderPrompt) Execute(input RenderPromptInput) (RenderPromptResul
 		return RenderPromptResult{}, fmt.Errorf("unsupported prompt role: %s", roleValue)
 	}
 
+	targetAgent := domain.DefaultPromptTargetAgent()
+	agentValue := strings.TrimSpace(input.Agent)
+	if agentValue != "" {
+		var err error
+		targetAgent, err = domain.ParsePromptTargetAgent(agentValue)
+		if err != nil {
+			return RenderPromptResult{}, err
+		}
+	}
+
 	templateSource, err := useCase.templates.TemplateForRole(projectRoot, role)
 	if err != nil {
 		return RenderPromptResult{}, fmt.Errorf("load prompt template for role %s: %w", role, err)
@@ -86,11 +97,14 @@ func (useCase *RenderPrompt) Execute(input RenderPromptInput) (RenderPromptResul
 		return RenderPromptResult{}, err
 	}
 
-	prompt, err := useCase.renderer.Render(templateSource, map[string]string{
-		"change_id":                changeID,
-		"task":                     DefaultPromptTask,
-		"project_context":          projectContext,
-		"project_brief_read_first": projectBriefReadFirst,
+	prompt, err := useCase.renderer.Render(templateSource, domain.PromptRenderRequest{
+		ProjectRoot:           projectRoot,
+		ChangeID:              changeID,
+		Role:                  role,
+		TargetAgent:           targetAgent,
+		Task:                  DefaultPromptTask,
+		ProjectContext:        projectContext,
+		ProjectBriefReadFirst: projectBriefReadFirst,
 	})
 	if err != nil {
 		return RenderPromptResult{}, fmt.Errorf("render prompt template for role %s: %w", role, err)

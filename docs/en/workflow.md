@@ -63,7 +63,7 @@ The workflow relates to existing commands as follows:
 - `brief` optionally collects confirmed project context before authoring when repository context is missing or ambiguous.
 - `generate` creates or starts the OpenSpec change package for the Spec Author Agent.
 - `validate` checks required OpenSpec change files before review or implementation.
-- `prompt --role ...` prints prompts for Spec Author Agent, Architecture Reviewer Agent, Implementer Agent, Test Engineer Agent, and Change Reviewer Agent.
+- `prompt --role ... [--agent ...]` prints prompts for Spec Author Agent, Architecture Reviewer Agent, Implementer Agent, Test Engineer Agent, and Change Reviewer Agent. `--role` controls workflow responsibility; `--agent` only adapts the prompt text for a target external tool and defaults to `generic`.
 - `review` checks local task checkbox completion and required change files.
 - `archive` explicitly archives an accepted change.
 
@@ -126,9 +126,10 @@ Validation checks that the required OpenSpec files exist. It does not prove the 
 
 ```bash
 go run ./cmd/specharbor prompt add-example-feature --role implementer
+go run ./cmd/specharbor prompt add-example-feature --role implementer --agent codex
 ```
 
-Role prompts point an agent at the repository rules, architecture spec, active change, and any available classified Project Context. The context section keeps user-confirmed context, detected facts, and suggested assumptions separate; assumptions remain assumptions. Agent-assisted workflows do not require provider API keys because SpecHarbor prints prompts for external coding agents to consume, without executing commands or agents.
+Role prompts point an agent at the repository rules, architecture spec, active change, and any available classified Project Context. The context section keeps user-confirmed context, detected facts, and suggested assumptions separate; assumptions remain assumptions. Agent-assisted workflows do not require provider API keys because SpecHarbor prints prompts for external coding agents to consume, without executing commands or agents. Supported prompt target agents are `generic`, `codex`, `claude-code`, `devin`, `cursor`, `copilot`, `gemini`, `roo`, `windsurf`, and `aider`; the target changes only the generated prompt wording and does not execute the selected tool.
 
 ## Implement and Review
 

@@ -1824,6 +1824,16 @@ func TestExecutePromptPrintsRenderedPromptOnly(t *testing.T) {
 	if !strings.Contains(promptOutput, "openspec/changes/implement-prompt-command/") {
 		t.Fatalf("prompt output = %q, want rendered change id", promptOutput)
 	}
+	for _, want := range []string{
+		"Workflow role: `implementer`",
+		"Target agent: `generic`",
+		"Paste or use this prompt in the selected external tool.",
+		"SpecHarbor only generated this prompt text; it does not execute",
+	} {
+		if !strings.Contains(promptOutput, want) {
+			t.Fatalf("prompt output = %q, want to contain %q", promptOutput, want)
+		}
+	}
 	if strings.Contains(promptOutput, "{{change_id}}") {
 		t.Fatalf("prompt output = %q, want no raw change_id placeholder", promptOutput)
 	}
@@ -1835,6 +1845,90 @@ func TestExecutePromptPrintsRenderedPromptOnly(t *testing.T) {
 	}
 	if strings.Contains(promptOutput, "not implemented") {
 		t.Fatalf("prompt output = %q, want rendered prompt instead of placeholder", promptOutput)
+	}
+	if strings.Contains(promptOutput, "SpecHarbor executes") {
+		t.Fatalf("prompt output = %q, must not claim SpecHarbor executes agents", promptOutput)
+	}
+}
+
+func TestExecutePromptAcceptsSupportedTargetAgents(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	tests := []struct {
+		agent string
+		want  string
+	}{
+		{agent: "generic", want: "neutral instructions suitable for any coding assistant"},
+		{agent: "codex", want: "Codex-style repository work"},
+		{agent: "claude-code", want: "careful repository edits"},
+		{agent: "devin", want: "autonomous-task boundaries"},
+		{agent: "cursor", want: "editor-assisted implementation"},
+		{agent: "copilot", want: "inside the coding environment"},
+		{agent: "gemini", want: "repository context carefully"},
+		{agent: "roo", want: "role-based task"},
+		{agent: "windsurf", want: "IDE agent workflow"},
+		{agent: "aider", want: "patch-oriented changes"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.agent, func(t *testing.T) {
+			var output bytes.Buffer
+			err := execute([]string{"prompt", "implement-prompt-command", "--role", "implementer", "--agent", test.agent}, &output)
+			if err != nil {
+				t.Fatalf("execute(prompt --agent %s) error = %v", test.agent, err)
+			}
+
+			promptOutput := output.String()
+			for _, want := range []string{
+				"Workflow role: `implementer`",
+				"Target agent: `" + test.agent + "`",
+				"Paste or use this prompt in the selected external tool.",
+				"SpecHarbor only generated this prompt text; it does not execute",
+				test.want,
+			} {
+				if !strings.Contains(promptOutput, want) {
+					t.Fatalf("prompt output = %q, want to contain %q", promptOutput, want)
+				}
+			}
+			for _, forbidden := range []string{
+				"SpecHarbor executes",
+				"provider setup",
+				"API key",
+				"git push",
+				"auto-commit",
+				"auto-push",
+				"auto-merge",
+			} {
+				if strings.Contains(promptOutput, forbidden) {
+					t.Fatalf("prompt output = %q, want no forbidden text %q", promptOutput, forbidden)
+				}
+			}
+		})
+	}
+}
+
+func TestExecutePromptDoesNotWriteFiles(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+
+	var output bytes.Buffer
+	if err := execute([]string{"prompt", "implement-prompt-command", "--role", "implementer", "--agent", "codex"}, &output); err != nil {
+		t.Fatalf("execute(prompt) error = %v", err)
+	}
+	if output.String() == "" {
+		t.Fatalf("execute(prompt) output is empty, want rendered prompt")
+	}
+
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatalf("ReadDir(%q) error = %v", root, err)
+	}
+	if len(entries) != 0 {
+		names := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			names = append(names, entry.Name())
+		}
+		t.Fatalf("prompt command wrote files or directories: %v", names)
 	}
 }
 
@@ -1938,6 +2032,36 @@ func TestExecutePromptRejectsInvalidArguments(t *testing.T) {
 			name: "unsupported role",
 			args: []string{"prompt", "implement-prompt-command", "--role", "unknown"},
 			want: "unsupported prompt role: unknown",
+		},
+		{
+			name: "unknown agent",
+			args: []string{"prompt", "implement-prompt-command", "--role", "implementer", "--agent", "unknown"},
+			want: "unsupported prompt target agent: unknown (supported: generic, codex, claude-code, devin, cursor, copilot, gemini, roo, windsurf, aider)",
+		},
+		{
+			name: "claude runner alias is not a prompt target",
+			args: []string{"prompt", "implement-prompt-command", "--role", "implementer", "--agent", "claude"},
+			want: "unsupported prompt target agent: claude (supported: generic, codex, claude-code, devin, cursor, copilot, gemini, roo, windsurf, aider)",
+		},
+		{
+			name: "missing agent value",
+			args: []string{"prompt", "implement-prompt-command", "--role", "implementer", "--agent"},
+			want: "prompt target agent value is required",
+		},
+		{
+			name: "empty agent value",
+			args: []string{"prompt", "implement-prompt-command", "--role", "implementer", "--agent", ""},
+			want: "prompt target agent value is required",
+		},
+		{
+			name: "missing agent value before flag",
+			args: []string{"prompt", "implement-prompt-command", "--role", "implementer", "--agent", "--role"},
+			want: "prompt target agent value is required",
+		},
+		{
+			name: "duplicate agent",
+			args: []string{"prompt", "implement-prompt-command", "--role", "implementer", "--agent", "generic", "--agent", "codex"},
+			want: "prompt target agent flag specified more than once",
 		},
 		{
 			name: "unsupported flag",

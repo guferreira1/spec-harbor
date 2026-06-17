@@ -12,9 +12,9 @@ func TestRenderPromptRendersSupportedRoles(t *testing.T) {
 	for _, role := range domain.SupportedPromptRoles() {
 		t.Run(string(role), func(t *testing.T) {
 			templates := &fakePromptTemplates{
-				template: "# Prompt\nchange={{change_id}}\ntask={{task}}\n",
+				template: "# Prompt\nchange={{change_id}}\ntask={{task}}\nrole={{role}}\nagent={{target_agent}}\n",
 			}
-			renderer := fakePromptRenderer{}
+			renderer := &fakePromptRenderer{}
 			useCase := NewRenderPrompt(templates, renderer)
 
 			result, err := useCase.Execute(RenderPromptInput{
@@ -32,17 +32,71 @@ func TestRenderPromptRendersSupportedRoles(t *testing.T) {
 			if templates.role != role {
 				t.Fatalf("role = %q, want %q", templates.role, role)
 			}
+			if len(renderer.requests) != 1 {
+				t.Fatalf("renderer requests = %d, want 1", len(renderer.requests))
+			}
+			if renderer.requests[0].Role != role {
+				t.Fatalf("render request role = %q, want %q", renderer.requests[0].Role, role)
+			}
+			if renderer.requests[0].TargetAgent != domain.PromptTargetAgentGeneric {
+				t.Fatalf("render request target agent = %q, want generic", renderer.requests[0].TargetAgent)
+			}
 			if !strings.Contains(result.Prompt, "change=implement-prompt-command") {
 				t.Fatalf("prompt = %q, want rendered change id", result.Prompt)
 			}
 			if !strings.Contains(result.Prompt, "task="+DefaultPromptTask) {
 				t.Fatalf("prompt = %q, want rendered default task", result.Prompt)
 			}
+			if !strings.Contains(result.Prompt, "role="+string(role)) {
+				t.Fatalf("prompt = %q, want rendered role", result.Prompt)
+			}
+			if !strings.Contains(result.Prompt, "agent=generic") {
+				t.Fatalf("prompt = %q, want rendered default agent", result.Prompt)
+			}
 			if strings.Contains(result.Prompt, "{{change_id}}") {
 				t.Fatalf("prompt = %q, want no raw change_id placeholder", result.Prompt)
 			}
 			if strings.Contains(result.Prompt, "{{task}}") {
 				t.Fatalf("prompt = %q, want no raw task placeholder", result.Prompt)
+			}
+		})
+	}
+}
+
+func TestRenderPromptPassesExplicitSupportedAgentsToRenderer(t *testing.T) {
+	for _, agent := range domain.SupportedPromptTargetAgents() {
+		t.Run(string(agent.ID), func(t *testing.T) {
+			templates := &fakePromptTemplates{
+				template: "# Prompt\nrole={{role}}\nagent={{target_agent}}\n",
+			}
+			renderer := &fakePromptRenderer{}
+			useCase := NewRenderPrompt(templates, renderer)
+
+			result, err := useCase.Execute(RenderPromptInput{
+				ProjectRoot: "/project",
+				ChangeID:    "implement-agent-aware-prompts",
+				Role:        "implementer",
+				Agent:       string(agent.ID),
+			})
+			if err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+
+			if len(renderer.requests) != 1 {
+				t.Fatalf("renderer requests = %d, want 1", len(renderer.requests))
+			}
+			request := renderer.requests[0]
+			if request.Role != domain.PromptRoleImplementer {
+				t.Fatalf("render request role = %q, want implementer", request.Role)
+			}
+			if request.TargetAgent != agent.ID {
+				t.Fatalf("render request target agent = %q, want %q", request.TargetAgent, agent.ID)
+			}
+			if !strings.Contains(result.Prompt, "role=implementer") {
+				t.Fatalf("prompt = %q, want rendered role", result.Prompt)
+			}
+			if !strings.Contains(result.Prompt, "agent="+string(agent.ID)) {
+				t.Fatalf("prompt = %q, want rendered target agent %q", result.Prompt, agent.ID)
 			}
 		})
 	}
@@ -62,7 +116,7 @@ func TestRenderPromptIncludesProjectContextForSupportedRoles(t *testing.T) {
 					}),
 				}, nil),
 			}
-			useCase := NewRenderPromptWithContext(templates, fakePromptRenderer{}, contextProvider)
+			useCase := NewRenderPromptWithContext(templates, &fakePromptRenderer{}, contextProvider)
 
 			result, err := useCase.Execute(RenderPromptInput{
 				ProjectRoot: "/project",
@@ -99,7 +153,7 @@ func TestRenderPromptIncludesProjectBriefReadFirstWhenBriefExists(t *testing.T) 
 	contextProvider := &fakePromptContextProvider{
 		briefExists: true,
 	}
-	useCase := NewRenderPromptWithContext(templates, fakePromptRenderer{}, contextProvider)
+	useCase := NewRenderPromptWithContext(templates, &fakePromptRenderer{}, contextProvider)
 
 	result, err := useCase.Execute(RenderPromptInput{
 		ProjectRoot: "/project",
@@ -135,7 +189,7 @@ func TestRenderPromptIncludesConfirmedContextAndConflictNotes(t *testing.T) {
 			}),
 		}, nil),
 	}
-	useCase := NewRenderPromptWithContext(templates, fakePromptRenderer{}, contextProvider)
+	useCase := NewRenderPromptWithContext(templates, &fakePromptRenderer{}, contextProvider)
 
 	result, err := useCase.Execute(RenderPromptInput{
 		ProjectRoot: "/project",
@@ -163,7 +217,7 @@ func TestRenderPromptWithoutContextProviderStillRendersMissingContextInstruction
 	templates := &fakePromptTemplates{
 		template: "{{project_context}}\n",
 	}
-	useCase := NewRenderPrompt(templates, fakePromptRenderer{})
+	useCase := NewRenderPrompt(templates, &fakePromptRenderer{})
 
 	result, err := useCase.Execute(RenderPromptInput{
 		ProjectRoot: "/project",
@@ -183,7 +237,7 @@ func TestRenderPromptPreservesTemplateFinalDecisionLabels(t *testing.T) {
 	templates := &fakePromptTemplates{
 		template: "{{project_context}}\n\nFinal decision must be exactly one of:\nIMPLEMENTATION_COMPLETE\nBLOCKED\n",
 	}
-	useCase := NewRenderPrompt(templates, fakePromptRenderer{})
+	useCase := NewRenderPrompt(templates, &fakePromptRenderer{})
 
 	result, err := useCase.Execute(RenderPromptInput{
 		ProjectRoot: "/project",
@@ -206,7 +260,7 @@ func TestRenderPromptPreservesTemplateFinalDecisionLabels(t *testing.T) {
 }
 
 func TestRenderPromptReturnsContextProviderErrors(t *testing.T) {
-	useCase := NewRenderPromptWithContext(&fakePromptTemplates{}, fakePromptRenderer{}, &fakePromptContextProvider{
+	useCase := NewRenderPromptWithContext(&fakePromptTemplates{}, &fakePromptRenderer{}, &fakePromptContextProvider{
 		discoverErr: fmt.Errorf("discovery failed"),
 	})
 
@@ -246,11 +300,16 @@ func TestRenderPromptRejectsInvalidInput(t *testing.T) {
 			input: RenderPromptInput{ProjectRoot: "/project", ChangeID: "change", Role: "unknown"},
 			want:  "unsupported prompt role: unknown",
 		},
+		{
+			name:  "unsupported agent",
+			input: RenderPromptInput{ProjectRoot: "/project", ChangeID: "change", Role: "implementer", Agent: "unknown"},
+			want:  "unsupported prompt target agent: unknown",
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			useCase := NewRenderPrompt(&fakePromptTemplates{}, fakePromptRenderer{})
+			useCase := NewRenderPrompt(&fakePromptTemplates{}, &fakePromptRenderer{})
 
 			_, err := useCase.Execute(test.input)
 			if err == nil {
@@ -278,11 +337,22 @@ func (templates *fakePromptTemplates) TemplateForRole(projectRoot string, role d
 	return templates.template, nil
 }
 
-type fakePromptRenderer struct{}
+type fakePromptRenderer struct {
+	requests []domain.PromptRenderRequest
+}
 
-func (renderer fakePromptRenderer) Render(templateSource string, data map[string]string) (string, error) {
+func (renderer *fakePromptRenderer) Render(templateSource string, request domain.PromptRenderRequest) (string, error) {
+	renderer.requests = append(renderer.requests, request)
 	output := templateSource
-	for key, value := range data {
+	for key, value := range map[string]string{
+		"change_id":                request.ChangeID,
+		"task":                     request.Task,
+		"project_context":          request.ProjectContext,
+		"project_brief_read_first": request.ProjectBriefReadFirst,
+		"role":                     string(request.Role),
+		"target_agent":             string(request.TargetAgent),
+		"target_agent_section":     "target agent section",
+	} {
 		output = strings.ReplaceAll(output, fmt.Sprintf("{{%s}}", key), value)
 	}
 	return output, nil

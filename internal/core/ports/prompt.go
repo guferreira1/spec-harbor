@@ -7,7 +7,7 @@ type PromptTemplateRepository interface {
 }
 
 type TemplateRenderer interface {
-	Render(templateSource string, data map[string]string) (string, error)
+	Render(templateSource string, request domain.PromptRenderRequest) (string, error)
 }
 
 type PromptContextProvider interface {
