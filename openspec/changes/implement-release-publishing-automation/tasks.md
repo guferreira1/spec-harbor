@@ -52,6 +52,10 @@
       `checksums.txt` with `GITHUB_TOKEN`, render the formula, check out
       `guferreira1/homebrew-tap` with `HOMEBREW_TAP_GITHUB_TOKEN`, and commit
       and push `Formula/specharbor.rb` only when it changed.
+- [x] Add a Homebrew asset availability gate in `homebrew-publish` after
+      downloading `checksums.txt` and before checking out the tap: require
+      checksum entries for both macOS archives and download each archive with
+      `gh release download` before rendering the formula.
 - [x] Ensure no job publishes on pull requests or branches and that publishing
       runs only after validation and tests pass.
 
