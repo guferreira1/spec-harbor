@@ -1,6 +1,6 @@
 {
   "name": "specharbor",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "SpecHarbor CLI. Installs the official specharbor binary from GitHub Releases with mandatory SHA-256 checksum verification.",
   "license": "MIT",
   "homepage": "https://github.com/guferreira1/spec-harbor#readme",
