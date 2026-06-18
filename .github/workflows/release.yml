@@ -112,6 +112,31 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release download "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --pattern checksums.txt --dir release-assets
 
+      - name: Validate Homebrew release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          mkdir -p release-assets/homebrew
+          while IFS= read -r asset; do
+            [ -n "${asset}" ] || continue
+            if ! awk -v name="${asset}" '$2 == name { found = 1 } END { if (!found) exit 1 }' release-assets/checksums.txt; then
+              echo "checksums.txt is missing required Homebrew asset: ${asset}" >&2
+              exit 1
+            fi
+            if ! gh release download "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --pattern "${asset}" --dir release-assets/homebrew; then
+              echo "GitHub Release asset is not downloadable: ${asset}" >&2
+              exit 1
+            fi
+            if [ ! -s "release-assets/homebrew/${asset}" ]; then
+              echo "GitHub Release asset download is empty: ${asset}" >&2
+              exit 1
+            fi
+          done <<'EOF'
+          specharbor_Darwin_arm64.tar.gz
+          specharbor_Darwin_x86_64.tar.gz
+          EOF
+
       - name: Checkout Homebrew tap
         uses: actions/checkout@v4
         with:
