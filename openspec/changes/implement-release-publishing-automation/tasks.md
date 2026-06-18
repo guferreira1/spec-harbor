@@ -102,11 +102,11 @@
 
 ## 7. Verification
 
-- [ ] Run `gofmt` on changed Go files and `go test ./...` /
+- [x] Run `gofmt` on changed Go files and `go test ./...` /
       `go test -count=1 ./...`.
-- [ ] Run `go run ./cmd/specharbor validate
+- [x] Run `go run ./cmd/specharbor validate
       implement-release-publishing-automation`.
 - [ ] Run `goreleaser check` and `goreleaser release --snapshot --clean`, then
       remove the generated `dist/` so nothing is staged.
-- [ ] Run `npm test` and `npm pack --dry-run` from `packages/npm/specharbor`.
-- [ ] Confirm no real publish, tag push, or tap write occurred.
+- [x] Run `npm test` and `npm pack --dry-run` from `packages/npm/specharbor`.
+- [x] Confirm no real publish, tag push, or tap write occurred.
